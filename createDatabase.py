@@ -5,14 +5,21 @@ conn_str = "postgresql://postgres:FPrWvNwkoqBIigGDjuBeJmMaJXCrjlgv@switchback.pr
 
 # Define your SQL commands
 sql_commands = """
+-- Drop existing tables (if they exist) to ensure schema updates
+DROP TABLE IF EXISTS relationships;
+DROP TABLE IF EXISTS users;
+
 -- Create the expanded users table
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE,
     first_name VARCHAR(50) NOT NULL,
     last_name VARCHAR(50) NOT NULL,
+    email VARCHAR(100) UNIQUE,
+    phone_number VARCHAR(20),
     birthday DATE,
     location VARCHAR(100),
+    high_school VARCHAR(100),
     university VARCHAR(100),
     field_of_interest VARCHAR(100),
     current_company VARCHAR(100),
@@ -20,7 +27,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- Create the relationships table
-CREATE TABLE IF NOT EXISTS relationships (
+CREATE TABLE relationships (
     id SERIAL PRIMARY KEY,
     user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     contact_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -42,7 +49,7 @@ try:
             cursor.execute(command)
     
     conn.commit()
-    print("Tables created successfully.")
+    print("Tables dropped and recreated successfully with updated schema.")
 
     cursor.close()
     conn.close()
