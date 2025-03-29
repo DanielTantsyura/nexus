@@ -1,7 +1,5 @@
 import psycopg2
-
-# Your Railway connection string
-conn_str = "postgresql://postgres:FPrWvNwkoqBIigGDjuBeJmMaJXCrjlgv@switchback.proxy.rlwy.net:50887/railway"
+from config import DATABASE_URL
 
 # Sample data as a list of dictionaries
 sample_data = [
@@ -62,32 +60,39 @@ sample_data = [
     }
 ]
 
-# SQL INSERT command template - adjusted to match our table schema
-insert_sql = """
-INSERT INTO users (
-    username, first_name, last_name, email, phone_number,
-    location, university, field_of_interest, high_school
-)
-VALUES (
-    %(username)s, %(first_name)s, %(last_name)s, %(email)s, %(phone_number)s,
-    %(location)s, %(university)s, %(field_of_interest)s, %(high_school)s
-);
-"""
+def insert_sample_users():
+    """Insert sample users into the database."""
+    # SQL INSERT command template - adjusted to match our table schema
+    insert_sql = """
+    INSERT INTO users (
+        username, first_name, last_name, email, phone_number,
+        location, university, field_of_interest, high_school
+    )
+    VALUES (
+        %(username)s, %(first_name)s, %(last_name)s, %(email)s, %(phone_number)s,
+        %(location)s, %(university)s, %(field_of_interest)s, %(high_school)s
+    );
+    """
 
-try:
-    # Connect to the Railway Postgres instance
-    conn = psycopg2.connect(conn_str)
-    cursor = conn.cursor()
+    try:
+        # Connect to the Railway Postgres instance
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
 
-    # Insert each sample record
-    for person in sample_data:
-        cursor.execute(insert_sql, person)
+        # Insert each sample record
+        for person in sample_data:
+            cursor.execute(insert_sql, person)
 
-    # Commit the transaction
-    conn.commit()
-    print("Sample user data inserted successfully.")
+        # Commit the transaction
+        conn.commit()
+        print("Sample user data inserted successfully.")
 
-    cursor.close()
-    conn.close()
-except Exception as e:
-    print("An error occurred:", e)
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print("An error occurred:", e)
+        return False
+
+if __name__ == "__main__":
+    insert_sample_users()

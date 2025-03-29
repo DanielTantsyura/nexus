@@ -1,7 +1,5 @@
 import psycopg2
-
-# Replace with your Railway connection string
-conn_str = "postgresql://postgres:FPrWvNwkoqBIigGDjuBeJmMaJXCrjlgv@switchback.proxy.rlwy.net:50887/railway"
+from config import DATABASE_URL
 
 # Define your SQL commands
 sql_commands = """
@@ -37,21 +35,28 @@ CREATE TABLE relationships (
 );
 """
 
-try:
-    # Connect to your Railway Postgres instance
-    conn = psycopg2.connect(conn_str)
-    cursor = conn.cursor()
+def create_database():
+    """Creates the database schema for the Nexus application."""
+    try:
+        # Connect to your Railway Postgres instance
+        conn = psycopg2.connect(DATABASE_URL)
+        cursor = conn.cursor()
 
-    # Execute SQL commands; note that execute() might not handle multiple statements in one call
-    # So we split on semicolons and run each one separately
-    for command in sql_commands.strip().split(';'):
-        if command.strip():
-            cursor.execute(command)
-    
-    conn.commit()
-    print("Tables dropped and recreated successfully with updated schema.")
+        # Execute SQL commands; note that execute() might not handle multiple statements in one call
+        # So we split on semicolons and run each one separately
+        for command in sql_commands.strip().split(';'):
+            if command.strip():
+                cursor.execute(command)
+        
+        conn.commit()
+        print("Tables dropped and recreated successfully with updated schema.")
 
-    cursor.close()
-    conn.close()
-except Exception as e:
-    print("An error occurred:", e)
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as e:
+        print("An error occurred:", e)
+        return False
+
+if __name__ == "__main__":
+    create_database()

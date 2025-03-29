@@ -1,39 +1,62 @@
-# Nexus iOS App
+# Nexus iOS Client
 
-A Swift/SwiftUI iOS application that connects to the Nexus database through a REST API.
+The iOS client for the Nexus networking application.
 
 ## Project Structure
 
-The project contains only essential files:
+- **Models/**: Data models used throughout the app
+  - `User.swift`: Model for user data
+  - `Connection.swift`: Model for user connections
 
-- **NexusApp.swift** - Entry point for the SwiftUI application
-- **ContentView.swift** - Main UI components and user interface
-- **NetworkManager.swift** - Data models and API communication
-- **Info.plist** - App configuration and security settings
-- **Assets.xcassets/** - Required for app icons
+- **App/**: Application core
+  - `AppCoordinator.swift`: Central coordinator for app state and navigation
+  - `NexusApp.swift`: SwiftUI application entry point
 
-## How to Set Up
+- **Views/**: User interface components
+  - `ContentView.swift`: Main user interface
 
-1. Open Xcode
-2. Select "Open a project or file"
-3. Navigate to the NexusApp folder and select it
+- **NetworkManager.swift**: Handles API communication
 
-## Backend Connection
+## Project Setup
 
-This app connects to a Python Flask API that interfaces with the PostgreSQL database. The API needs to be running at `http://localhost:5000` for the app to function.
+1. **Prerequisites**:
+   - Xcode 13.0 or later
+   - macOS Monterey or later
+   - Running Nexus API (on port 8080)
 
-## How to Run
+2. **Opening the Project**:
+   - Open `nexus.xcodeproj` in Xcode
+   - Wait for Xcode to index the project
 
-1. Start the backend API:
-   ```
-   python api.py
-   ```
+3. **Running the App**:
+   - Select a simulator or connected device
+   - Press the Play button (⌘+R)
 
-2. Run the app in Xcode using the play button
+## Testing on a Physical Device
 
-## Features
+When testing on a physical device, you'll need to update the device IP address in `NetworkManager.swift`:
 
-- View all users in the Nexus database
-- Search for users by name, location, or other attributes
-- View detailed user profiles including contact information
-- See user connections and relationship descriptions
+```swift
+#if targetEnvironment(simulator)
+private let baseURL = "http://127.0.0.1:8080"  // For simulator
+#else
+private let baseURL = "http://YOUR.IP.ADDRESS:8080"  // For physical device
+#endif
+```
+
+Replace `YOUR.IP.ADDRESS` with your Mac's IP address.
+
+## Troubleshooting
+
+If you encounter connection issues:
+
+1. Make sure the API is running on port 8080
+2. Check that App Transport Security settings allow unencrypted HTTP connections
+3. If running on a physical device, ensure it's on the same network as your Mac
+4. Use the verbose logging in the app to diagnose connection issues
+
+## Common Issues
+
+- **"Cannot connect to API"**: Check that API is running and accessible
+- **"No data found"**: Verify the database has been set up with sample data
+- **"JSON parsing error"**: The API response format may have changed, check model compatibility 

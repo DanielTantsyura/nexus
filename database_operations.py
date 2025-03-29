@@ -1,18 +1,14 @@
 import psycopg2
 from psycopg2.extras import RealDictCursor
-import os
 from typing import List, Dict, Optional, Any, Tuple
-
-# Database connection string
-# In production, use environment variables for credentials
-conn_str = "postgresql://postgres:FPrWvNwkoqBIigGDjuBeJmMaJXCrjlgv@switchback.proxy.rlwy.net:50887/railway"
+from config import DATABASE_URL
 
 class DatabaseManager:
     """
     A class to manage database operations for the Nexus application.
     """
     
-    def __init__(self, connection_string: str = conn_str):
+    def __init__(self, connection_string: str = DATABASE_URL):
         """
         Initialize the DatabaseManager with a connection string.
         

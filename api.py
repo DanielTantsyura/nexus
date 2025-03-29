@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request
 from database_operations import DatabaseManager
 from flask_cors import CORS
+from config import API_HOST, API_PORT, API_DEBUG
 
 app = Flask(__name__)
 CORS(app)  # Enable cross-origin requests
@@ -10,6 +11,7 @@ db = DatabaseManager()
 
 @app.route('/users', methods=['GET'])
 def get_users():
+    """Get all users from the database."""
     db.connect()
     try:
         users = db.get_all_users()
@@ -19,7 +21,15 @@ def get_users():
 
 @app.route('/users', methods=['POST'])
 def add_user():
+    """Add a new user to the database."""
     user_data = request.json
+    
+    # Validate required fields
+    required_fields = ['first_name', 'last_name']
+    for field in required_fields:
+        if field not in user_data or not user_data[field]:
+            return jsonify({"error": f"Missing required field: {field}"}), 400
+    
     db.connect()
     try:
         user_id = db.add_user(user_data)
@@ -31,7 +41,12 @@ def add_user():
 
 @app.route('/users/<int:user_id>', methods=['PUT'])
 def update_user(user_id):
+    """Update an existing user in the database."""
     user_data = request.json
+    
+    if not user_data:
+        return jsonify({"error": "No data provided"}), 400
+        
     db.connect()
     try:
         success = db.update_user(user_id, user_data)
@@ -43,6 +58,7 @@ def update_user(user_id):
 
 @app.route('/users/search', methods=['GET'])
 def search_users():
+    """Search for users by name, location, or other attributes."""
     search_term = request.args.get('term', '')
     db.connect()
     try:
@@ -53,6 +69,7 @@ def search_users():
 
 @app.route('/users/<username>', methods=['GET'])
 def get_user(username):
+    """Get a specific user by username."""
     db.connect()
     try:
         user = db.get_user_by_username(username)
@@ -64,6 +81,7 @@ def get_user(username):
 
 @app.route('/users/<int:user_id>/connections', methods=['GET'])
 def get_connections(user_id):
+    """Get all connections for a specific user."""
     db.connect()
     try:
         connections = db.get_user_connections(user_id)
@@ -73,6 +91,7 @@ def get_connections(user_id):
 
 @app.route('/connections', methods=['POST'])
 def add_connection():
+    """Add a new connection between users."""
     data = request.json
     user_id = data.get('user_id')
     contact_id = data.get('contact_id')
@@ -92,6 +111,7 @@ def add_connection():
 
 @app.route('/connections', methods=['DELETE'])
 def remove_connection():
+    """Remove a connection between users."""
     data = request.json
     user_id = data.get('user_id')
     contact_id = data.get('contact_id')
@@ -109,4 +129,4 @@ def remove_connection():
         db.disconnect()
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080, debug=True) 
+    app.run(host=API_HOST, port=API_PORT, debug=API_DEBUG) 
