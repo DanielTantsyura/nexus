@@ -12,7 +12,12 @@ sample_data = [
         "location": "Westchester, New York",
         "university": "CMU",
         "field_of_interest": "Business, Investing, Networking, Long Term Success",
-        "high_school": "Riverdale"
+        "high_school": "Riverdale",
+        "gender": "Male",
+        "ethnicity": "White",
+        "uni_major": "Computer Science",
+        "job_title": "Product Manager",
+        "current_company": "Nexus Inc."
     },
     {
         "username": "sorendupont",
@@ -23,7 +28,12 @@ sample_data = [
         "location": "Brooklyn, New York",
         "university": "CMU",
         "field_of_interest": "Libertarian Economics, Math Competitions and Research, Coding",
-        "high_school": None
+        "high_school": None,
+        "gender": "Male",
+        "ethnicity": "White",
+        "uni_major": "Mathematics",
+        "job_title": "Researcher",
+        "current_company": "Tech Innovations"
     },
     {
         "username": None,
@@ -34,7 +44,12 @@ sample_data = [
         "location": "North New Jersey",
         "university": "CMU",
         "field_of_interest": "Communication, Business",
-        "high_school": None
+        "high_school": None,
+        "gender": "Male",
+        "ethnicity": "White",
+        "uni_major": "Business Administration",
+        "job_title": "Business Development",
+        "current_company": "Eagle Corp"
     },
     {
         "username": "stanosipenko",
@@ -45,7 +60,12 @@ sample_data = [
         "location": "London",
         "university": "CMU",
         "field_of_interest": "Self Improvement, Coding Competitions, Physicality",
-        "high_school": None
+        "high_school": None,
+        "gender": "Male",
+        "ethnicity": "White",
+        "uni_major": "Computer Science",
+        "job_title": "Software Engineer",
+        "current_company": "London Tech"
     },
     {
         "username": "corwincheung",
@@ -56,7 +76,12 @@ sample_data = [
         "location": "NYC, New York",
         "university": "Harvard",
         "field_of_interest": "Entrepreneurship, Self Development, Physicality, Reading",
-        "high_school": "Riverdale"
+        "high_school": "Riverdale",
+        "gender": "Male",
+        "ethnicity": "Asian",
+        "uni_major": "Economics",
+        "job_title": "Entrepreneur",
+        "current_company": "Self-employed"
     }
 ]
 
@@ -66,11 +91,13 @@ def insert_sample_users():
     insert_sql = """
     INSERT INTO users (
         username, first_name, last_name, email, phone_number,
-        location, university, field_of_interest, high_school
+        location, university, field_of_interest, high_school,
+        gender, ethnicity, uni_major, job_title, current_company
     )
     VALUES (
         %(username)s, %(first_name)s, %(last_name)s, %(email)s, %(phone_number)s,
-        %(location)s, %(university)s, %(field_of_interest)s, %(high_school)s
+        %(location)s, %(university)s, %(field_of_interest)s, %(high_school)s,
+        %(gender)s, %(ethnicity)s, %(uni_major)s, %(job_title)s, %(current_company)s
     );
     """
 

@@ -14,6 +14,10 @@ struct User: Identifiable, Codable, Hashable {
     var birthday: String?
     var createdAt: String?
     var currentCompany: String?
+    var gender: String?
+    var ethnicity: String?
+    var uniMajor: String?
+    var jobTitle: String?
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -29,6 +33,10 @@ struct User: Identifiable, Codable, Hashable {
         case birthday
         case createdAt = "created_at"
         case currentCompany = "current_company"
+        case gender
+        case ethnicity
+        case uniMajor = "uni_major"
+        case jobTitle = "job_title"
     }
     
     var fullName: String {

@@ -128,5 +128,44 @@ def remove_connection():
     finally:
         db.disconnect()
 
+@app.route('/login', methods=['POST'])
+def create_login():
+    """Create login credentials for a user."""
+    data = request.json
+    user_id = data.get('user_id')
+    username = data.get('username')
+    passkey = data.get('passkey')
+    
+    if not all([user_id, username, passkey]):
+        return jsonify({"error": "Missing required fields"}), 400
+    
+    db.connect()
+    try:
+        success = db.add_user_login(user_id, username, passkey)
+        if success:
+            return jsonify({"success": True}), 201
+        return jsonify({"error": "Failed to create login"}), 400
+    finally:
+        db.disconnect()
+
+@app.route('/login/validate', methods=['POST'])
+def validate_login():
+    """Validate user login credentials."""
+    data = request.json
+    username = data.get('username')
+    passkey = data.get('passkey')
+    
+    if not all([username, passkey]):
+        return jsonify({"error": "Missing username or passkey"}), 400
+    
+    db.connect()
+    try:
+        user_id = db.validate_login(username, passkey)
+        if user_id:
+            return jsonify({"user_id": user_id})
+        return jsonify({"error": "Invalid login credentials"}), 401
+    finally:
+        db.disconnect()
+
 if __name__ == '__main__':
     app.run(host=API_HOST, port=API_PORT, debug=API_DEBUG) 

@@ -133,7 +133,8 @@ class DatabaseManager:
         SELECT 
             u.id, u.username, u.first_name, u.last_name,
             u.email, u.phone_number, u.location, u.university,
-            u.field_of_interest, u.high_school,
+            u.field_of_interest, u.high_school, u.gender, u.ethnicity,
+            u.uni_major, u.job_title, u.current_company,
             r.relationship_description
         FROM relationships r
         JOIN users u ON r.contact_id = u.id
@@ -162,10 +163,12 @@ class DatabaseManager:
         query = """
         INSERT INTO users (
             username, first_name, last_name, email, phone_number,
-            location, university, field_of_interest, high_school
+            location, university, field_of_interest, high_school,
+            gender, ethnicity, uni_major, job_title, current_company
         ) VALUES (
             %(username)s, %(first_name)s, %(last_name)s, %(email)s, %(phone_number)s,
-            %(location)s, %(university)s, %(field_of_interest)s, %(high_school)s
+            %(location)s, %(university)s, %(field_of_interest)s, %(high_school)s,
+            %(gender)s, %(ethnicity)s, %(uni_major)s, %(job_title)s, %(current_company)s
         ) RETURNING id;
         """
         
@@ -180,7 +183,7 @@ class DatabaseManager:
     
     def add_connection(self, user_id: int, contact_id: int, description: str) -> bool:
         """
-        Add a new connection between two users.
+        Add a new connection between two users in both directions.
         
         Args:
             user_id: ID of the first user
@@ -196,7 +199,12 @@ class DatabaseManager:
         """
         
         try:
+            # First direction: user_id -> contact_id
             self.cursor.execute(query, (user_id, contact_id, description))
+            
+            # Second direction: contact_id -> user_id (create the reciprocal connection)
+            self.cursor.execute(query, (contact_id, user_id, description))
+            
             self.connection.commit()
             return True
         except Exception as e:
@@ -206,7 +214,7 @@ class DatabaseManager:
     
     def remove_connection(self, user_id: int, contact_id: int) -> bool:
         """
-        Remove a connection between two users.
+        Remove a connection between two users in both directions.
         
         Args:
             user_id: ID of the first user
@@ -217,11 +225,12 @@ class DatabaseManager:
         """
         query = """
         DELETE FROM relationships
-        WHERE user_id = %s AND contact_id = %s;
+        WHERE (user_id = %s AND contact_id = %s) OR (user_id = %s AND contact_id = %s);
         """
         
         try:
-            self.cursor.execute(query, (user_id, contact_id))
+            # Remove connections in both directions
+            self.cursor.execute(query, (user_id, contact_id, contact_id, user_id))
             self.connection.commit()
             return True
         except Exception as e:
@@ -263,6 +272,57 @@ class DatabaseManager:
             self.connection.rollback()
             print(f"Error updating user: {e}")
             return False
+
+    def add_user_login(self, user_id: int, username: str, passkey: str) -> bool:
+        """
+        Add login credentials for a user.
+        
+        Args:
+            user_id: ID of the user
+            username: Login username
+            passkey: Password/key for authentication
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        query = """
+        INSERT INTO logins (user_id, username, passkey)
+        VALUES (%s, %s, %s)
+        """
+        
+        try:
+            self.cursor.execute(query, (user_id, username, passkey))
+            self.connection.commit()
+            return True
+        except Exception as e:
+            self.connection.rollback()
+            print(f"Error adding user login: {e}")
+            return False
+    
+    def validate_login(self, username: str, passkey: str) -> Optional[int]:
+        """
+        Validate user login credentials.
+        
+        Args:
+            username: Login username
+            passkey: Password/key for authentication
+            
+        Returns:
+            User ID if login successful, None otherwise
+        """
+        query = """
+        SELECT user_id
+        FROM logins
+        WHERE username = %s AND passkey = %s
+        """
+        
+        try:
+            self.cursor.execute(query, (username, passkey))
+            result = self.cursor.fetchone()
+            return result['user_id'] if result else None
+        except Exception as e:
+            print(f"Error validating login: {e}")
+            return None
 
 
 # Example usage

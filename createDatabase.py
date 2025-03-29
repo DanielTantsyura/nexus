@@ -5,6 +5,7 @@ from config import DATABASE_URL
 sql_commands = """
 -- Drop existing tables (if they exist) to ensure schema updates
 DROP TABLE IF EXISTS relationships;
+DROP TABLE IF EXISTS logins;
 DROP TABLE IF EXISTS users;
 
 -- Create the expanded users table
@@ -21,6 +22,19 @@ CREATE TABLE users (
     university VARCHAR(100),
     field_of_interest VARCHAR(100),
     current_company VARCHAR(100),
+    gender VARCHAR(50),
+    ethnicity VARCHAR(100),
+    uni_major VARCHAR(100),
+    job_title VARCHAR(100),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Create the login table
+CREATE TABLE logins (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    passkey VARCHAR(100) NOT NULL,
     created_at TIMESTAMP DEFAULT NOW()
 );
 

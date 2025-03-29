@@ -12,6 +12,10 @@ struct Connection: Identifiable, Codable, Hashable {
     var fieldOfInterest: String?
     var highSchool: String?
     var relationshipDescription: String?
+    var gender: String?
+    var ethnicity: String?
+    var uniMajor: String?
+    var jobTitle: String?
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -25,6 +29,10 @@ struct Connection: Identifiable, Codable, Hashable {
         case fieldOfInterest = "field_of_interest"
         case highSchool = "high_school"
         case relationshipDescription = "relationship_description"
+        case gender
+        case ethnicity
+        case uniMajor = "uni_major"
+        case jobTitle = "job_title"
     }
     
     var fullName: String {

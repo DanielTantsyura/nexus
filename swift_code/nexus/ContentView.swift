@@ -7,23 +7,17 @@ struct ContentView: View {
     
     var body: some View {
         NavigationStack(path: $coordinator.navigationPath) {
-            VStack {
+            VStack(spacing: 0) {
+                // Header
+                headerView
+                
                 // Search bar
                 searchBarView
                 
                 // Content based on state
                 contentView
             }
-            .navigationTitle("Nexus Network")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        coordinator.refreshData()
-                    }) {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                }
-            }
+            .navigationBarHidden(true)
             .navigationDestination(for: User.self) { user in
                 UserDetailView(user: user)
             }
@@ -35,26 +29,72 @@ struct ContentView: View {
     
     // MARK: - Subviews
     
+    private var headerView: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Text("Nexus Network")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                
+                Spacer()
+                
+                Button(action: {
+                    coordinator.refreshData()
+                }) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.title3)
+                        .foregroundColor(.blue)
+                }
+            }
+            
+            Text("Connect with people in your network")
+                .font(.subheadline)
+                .foregroundColor(.gray)
+        }
+        .padding(.horizontal)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+    }
+    
     private var searchBarView: some View {
         HStack {
-            TextField("Search users...", text: $searchText)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .padding(.horizontal)
-                .onSubmit {
-                    performSearch()
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(.gray)
+                
+                TextField("Search users...", text: $searchText)
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
+                
+                if !searchText.isEmpty {
+                    Button(action: {
+                        searchText = ""
+                        coordinator.refreshData()
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.gray)
+                    }
                 }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(Color.gray.opacity(0.1))
+            .cornerRadius(10)
             
             Button(action: {
                 performSearch()
             }) {
-                Image(systemName: "magnifyingglass")
+                Text("Search")
+                    .fontWeight(.medium)
                     .foregroundColor(.white)
-                    .padding(8)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
                     .background(Color.blue)
-                    .cornerRadius(8)
+                    .cornerRadius(10)
             }
-            .padding(.trailing)
         }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
     }
     
     @ViewBuilder
@@ -72,16 +112,26 @@ struct ContentView: View {
     
     private var loadingView: some View {
         VStack {
+            Spacer()
             ProgressView()
+                .scaleEffect(1.5)
                 .padding()
             Text("Loading users...")
                 .foregroundColor(.gray)
+            Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     private func errorView(_ message: String) -> some View {
-        VStack {
+        VStack(spacing: 16) {
+            Spacer()
+            
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 50))
+                .foregroundColor(.red)
+                .padding()
+            
             Text("Error")
                 .font(.headline)
                 .foregroundColor(.red)
@@ -94,19 +144,20 @@ struct ContentView: View {
             Button("Retry") {
                 coordinator.refreshData()
             }
-            .padding()
-            .background(Color.blue)
-            .foregroundColor(.white)
-            .cornerRadius(8)
+            .buttonStyle(PrimaryButtonStyle())
+            
+            Spacer()
         }
         .padding()
     }
     
     private var emptyStateView: some View {
-        VStack {
+        VStack(spacing: 20) {
+            Spacer()
+            
             Image(systemName: "person.3")
-                .font(.system(size: 50))
-                .foregroundColor(.gray)
+                .font(.system(size: 60))
+                .foregroundColor(.gray.opacity(0.7))
                 .padding()
             
             Text("No users found")
@@ -116,27 +167,41 @@ struct ContentView: View {
             if !searchText.isEmpty {
                 Text("Try a different search term")
                     .foregroundColor(.gray)
-                    .padding(.top, 8)
+            } else {
+                Text("Refresh to find people")
+                    .foregroundColor(.gray)
             }
             
             Button("Refresh") {
                 coordinator.refreshData()
             }
-            .padding()
-            .background(Color.blue)
-            .foregroundColor(.white)
-            .cornerRadius(8)
-            .padding(.top, 16)
+            .buttonStyle(PrimaryButtonStyle())
+            
+            Spacer()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
     }
     
     private var userListView: some View {
-        List(coordinator.networkManager.users) { user in
-            UserListRow(user: user)
-                .onTapGesture {
-                    coordinator.showUserDetail(user: user)
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(coordinator.networkManager.users) { user in
+                    VStack(spacing: 0) {
+                        UserListRow(user: user)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                coordinator.showUserDetail(user: user)
+                            }
+                            .padding(.horizontal)
+                        
+                        if user.id != coordinator.networkManager.users.last?.id {
+                            Divider()
+                                .padding(.leading)
+                        }
+                    }
                 }
+            }
+            .padding(.vertical, 8)
         }
         .refreshable {
             coordinator.refreshData()
@@ -159,14 +224,54 @@ struct UserListRow: View {
     let user: User
     
     var body: some View {
-        VStack(alignment: .leading) {
-            Text(user.fullName)
-                .font(.headline)
-            Text(user.university ?? "No university")
-                .font(.subheadline)
+        HStack(spacing: 12) {
+            // Avatar
+            Circle()
+                .fill(Color.blue.opacity(0.2))
+                .frame(width: 50, height: 50)
+                .overlay(
+                    Text(String(user.fullName.prefix(1)))
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(.blue)
+                )
+            
+            // User info
+            VStack(alignment: .leading, spacing: 4) {
+                Text(user.fullName)
+                    .font(.headline)
+                
+                HStack(spacing: 8) {
+                    if let university = user.university {
+                        Label(university, systemImage: "building.columns")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    
+                    if let location = user.location {
+                        Label(location, systemImage: "location")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                }
+                
+                if let jobTitle = user.jobTitle, let company = user.currentCompany {
+                    Text("\(jobTitle) at \(company)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else if let jobTitle = user.jobTitle {
+                    Text(jobTitle)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(.caption)
                 .foregroundColor(.gray)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
     }
 }
 
@@ -184,15 +289,22 @@ struct UserDetailView: View {
                 // User info section
                 userInfoSection
                 
-                // Contact info section
-                contactInfoSection
-                
                 // Connections section
                 connectionsSection
             }
             .padding()
         }
-        .navigationTitle("Profile")
+        .navigationTitle(user.fullName)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    showingAddConnectionSheet = true
+                }) {
+                    Image(systemName: "plus")
+                }
+            }
+        }
         .onAppear {
             coordinator.activeScreen = .userDetail
             loadConnections(forceReload: true)
@@ -216,43 +328,148 @@ struct UserDetailView: View {
     // MARK: - Subviews
     
     private var userInfoSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(user.fullName)
-                .font(.largeTitle)
-                .fontWeight(.bold)
+        VStack(alignment: .leading, spacing: 16) {
+            // Header with name and basic info
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(user.fullName)
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                    
+                    if let jobTitle = user.jobTitle, let company = user.currentCompany {
+                        Text("\(jobTitle) at \(company)")
+                            .font(.headline)
+                            .foregroundColor(.blue)
+                    } else if let jobTitle = user.jobTitle {
+                        Text(jobTitle)
+                            .font(.headline)
+                            .foregroundColor(.blue)
+                    } else if let company = user.currentCompany {
+                        Text("Works at \(company)")
+                            .font(.headline)
+                            .foregroundColor(.blue)
+                    }
+                    
+                    if let location = user.location {
+                        Label(location, systemImage: "location.fill")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                    }
+                }
+                Spacer()
+                Circle()
+                    .fill(Color.blue.opacity(0.2))
+                    .frame(width: 80, height: 80)
+                    .overlay(
+                        Text(String(user.fullName.prefix(1)))
+                            .font(.system(size: 36, weight: .bold))
+                            .foregroundColor(.blue)
+                    )
+            }
+            .padding(.bottom, 8)
             
-            Text(user.university ?? "No university")
-                .font(.title3)
-                .foregroundColor(.gray)
+            Divider()
             
-            Text(user.location ?? "No location")
-                .font(.subheadline)
+            // Personal details
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Personal Details")
+                    .font(.headline)
+                    .padding(.vertical, 4)
+                
+                Group {
+                    if let gender = user.gender {
+                        infoRow(icon: "person.fill", title: "Gender", value: gender)
+                    }
+                    
+                    if let ethnicity = user.ethnicity {
+                        infoRow(icon: "globe", title: "Ethnicity", value: ethnicity)
+                    }
+                    
+                    if let email = user.email {
+                        infoRow(icon: "envelope.fill", title: "Email", value: email)
+                    }
+                    
+                    if let phone = user.phoneNumber {
+                        infoRow(icon: "phone.fill", title: "Phone", value: phone)
+                    }
+                }
+            }
+            
+            Divider()
+            
+            // Education
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Education")
+                    .font(.headline)
+                    .padding(.vertical, 4)
+                
+                Group {
+                    if let university = user.university {
+                        infoRow(icon: "building.columns.fill", title: "University", value: university)
+                    }
+                    
+                    if let major = user.uniMajor {
+                        infoRow(icon: "book.fill", title: "Major", value: major)
+                    }
+                    
+                    if let highSchool = user.highSchool {
+                        infoRow(icon: "building.2.fill", title: "High School", value: highSchool)
+                    }
+                }
+            }
+            
+            Divider()
+            
+            // Interests
+            if let interests = user.fieldOfInterest {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Interests")
+                        .font(.headline)
+                        .padding(.vertical, 4)
+                    
+                    Text(interests)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    
+                    // Interest tags
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack {
+                            ForEach(interests.components(separatedBy: ", "), id: \.self) { interest in
+                                Text(interest)
+                                    .font(.caption)
+                                    .padding(6)
+                                    .background(Color.blue.opacity(0.1))
+                                    .foregroundColor(.blue)
+                                    .cornerRadius(8)
+                            }
+                        }
+                    }
+                }
+            }
         }
         .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.gray.opacity(0.1))
         .cornerRadius(12)
     }
     
-    private var contactInfoSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Contact Information")
-                .font(.headline)
+    private func infoRow(icon: String, title: String, value: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .foregroundColor(.blue)
+                .frame(width: 24)
             
-            HStack {
-                Image(systemName: "envelope")
-                Text(user.email ?? "No email")
-            }
-            
-            HStack {
-                Image(systemName: "phone")
-                Text(user.phoneNumber ?? "No phone number")
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                Text(value)
+                    .foregroundColor(.primary)
             }
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.gray.opacity(0.1))
-        .cornerRadius(12)
+    }
+    
+    private var contactInfoSection: some View {
+        EmptyView()
     }
     
     private var connectionsSection: some View {
@@ -291,7 +508,6 @@ struct UserDetailView: View {
             }
         }
         .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.gray.opacity(0.1))
         .cornerRadius(12)
     }
@@ -306,41 +522,69 @@ struct UserDetailView: View {
                 Spacer()
             }
         } else if localConnections.isEmpty {
-            Text("No connections found")
-                .foregroundColor(.gray)
-                .padding(.vertical, 8)
-                .onTapGesture {
-                    loadConnections(forceReload: true)
-                }
+            VStack(spacing: 12) {
+                Image(systemName: "person.3.sequence.fill")
+                    .font(.system(size: 40))
+                    .foregroundColor(.gray.opacity(0.5))
+                    .padding(.top, 8)
+                
+                Text("No connections found")
+                    .foregroundColor(.gray)
+                    .padding(.vertical, 8)
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+            .onTapGesture {
+                loadConnections(forceReload: true)
+            }
         } else {
             connectionsList
         }
     }
     
     private var connectionsList: some View {
-        ForEach(localConnections) { connection in
-            HStack {
-                Text(connection.fullName)
-                    .fontWeight(.semibold)
-                Spacer()
-                Text(connection.relationshipDescription ?? "Unknown relationship")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                
-                Button(action: {
-                    coordinator.networkManager.removeConnection(
-                        userId: user.id,
-                        connectionId: connection.id
-                    ) { _ in
-                        loadConnections(forceReload: true)
+        VStack(spacing: 0) {
+            ForEach(localConnections) { connection in
+                HStack {
+                    Circle()
+                        .fill(Color.blue.opacity(0.2))
+                        .frame(width: 40, height: 40)
+                        .overlay(
+                            Text(String(connection.fullName.prefix(1)))
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(.blue)
+                        )
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(connection.fullName)
+                            .fontWeight(.semibold)
+                        
+                        if let description = connection.relationshipDescription {
+                            Text(description)
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
                     }
-                }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.red)
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        coordinator.networkManager.removeConnection(
+                            userId: user.id,
+                            connectionId: connection.id
+                        ) { _ in
+                            loadConnections(forceReload: true)
+                        }
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.red)
+                    }
+                }
+                .padding(.vertical, 12)
+                
+                if connection.id != localConnections.last?.id {
+                    Divider()
                 }
             }
-            .padding(.vertical, 4)
-            Divider()
         }
     }
     
@@ -397,12 +641,53 @@ struct AddConnectionView: View {
     
     var body: some View {
         NavigationStack {
-            VStack {
+            VStack(spacing: 0) {
                 // Search bar
-                searchBarView
+                VStack(spacing: 16) {
+                    Text("Find people to connect with")
+                        .font(.headline)
+                        .multilineTextAlignment(.center)
+                        .padding(.top)
+                    
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.gray)
+                        
+                        TextField("Search by name, location, university...", text: $searchText)
+                            .autocapitalization(.none)
+                            .disableAutocorrection(true)
+                        
+                        if !searchText.isEmpty {
+                            Button(action: {
+                                searchText = ""
+                            }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                    }
+                    .padding(10)
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(10)
+                    
+                    Button("Search") {
+                        performSearch()
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                }
+                .padding()
+                .background(Color.white)
+                
+                Divider()
                 
                 // Content based on state
-                contentView
+                if coordinator.networkManager.isLoading {
+                    loadingView
+                } else if coordinator.networkManager.users.isEmpty {
+                    emptyStateView
+                } else {
+                    userSelectionView
+                }
                 
                 Spacer()
             }
@@ -429,42 +714,24 @@ struct AddConnectionView: View {
     
     // MARK: - Subviews
     
-    private var searchBarView: some View {
+    private var loadingView: some View {
         VStack {
-            TextField("Search for users", text: $searchText)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .padding()
-                .onSubmit {
-                    performSearch()
-                }
-            
-            Button("Search") {
-                performSearch()
-            }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-            .background(Color.blue)
-            .foregroundColor(.white)
-            .cornerRadius(8)
-        }
-    }
-    
-    @ViewBuilder
-    private var contentView: some View {
-        if coordinator.networkManager.isLoading {
+            Spacer()
             ProgressView()
+                .scaleEffect(1.5)
                 .padding()
-        } else if coordinator.networkManager.users.isEmpty {
-            emptyStateView
-        } else {
-            userSelectionView
+            Text("Searching...")
+                .foregroundColor(.gray)
+            Spacer()
         }
     }
     
     private var emptyStateView: some View {
-        VStack {
-            Image(systemName: "person.slash")
-                .font(.system(size: 40))
+        VStack(spacing: 20) {
+            Spacer()
+            
+            Image(systemName: "person.crop.circle.badge.xmark")
+                .font(.system(size: 60))
                 .foregroundColor(.gray)
                 .padding()
             
@@ -472,21 +739,28 @@ struct AddConnectionView: View {
                 .font(.headline)
                 .foregroundColor(.gray)
             
-            Text("Try a different search term")
-                .foregroundColor(.gray)
-                .padding(.top, 8)
+            if !searchText.isEmpty {
+                Text("Try a different search term")
+                    .foregroundColor(.gray)
+            } else {
+                Text("Try searching for someone")
+                    .foregroundColor(.gray)
+            }
+            
+            Spacer()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
     }
     
     private var userSelectionView: some View {
-        VStack {
-            userListView
-            
+        VStack(spacing: 0) {
             if selectedUserId != nil {
                 relationshipSelectionView
+                    .padding()
+                    .background(Color.gray.opacity(0.05))
             }
+            
+            userListView
         }
     }
     
@@ -494,39 +768,66 @@ struct AddConnectionView: View {
         List {
             ForEach(coordinator.networkManager.users.filter { $0.id != userId }) { user in
                 HStack {
-                    VStack(alignment: .leading) {
+                    // User avatar
+                    Circle()
+                        .fill(Color.blue.opacity(0.2))
+                        .frame(width: 50, height: 50)
+                        .overlay(
+                            Text(String(user.fullName.prefix(1)))
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.blue)
+                        )
+                    
+                    // User info
+                    VStack(alignment: .leading, spacing: 2) {
                         Text(user.fullName)
                             .font(.headline)
-                        Text(user.university ?? "")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
+                        
+                        if let university = user.university {
+                            Text(university)
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                        }
+                        
+                        if let location = user.location {
+                            Text(location)
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
                     }
+                    .padding(.leading, 8)
                     
                     Spacer()
                     
+                    // Selection indicator
                     if selectedUserId == user.id {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(.blue)
+                            .font(.title2)
                     }
                 }
                 .contentShape(Rectangle())
                 .onTapGesture {
                     selectedUserId = user.id
                 }
+                .padding(.vertical, 4)
             }
         }
         .listStyle(PlainListStyle())
     }
     
     private var relationshipSelectionView: some View {
-        VStack {
+        VStack(spacing: 16) {
+            Text("What's your relationship?")
+                .font(.headline)
+            
             Picker("Relationship Type", selection: $relationshipType) {
                 ForEach(relationshipTypes, id: \.self) { type in
                     Text(type).tag(type)
                 }
             }
-            .pickerStyle(MenuPickerStyle())
-            .padding()
+            .pickerStyle(SegmentedPickerStyle())
+            .padding(.vertical, 4)
             
             addConnectionButton
         }
@@ -542,15 +843,11 @@ struct AddConnectionView: View {
                     .padding(.horizontal)
             } else {
                 Text("Add Connection")
-                    .padding(.horizontal)
+                    .frame(maxWidth: .infinity)
+                    .fontWeight(.semibold)
             }
         }
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity)
-        .background(Color.blue)
-        .foregroundColor(.white)
-        .cornerRadius(8)
-        .padding()
+        .buttonStyle(PrimaryButtonStyle())
         .disabled(isLoading)
     }
     
@@ -584,5 +881,17 @@ struct AddConnectionView: View {
                 }
             }
         }
+    }
+}
+
+struct PrimaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding()
+            .background(configuration.isPressed ? Color.blue.opacity(0.8) : Color.blue)
+            .foregroundColor(.white)
+            .cornerRadius(10)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.easeInOut(duration: 0.2), value: configuration.isPressed)
     }
 }

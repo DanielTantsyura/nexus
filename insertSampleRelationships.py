@@ -18,8 +18,8 @@ def insert_sample_relationships():
         
         print(f"Found {len(user_ids)} users in the database")
         
-        # Define the relationships to add
-        # daniel-everyone, max-soren
+        # Define the relationships to add - no longer need to define both directions
+        # since the add_connection function now handles bidirectional connections
         relationships = []
         
         # Add Daniel's connections to everyone
@@ -30,19 +30,19 @@ def insert_sample_relationships():
                     relationships.append({
                         'user_id': daniel_id,
                         'contact_id': id,
-                        'description': f"Daniel knows {name.capitalize()}"
+                        'description': f"Friends and colleagues"
                     })
         else:
             print("Warning: Daniel not found in the database")
         
-        # Add Max-Soren connection
+        # Add Max-Soren connection - only need to define one direction
         max_id = user_ids.get('max')
         soren_id = user_ids.get('soren')
         if max_id and soren_id:
             relationships.append({
                 'user_id': max_id,
                 'contact_id': soren_id,
-                'description': "Max knows Soren"
+                'description': "College friends"
             })
         else:
             print(f"Warning: Max or Soren not found in the database. Max ID: {max_id}, Soren ID: {soren_id}")
@@ -58,10 +58,19 @@ def insert_sample_relationships():
         print("Cleared existing relationships")
         
         for rel in relationships:
+            # Insert in one direction
             cursor.execute(relationship_sql, rel)
+            
+            # Insert the reverse direction with the same description
+            reverse_rel = {
+                'user_id': rel['contact_id'],
+                'contact_id': rel['user_id'],
+                'description': rel['description']
+            }
+            cursor.execute(relationship_sql, reverse_rel)
         
         conn.commit()
-        print(f"{len(relationships)} relationships added successfully.")
+        print(f"{len(relationships) * 2} relationships added successfully (bidirectional).")
 
         cursor.close()
         conn.close()

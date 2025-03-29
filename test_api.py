@@ -68,6 +68,18 @@ def test_get_connections(user_id):
 def test_add_user(user_data):
     """Test the POST /users endpoint"""
     print("\n--- Testing POST /users ---")
+    # Ensure default values for new fields
+    if 'gender' not in user_data:
+        user_data['gender'] = None
+    if 'ethnicity' not in user_data:
+        user_data['ethnicity'] = None
+    if 'uni_major' not in user_data:
+        user_data['uni_major'] = None
+    if 'job_title' not in user_data:
+        user_data['job_title'] = None
+    if 'current_company' not in user_data:
+        user_data['current_company'] = None
+        
     response = requests.post(f"{BASE_URL}/users", json=user_data)
     if response.status_code == 201:
         result = response.json()
@@ -123,6 +135,24 @@ def test_remove_connection(user_id, contact_id):
         print(response.text)
         return False
 
+def test_login_validation(username, passkey):
+    """Test the POST /login/validate endpoint"""
+    print(f"\n--- Testing POST /login/validate ---")
+    data = {
+        'username': username,
+        'passkey': passkey
+    }
+    
+    response = requests.post(f"{BASE_URL}/login/validate", json=data)
+    if response.status_code == 200:
+        result = response.json()
+        print(f"Success! Validated login for user ID: {result['user_id']}")
+        return result['user_id']
+    else:
+        print(f"Failed with status code: {response.status_code}")
+        print(response.text)
+        return None
+
 def run_all_tests():
     print("=== Starting API Tests ===")
     
@@ -172,6 +202,12 @@ def run_all_tests():
                 
                 # Test 8: Remove the connection we just created
                 test_remove_connection(existing_user_id, new_user_id)
+        
+        # Test 9: Test login validation
+        if username:
+            # Use the known passkey format from insertSampleLogins.py
+            passkey = f"{users[0]['first_name'].lower()}{users[0]['last_name'].lower()}123"
+            test_login_validation(username, passkey)
     
     print("\n=== API Tests Completed ===")
 

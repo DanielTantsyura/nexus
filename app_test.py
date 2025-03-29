@@ -68,7 +68,12 @@ def test_user_operations():
         "location": "Test Location",
         "university": "Test University",
         "field_of_interest": "Comprehensive Testing",
-        "high_school": "Test High School"
+        "high_school": "Test High School",
+        "gender": "Non-binary",
+        "ethnicity": "Mixed",
+        "uni_major": "Computer Science",
+        "job_title": "QA Engineer",
+        "current_company": "Test Corp"
     }
     
     response = requests.post(f"{API_URL}/users", json=test_user_data)
@@ -184,29 +189,124 @@ def test_connection_operations():
     # Success
     return True
 
-def run_all_tests():
+def test_login_operations():
+    """Test user login operations"""
+    log("\n=== Testing Login Operations ===")
+    
+    # Step 1: Create a test user with a login
+    log("\n--- Step 1: Create a test user with login ---")
+    
+    username = f"logintest_{int(time.time())}"
+    passkey = "testpassword123"
+    
+    # Create test user
+    test_user_data = {
+        "username": username,
+        "first_name": "Login",
+        "last_name": "Tester",
+        "email": f"login.test{int(time.time())}@example.com",
+        "phone_number": "5557654321",
+        "location": "Login Test Location",
+        "university": "Auth University",
+        "field_of_interest": "Authentication, Security",
+        "high_school": "Security High",
+        "gender": "Other",
+        "ethnicity": "Test",
+        "uni_major": "Authentication Science",
+        "job_title": "Security Tester",
+        "current_company": "Auth Corp"
+    }
+    
+    response = requests.post(f"{API_URL}/users", json=test_user_data)
+    if response.status_code != 201:
+        log(f"❌ Failed to create test user for login. Status code: {response.status_code}")
+        return False
+    
+    user_id = response.json().get('id')
+    log(f"Created test user with ID: {user_id}")
+    
+    # Step 2: Create login credentials
+    log("\n--- Step 2: Create login credentials ---")
+    
+    login_data = {
+        "user_id": user_id,
+        "username": username,
+        "passkey": passkey
+    }
+    
+    response = requests.post(f"{API_URL}/login", json=login_data)
+    if response.status_code != 201:
+        log(f"❌ Failed to create login credentials. Status code: {response.status_code}")
+        log(response.text)
+        return False
+    
+    log("✅ Created login credentials successfully")
+    
+    # Step 3: Validate login with correct credentials
+    log("\n--- Step 3: Validate correct login ---")
+    
+    validate_data = {
+        "username": username,
+        "passkey": passkey
+    }
+    
+    response = requests.post(f"{API_URL}/login/validate", json=validate_data)
+    if response.status_code != 200:
+        log(f"❌ Failed to validate login. Status code: {response.status_code}")
+        log(response.text)
+        return False
+    
+    validated_user_id = response.json().get('user_id')
+    if validated_user_id != user_id:
+        log(f"❌ Incorrect user ID returned. Expected: {user_id}, Got: {validated_user_id}")
+        return False
+    
+    log("✅ Login validation successful")
+    
+    # Step 4: Validate login with incorrect credentials
+    log("\n--- Step 4: Test login with incorrect credentials ---")
+    
+    incorrect_validate_data = {
+        "username": username,
+        "passkey": "wrongpassword"
+    }
+    
+    response = requests.post(f"{API_URL}/login/validate", json=incorrect_validate_data)
+    if response.status_code == 200:
+        log("❌ Login succeeded with incorrect password!")
+        return False
+    
+    log("✅ Login correctly rejected invalid credentials")
+    
+    return True
+
+def run_tests():
     """Run all application tests"""
     log("\n🔍 Starting Nexus Application Test Suite 🔍\n")
     
     # Test API connection
     if not test_api_connection():
-        log("\n❌ API connection test failed. Aborting further tests.")
+        log("❌ API connection test failed. Make sure the API is running.")
         return False
     
     # Test user operations
     if not test_user_operations():
-        log("\n❌ User operations test failed.")
+        log("❌ User operations test failed.")
         return False
     
-    # Test connection operations
+    # Test connection operations 
     if not test_connection_operations():
-        log("\n❌ Connection operations test failed.")
+        log("❌ Connection operations test failed.")
         return False
     
-    # All tests passed
+    # Test login operations
+    if not test_login_operations():
+        log("❌ Login operations test failed.")
+        return False
+    
     log("\n✅ All tests passed! The Nexus application is working correctly.")
     return True
 
 if __name__ == "__main__":
-    success = run_all_tests()
-    sys.exit(0 if success else 1) 
+    success = run_tests()
+    sys.exit(0 if success else 1)
