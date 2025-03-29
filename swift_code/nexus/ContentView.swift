@@ -29,16 +29,32 @@ struct ContentView: View {
                     ProgressView()
                         .padding()
                 } else if let errorMessage = networkManager.errorMessage {
-                    Text("Error: \(errorMessage)")
-                        .foregroundColor(.red)
+                    VStack {
+                        Text("Error")
+                            .font(.headline)
+                            .foregroundColor(.red)
+                        
+                        Text(errorMessage)
+                            .foregroundColor(.red)
+                            .multilineTextAlignment(.center)
+                            .padding()
+                        
+                        Button("Retry") {
+                            networkManager.fetchUsers()
+                        }
                         .padding()
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                    }
+                    .padding()
                 } else {
                     List(networkManager.users) { user in
                         NavigationLink(destination: UserDetailView(user: user, networkManager: networkManager)) {
                             VStack(alignment: .leading) {
                                 Text(user.fullName)
                                     .font(.headline)
-                                Text(user.university)
+                                Text(user.university ?? "No university")
                                     .font(.subheadline)
                                     .foregroundColor(.gray)
                             }
@@ -76,11 +92,11 @@ struct UserDetailView: View {
                         .font(.largeTitle)
                         .fontWeight(.bold)
                     
-                    Text(user.university)
+                    Text(user.university ?? "No university")
                         .font(.title3)
                         .foregroundColor(.gray)
                     
-                    Text(user.location)
+                    Text(user.location ?? "No location")
                         .font(.subheadline)
                 }
                 .padding()
@@ -95,12 +111,12 @@ struct UserDetailView: View {
                     
                     HStack {
                         Image(systemName: "envelope")
-                        Text(user.email)
+                        Text(user.email ?? "No email")
                     }
                     
                     HStack {
                         Image(systemName: "phone")
-                        Text(user.phoneNumber)
+                        Text(user.phoneNumber ?? "No phone number")
                     }
                 }
                 .padding()
@@ -122,7 +138,7 @@ struct UserDetailView: View {
                                 Text(connection.fullName)
                                     .fontWeight(.semibold)
                                 Spacer()
-                                Text(connection.relationshipDescription)
+                                Text(connection.relationshipDescription ?? "Unknown relationship")
                                     .font(.caption)
                                     .foregroundColor(.gray)
                             }

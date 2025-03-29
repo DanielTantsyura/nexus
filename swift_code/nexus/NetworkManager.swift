@@ -4,15 +4,18 @@ import Combine
 // MARK: - Models
 struct User: Identifiable, Codable {
     var id: Int
-    var username: String
-    var firstName: String
-    var lastName: String
-    var email: String
-    var phoneNumber: String
-    var location: String
-    var university: String
-    var fieldOfInterest: String
-    var highSchool: String
+    var username: String?
+    var firstName: String?
+    var lastName: String?
+    var email: String?
+    var phoneNumber: String?
+    var location: String?
+    var university: String?
+    var fieldOfInterest: String?
+    var highSchool: String?
+    var birthday: String?
+    var createdAt: String?
+    var currentCompany: String?
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -25,30 +28,45 @@ struct User: Identifiable, Codable {
         case university
         case fieldOfInterest = "field_of_interest"
         case highSchool = "high_school"
+        case birthday
+        case createdAt = "created_at"
+        case currentCompany = "current_company"
     }
     
     var fullName: String {
-        return "\(firstName) \(lastName)"
+        return "\(firstName ?? "Unknown") \(lastName ?? "User")"
     }
 }
 
 struct Connection: Identifiable, Codable {
     var id: Int
-    var username: String
-    var firstName: String
-    var lastName: String
-    var relationshipDescription: String
+    var username: String?
+    var firstName: String?
+    var lastName: String?
+    var email: String?
+    var phoneNumber: String?
+    var location: String?
+    var university: String?
+    var fieldOfInterest: String?
+    var highSchool: String?
+    var relationshipDescription: String?
     
     enum CodingKeys: String, CodingKey {
         case id
         case username
         case firstName = "first_name"
         case lastName = "last_name"
+        case email
+        case phoneNumber = "phone_number"
+        case location
+        case university
+        case fieldOfInterest = "field_of_interest"
+        case highSchool = "high_school"
         case relationshipDescription = "relationship_description"
     }
     
     var fullName: String {
-        return "\(firstName) \(lastName)"
+        return "\(firstName ?? "Unknown") \(lastName ?? "User")"
     }
 }
 
@@ -61,7 +79,14 @@ class NetworkManager: ObservableObject {
     @Published var errorMessage: String?
     
     private var cancellables = Set<AnyCancellable>()
-    private let baseURL = "http://localhost:5000"
+    
+    // Use localhost for simulator, IP address for physical device
+    #if targetEnvironment(simulator)
+    private let baseURL = "http://127.0.0.1:8080"  // Explicitly use IPv4 localhost
+    #else
+    // Replace with your Mac's actual IP address when testing on a physical device
+    private let baseURL = "http://10.0.0.232:8080"
+    #endif
     
     // MARK: - API Methods
     func fetchUsers() {
@@ -76,6 +101,7 @@ class NetworkManager: ObservableObject {
                 self?.users = users
             case .failure(let error):
                 self?.errorMessage = error.localizedDescription
+                print("Error fetching users: \(error.localizedDescription)")
             }
         }
     }
@@ -117,9 +143,7 @@ class NetworkManager: ObservableObject {
             switch result {
             case .success(let user):
                 self?.selectedUser = user
-                if let userId = user.id as? Int {
-                    self?.getConnections(userId: userId)
-                }
+                self?.getConnections(userId: user.id)
             case .failure(let error):
                 self?.errorMessage = error.localizedDescription
             }
@@ -144,22 +168,51 @@ class NetworkManager: ObservableObject {
             return
         }
         
+        print("Fetching data from: \(url.absoluteString)")
+        
         URLSession.shared.dataTask(with: url) { data, response, error in
             DispatchQueue.main.async {
                 if let error = error {
+                    print("Network error: \(error.localizedDescription)")
                     completion(.failure(error))
                     return
                 }
                 
+                if let httpResponse = response as? HTTPURLResponse {
+                    print("HTTP status code: \(httpResponse.statusCode)")
+                }
+                
                 guard let data = data else {
+                    print("No data received from API")
                     completion(.failure(URLError(.zeroByteResource)))
                     return
+                }
+                
+                // Print the raw JSON string for debugging
+                if let jsonString = String(data: data, encoding: .utf8) {
+                    print("Raw JSON data: \(jsonString.prefix(200))...")
                 }
                 
                 do {
                     let decodedData = try JSONDecoder().decode(T.self, from: data)
                     completion(.success(decodedData))
                 } catch {
+                    print("JSON decoding error: \(error)")
+                    // Try to get more detailed decoding error information
+                    if let decodingError = error as? DecodingError {
+                        switch decodingError {
+                        case .keyNotFound(let key, let context):
+                            print("Key '\(key)' not found: \(context.debugDescription)")
+                        case .typeMismatch(let type, let context):
+                            print("Type mismatch for type '\(type)': \(context.debugDescription)")
+                        case .valueNotFound(let type, let context):
+                            print("Value not found for type '\(type)': \(context.debugDescription)")
+                        case .dataCorrupted(let context):
+                            print("Data corrupted: \(context.debugDescription)")
+                        @unknown default:
+                            print("Unknown decoding error")
+                        }
+                    }
                     completion(.failure(error))
                 }
             }
