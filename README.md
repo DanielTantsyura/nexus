@@ -1,104 +1,153 @@
 # Nexus Application
 
-A social networking application that allows users to manage connections with others.
+A modern social networking application that allows users to manage connections with others, featuring a Flask backend API and a native iOS client with SwiftUI.
 
 ## Features
 
 - **User Management**:
   - Create, read, update, and delete user profiles
-  - Search for users by name, university, or location
-  - View detailed user profiles
+  - Search for users by name, university, location, or interests
+  - Comprehensive user profiles with personal and professional details
 
 - **Connection Management**:
-  - Create connections between users with relationship types
-  - View user connections with relationship details
-  - Remove connections with a single tap
+  - Bidirectional connections between users with relationship types
+  - Connection management with intuitive UI
+  - Automatic relationship synchronization
 
-- **API Endpoints**:
-  - RESTful API with Flask
-  - Comprehensive endpoints for users and connections
-  - API documentation at `/docs` endpoint
+- **Authentication**:
+  - Simple login system with username/password authentication
+  - User-specific data access
+  - Secure credential storage
 
-- **iOS Client**:
-  - Native Swift client with SwiftUI
-  - Clean architecture with MVVM and Coordinator pattern
-  - Responsive UI with proper loading states
-  - Pull-to-refresh and search functionality
+- **Modern UI**:
+  - Clean, responsive SwiftUI interface
+  - Consistent design language
+  - Proper loading states and error handling
 
 ## Project Structure
 
 ```
 nexus/
-├── app_test.py             # Comprehensive test script for entire application
-├── api.py                  # Flask API server
-├── config.py               # Configuration settings
-├── createDatabase.py       # Database initialization script
-├── database_operations.py  # Core database functions
-├── insertSampleRelationships.py  # Sample data script for relationships
-├── insertSampleUsers.py    # Sample data script for users
-├── requirements.txt        # Python dependencies
-├── setup.py                # One-step setup script
-├── test_local_connection.py # API testing script
-└── swift_code/nexus/       # iOS client application
-    ├── NexusApp.swift      # Main app entry point
-    ├── ContentView.swift   # Main views
-    ├── NetworkManager.swift # API communication
-    ├── Models/             # Data models
-    │   ├── User.swift
-    │   └── Connection.swift
-    └── App/                # App architecture
-        └── AppCoordinator.swift
+├── api.py                       # Flask API server
+├── app_test.py                  # Comprehensive test script
+├── config.py                    # Configuration settings
+├── createDatabase.py            # Database initialization script
+├── database_operations.py       # Core database operations
+├── database_utils.py            # Database utilities for maintenance
+├── requirements.txt             # Python dependencies
+├── setup.py                     # One-step setup script
+├── swift_code/                  # iOS client application
+│   ├── nexus/                   # Main app code
+│   │   ├── App/                 # App architecture
+│   │   ├── Models/              # Data models
+│   │   ├── ContentView.swift    # Main views
+│   │   ├── NetworkManager.swift # API communication
+│   │   └── NexusApp.swift       # Main app entry point
+│   └── nexus.xcodeproj/         # Xcode project files
+└── test_api.py                  # API testing script
 ```
 
 ## Getting Started
 
 ### Backend Setup
 
-1. Install required dependencies:
+1. **Install Dependencies**
    ```
    pip install -r requirements.txt
    ```
 
-2. Set up the database and sample data:
+2. **Set Up Database**
    ```
    python setup.py
    ```
+   This script creates the database schema and populates it with sample data.
 
-3. Start the API server:
+3. **Start API Server**
    ```
    python api.py
    ```
 
-4. Access the API at:
-   - http://localhost:8080/users
-   - http://localhost:8080/users/{user_id}
-   - http://localhost:8080/users/search?term={search_term}
-   - http://localhost:8080/users/{user_id}/connections
-   - http://localhost:8080/connections
+4. **API Endpoints**
+
+   | Endpoint | Method | Description |
+   |----------|--------|-------------|
+   | `/users` | GET | List all users |
+   | `/users` | POST | Create a new user |
+   | `/users/{user_id}` | PUT | Update a user |
+   | `/users/{username}` | GET | Get a specific user |
+   | `/users/search?term={search_term}` | GET | Search for users |
+   | `/users/{user_id}/connections` | GET | Get user connections |
+   | `/connections` | POST | Create a new connection |
+   | `/connections` | DELETE | Remove a connection |
+   | `/login` | POST | Create login credentials |
+   | `/login/validate` | POST | Validate user credentials |
 
 ### iOS Client Setup
 
-See the [iOS App README](swift_code/nexus/README.md) for details on setting up and running the iOS client application.
+1. **Configure Network Settings**
+   - Open `NetworkManager.swift`
+   - For simulator: URL is already set to `127.0.0.1`
+   - For physical device: Update IP address to your Mac's IP
+
+2. **Run in Xcode**
+   - Open `swift_code/nexus.xcodeproj`
+   - Select a device or simulator
+   - Run the application (⌘+R)
+
+## Database Utilities
+
+The project includes a consolidated utility script for database management:
+
+```
+python database_utils.py [command] [args]
+```
+
+Available commands:
+
+- `check` - View current database state
+- `passwords [password]` - Update all user passwords
+- `clean [threshold]` - Remove test data
+- `login <user_id> <username> <password>` - Ensure a specific user has login credentials
 
 ## Testing
 
-Run the comprehensive test suite to verify functionality:
+Run the comprehensive test suite:
 
 ```
 python app_test.py
 ```
 
-This will test the database setup, API connectivity, and all core operations.
+This tests the entire application including:
+- Database operations
+- API endpoints
+- Connection management
+- User authentication
+
+For API-specific tests:
+
+```
+python test_api.py
+```
 
 ## Key Technologies
 
-- **Backend**:
-  - Python Flask for API
-  - PostgreSQL database
-  - SQLAlchemy ORM
+### Backend
+- **Python 3.9+**
+- **Flask** - Lightweight web framework
+- **PostgreSQL** - Relational database
+- **psycopg2** - PostgreSQL adapter
 
-- **iOS**:
-  - Swift 5.x
-  - SwiftUI framework
-  - Combine for reactive updates
-  - MVVM + Coordinator architecture
+### iOS Client
+- **Swift 5.7+**
+- **SwiftUI** - Declarative UI framework
+- **Combine** - Reactive programming
+- **MVVM + Coordinator** - Architecture pattern
+
+## Contributors
+
+- Daniel Tantsyura
+- Contributions welcome!
+
+## License
+
+This project is available under the MIT License.

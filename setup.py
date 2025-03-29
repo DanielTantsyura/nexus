@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Unified setup script for the Nexus application.
 
@@ -5,13 +6,13 @@ This script:
 1. Creates the database schema
 2. Inserts sample users
 3. Inserts sample relationships
-4. Inserts sample login credentials
+4. Sets up login credentials
 """
 
 from createDatabase import create_database
 from insertSampleUsers import insert_sample_users
 from insertSampleRelationships import insert_sample_relationships
-from insertSampleLogins import insert_sample_logins
+from database_utils import DatabaseUtils
 
 def setup_database():
     """Set up the database with schema and sample data."""
@@ -38,15 +39,18 @@ def setup_database():
         print("❌ Failed to insert sample relationships.\n")
         return False
     
-    print("Step 4: Inserting sample login credentials...")
-    if insert_sample_logins():
-        print("✅ Sample login credentials inserted successfully.\n")
-    else:
-        print("❌ Failed to insert sample login credentials.\n")
+    print("Step 4: Setting up user passwords...")
+    db_utils = DatabaseUtils()
+    try:
+        db_utils.update_passwords("password")
+        print("✅ User passwords configured successfully.\n")
+    except Exception as e:
+        print(f"❌ Failed to set up user passwords: {e}\n")
         return False
     
     print("\n=== Database setup completed successfully! ===\n")
     print("You can now run the API with: python api.py")
+    print("Default username/password for all users is: <username>/password")
     return True
 
 if __name__ == "__main__":
