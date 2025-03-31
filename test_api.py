@@ -389,7 +389,7 @@ def test_login_operations():
         log("❌ Login validation succeeded with incorrect password")
         increment_test(False)
         return False
-    
+
     log("✅ Login validation with incorrect password correctly failed")
     increment_test(True)
     return True
@@ -410,8 +410,8 @@ def run_basic_tests():
         
         # Test 3: Get user by username
         if 'username' in users[0]:
-            username = users[0]['username']
-            test_get_user_by_username(username)
+        username = users[0]['username']
+        test_get_user_by_username(username)
         
         # Test 4: Get user connections
         test_get_connections(existing_user_id)
@@ -445,7 +445,7 @@ def run_basic_tests():
                 
                 # Test 8: Remove the connection we just created
                 test_remove_connection(existing_user_id, new_user_id)
-        
+    
         # Test 9: Test login validation
         if username:
             # Use the known passkey format from insertSampleLogins.py

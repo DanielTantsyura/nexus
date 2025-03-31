@@ -39,6 +39,18 @@ def add_user():
     finally:
         db.disconnect()
 
+@app.route('/users/<int:user_id>', methods=['GET'])
+def get_user_by_id(user_id):
+    """Get a specific user by ID."""
+    db.connect()
+    try:
+        user = db.get_user_by_id(user_id)
+        if user:
+            return jsonify(user)
+        return jsonify({"error": "User not found"}), 404
+    finally:
+        db.disconnect()
+
 @app.route('/users/<int:user_id>', methods=['PUT'])
 def update_user(user_id):
     """Update an existing user in the database."""

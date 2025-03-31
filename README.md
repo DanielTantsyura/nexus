@@ -1,6 +1,61 @@
 # Nexus Application
 
-A modern social networking application that allows users to manage connections with others, featuring a Flask backend API and a native iOS client with SwiftUI.
+A modern social networking application featuring a Flask backend API and a native iOS client built with SwiftUI. Nexus enables users to create profiles, search for connections, and manage their professional network.
+
+## Overview
+
+Nexus is a modern social networking platform with a Flask-based backend API and a native iOS client. The project implements user management, connection handling, and profile viewing capabilities in a clean, maintainable architecture.
+
+## Key Improvements
+
+### Backend Improvements
+
+1. **Database Utilities Consolidation**
+   - Combined multiple utility scripts into a unified `database_utils.py`
+   - Created a structured `DatabaseUtils` class with comprehensive methods for database operations
+   - Added proper error handling and connection management
+   - Implemented a command-line interface for easier utility execution
+
+2. **Documentation Enhancements**
+   - Updated README files with clearer project structure information
+   - Improved API endpoint documentation
+   - Enhanced setup instructions
+
+### iOS Client Improvements
+
+1. **Code Organization**
+   - Extracted UI components into a dedicated `UIComponents.swift` file
+   - Split large views into smaller, more manageable components
+   - Separated `UserListRow.swift` and `UserDetailView.swift` from ContentView
+   - Consolidated all models into a single `Models.swift` file
+   - Flattened directory structure by moving all files to the main directory
+
+2. **UI Component Library**
+   - Implemented reusable button styles (`PrimaryButtonStyle`, `SecondaryButtonStyle`)
+   - Created standard UI components (`UserAvatar`, `InfoRow`, `SectionCard`)
+   - Added state handling views (`LoadingView`, `ErrorView`, `EmptyStateView`)
+
+3. **View Refactoring**
+   - Refactored `HomeView` to use the new component library
+   - Enhanced `UserListView` with improved search and error states
+   - Updated `UserDetailView` with better connection management
+   - Streamlined `ContentView` to focus on navigation coordination
+
+## Architecture Highlights
+
+### Backend
+
+- **Flask-based RESTful API**: Clean separation of routes and database operations
+- **PostgreSQL Database**: Robust data storage with proper connection management
+- **Utility Scripts**: Consolidated database management utilities
+
+### iOS Client
+
+- **MVVM + Coordinator Pattern**: Clean separation of concerns
+- **SwiftUI Framework**: Modern declarative UI development
+- **Centralized State Management**: Via AppCoordinator
+- **Reusable Component Library**: UI consistency and maintainability
+- **Flat File Structure**: Simpler navigation with all files in the main directory
 
 ## Features
 
@@ -11,40 +66,47 @@ A modern social networking application that allows users to manage connections w
 
 - **Connection Management**:
   - Bidirectional connections between users with relationship types
-  - Connection management with intuitive UI
+  - View and manage user connections
   - Automatic relationship synchronization
 
 - **Authentication**:
-  - Simple login system with username/password authentication
+  - Secure login system with username/password authentication
   - User-specific data access
-  - Secure credential storage
+  - Persistent login with UserDefaults storage
 
 - **Modern UI**:
   - Clean, responsive SwiftUI interface
-  - Consistent design language
   - Proper loading states and error handling
+  - Retry mechanisms for failed network requests
 
 ## Project Structure
 
 ```
 nexus/
 ├── api.py                       # Flask API server
-├── app_test.py                  # Comprehensive test script
 ├── config.py                    # Configuration settings
-├── createDatabase.py            # Database initialization script
 ├── database_operations.py       # Core database operations
-├── database_utils.py            # Database utilities for maintenance
-├── requirements.txt             # Python dependencies
+├── database_utils.py            # Consolidated database utilities
 ├── setup.py                     # One-step setup script
-├── swift_code/                  # iOS client application
-│   ├── nexus/                   # Main app code
-│   │   ├── App/                 # App architecture
-│   │   ├── Models/              # Data models
-│   │   ├── ContentView.swift    # Main views
-│   │   ├── NetworkManager.swift # API communication
-│   │   └── NexusApp.swift       # Main app entry point
-│   └── nexus.xcodeproj/         # Xcode project files
-└── test_api.py                  # API testing script
+├── requirements.txt             # Python dependencies
+├── test_api.py                  # API testing script
+├── createDatabase.py            # Database initialization script
+├── insertSampleUsers.py         # Sample user data insertion
+├── insertSampleRelationships.py # Sample relationship data
+└── swift_code/                  # iOS client application
+    └── nexus/                   # Main app code
+        ├── AppCoordinator.swift # Navigation and state management
+        ├── Models.swift         # Combined data models
+        ├── NetworkManager.swift # API communication
+        ├── ContentView.swift    # Container view
+        ├── HomeView.swift       # Home screen
+        ├── UserListView.swift   # User listing
+        ├── UserListRow.swift    # User list items
+        ├── UserDetailView.swift # User detail view
+        ├── EditProfileView.swift # Profile editing
+        ├── LoginView.swift      # Authentication UI
+        ├── UIComponents.swift   # Reusable UI components
+        └── NexusApp.swift       # App entry point
 ```
 
 ## Getting Started
@@ -73,8 +135,9 @@ nexus/
    |----------|--------|-------------|
    | `/users` | GET | List all users |
    | `/users` | POST | Create a new user |
+   | `/users/{user_id}` | GET | Get user by ID |
    | `/users/{user_id}` | PUT | Update a user |
-   | `/users/{username}` | GET | Get a specific user |
+   | `/users/{username}` | GET | Get user by username |
    | `/users/search?term={search_term}` | GET | Search for users |
    | `/users/{user_id}/connections` | GET | Get user connections |
    | `/connections` | POST | Create a new connection |
@@ -85,12 +148,12 @@ nexus/
 ### iOS Client Setup
 
 1. **Configure Network Settings**
-   - Open `NetworkManager.swift`
-   - For simulator: URL is already set to `127.0.0.1`
+   - Open `swift_code/nexus/NetworkManager.swift`
+   - For simulator: URL is already set to `127.0.0.1:8080`
    - For physical device: Update IP address to your Mac's IP
 
 2. **Run in Xcode**
-   - Open `swift_code/nexus.xcodeproj`
+   - Open the project in Xcode
    - Select a device or simulator
    - Run the application (⌘+R)
 
@@ -111,35 +174,43 @@ Available commands:
 
 ## Testing
 
-Run the comprehensive test suite:
-
-```
-python app_test.py
-```
-
-This tests the entire application including:
-- Database operations
-- API endpoints
-- Connection management
-- User authentication
-
-For API-specific tests:
+Run the comprehensive API test suite:
 
 ```
 python test_api.py
 ```
 
+This tests:
+- API endpoints
+- Database operations
+- Connection management
+- User authentication
+
+## Future Enhancement Opportunities
+
+1. **Backend**
+   - Implement authentication middleware
+   - Add pagination for large data sets
+   - Create comprehensive test suite
+   - Add user profile image support
+
+2. **iOS Client**
+   - Implement offline mode with local caching
+   - Add push notifications
+   - Enhance user profile editing
+   - Implement message exchange functionality
+
 ## Key Technologies
 
 ### Backend
 - **Python 3.9+**
-- **Flask** - Lightweight web framework
+- **Flask** - Web framework
 - **PostgreSQL** - Relational database
 - **psycopg2** - PostgreSQL adapter
 
 ### iOS Client
 - **Swift 5.7+**
-- **SwiftUI** - Declarative UI framework
+- **SwiftUI** - Declarative UI
 - **Combine** - Reactive programming
 - **MVVM + Coordinator** - Architecture pattern
 

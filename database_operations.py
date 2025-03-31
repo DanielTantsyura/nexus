@@ -85,6 +85,29 @@ class DatabaseManager:
             print(f"Error retrieving user: {e}")
             return None
     
+    def get_user_by_id(self, user_id: int) -> Optional[Dict]:
+        """
+        Retrieve a user by their ID.
+        
+        Args:
+            user_id: The user ID to search for
+            
+        Returns:
+            User dictionary or None if not found
+        """
+        query = """
+        SELECT * FROM users
+        WHERE id = %s;
+        """
+        
+        try:
+            self.cursor.execute(query, (user_id,))
+            user = self.cursor.fetchone()
+            return dict(user) if user else None
+        except Exception as e:
+            print(f"Error retrieving user: {e}")
+            return None
+    
     def search_users(self, search_term: str) -> List[Dict]:
         """
         Search for users by name, location, or interests.
