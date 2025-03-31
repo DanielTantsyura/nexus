@@ -17,7 +17,9 @@ sample_data = [
         "ethnicity": "White",
         "uni_major": "Computer Science",
         "job_title": "Product Manager",
-        "current_company": "Nexus Inc."
+        "current_company": "Nexus Inc.",
+        "profile_image_url": "https://randomuser.me/api/portraits/men/1.jpg",
+        "linkedin_url": "https://linkedin.com/in/danieltantsyura"
     },
     {
         "username": "sorendupont",
@@ -33,7 +35,9 @@ sample_data = [
         "ethnicity": "White",
         "uni_major": "Mathematics",
         "job_title": "Researcher",
-        "current_company": "Tech Innovations"
+        "current_company": "Tech Innovations",
+        "profile_image_url": "https://randomuser.me/api/portraits/men/2.jpg",
+        "linkedin_url": "https://linkedin.com/in/sorendupont"
     },
     {
         "username": None,
@@ -49,7 +53,9 @@ sample_data = [
         "ethnicity": "White",
         "uni_major": "Business Administration",
         "job_title": "Business Development",
-        "current_company": "Eagle Corp"
+        "current_company": "Eagle Corp",
+        "profile_image_url": "https://randomuser.me/api/portraits/men/3.jpg",
+        "linkedin_url": None
     },
     {
         "username": "stanosipenko",
@@ -65,7 +71,9 @@ sample_data = [
         "ethnicity": "White",
         "uni_major": "Computer Science",
         "job_title": "Software Engineer",
-        "current_company": "London Tech"
+        "current_company": "London Tech",
+        "profile_image_url": "https://randomuser.me/api/portraits/men/4.jpg",
+        "linkedin_url": "https://linkedin.com/in/stanosipenko"
     },
     {
         "username": "corwincheung",
@@ -81,7 +89,9 @@ sample_data = [
         "ethnicity": "Asian",
         "uni_major": "Economics",
         "job_title": "Entrepreneur",
-        "current_company": "Self-employed"
+        "current_company": "Self-employed",
+        "profile_image_url": "https://randomuser.me/api/portraits/men/5.jpg",
+        "linkedin_url": "https://linkedin.com/in/corwincheung"
     }
 ]
 
@@ -92,12 +102,14 @@ def insert_sample_users():
     INSERT INTO users (
         username, first_name, last_name, email, phone_number,
         location, university, field_of_interest, high_school,
-        gender, ethnicity, uni_major, job_title, current_company
+        gender, ethnicity, uni_major, job_title, current_company,
+        profile_image_url, linkedin_url
     )
     VALUES (
         %(username)s, %(first_name)s, %(last_name)s, %(email)s, %(phone_number)s,
         %(location)s, %(university)s, %(field_of_interest)s, %(high_school)s,
-        %(gender)s, %(ethnicity)s, %(uni_major)s, %(job_title)s, %(current_company)s
+        %(gender)s, %(ethnicity)s, %(uni_major)s, %(job_title)s, %(current_company)s,
+        %(profile_image_url)s, %(linkedin_url)s
     );
     """
 

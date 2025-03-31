@@ -26,6 +26,8 @@ CREATE TABLE users (
     ethnicity VARCHAR(100),
     uni_major VARCHAR(100),
     job_title VARCHAR(100),
+    profile_image_url VARCHAR(255),
+    linkedin_url VARCHAR(255),
     created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -35,6 +37,7 @@ CREATE TABLE logins (
     user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     username VARCHAR(50) NOT NULL UNIQUE,
     passkey VARCHAR(100) NOT NULL,
+    last_login TIMESTAMP,
     created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -44,6 +47,9 @@ CREATE TABLE relationships (
     user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     contact_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     relationship_description VARCHAR(255),
+    custom_note TEXT,
+    tags TEXT,
+    last_viewed TIMESTAMP,
     created_at TIMESTAMP DEFAULT NOW(),
     UNIQUE (user_id, contact_id)
 );

@@ -83,30 +83,32 @@ Nexus is a modern social networking platform with a Flask-based backend API and 
 
 ```
 nexus/
-├── api.py                       # Flask API server
-├── config.py                    # Configuration settings
-├── database_operations.py       # Core database operations
-├── database_utils.py            # Consolidated database utilities
-├── setup.py                     # One-step setup script
-├── requirements.txt             # Python dependencies
-├── test_api.py                  # API testing script
-├── createDatabase.py            # Database initialization script
-├── insertSampleUsers.py         # Sample user data insertion
-├── insertSampleRelationships.py # Sample relationship data
-└── swift_code/                  # iOS client application
-    └── nexus/                   # Main app code
-        ├── AppCoordinator.swift # Navigation and state management
-        ├── Models.swift         # Combined data models
-        ├── NetworkManager.swift # API communication
-        ├── ContentView.swift    # Container view
-        ├── HomeView.swift       # Home screen
-        ├── UserListView.swift   # User listing
-        ├── UserListRow.swift    # User list items
-        ├── UserDetailView.swift # User detail view
+├── database_code/                # Backend database code
+│   ├── api.py                    # Flask API server
+│   ├── config.py                 # Configuration settings
+│   ├── createDatabase.py         # Database schema creation
+│   ├── database_operations.py    # Core database operations
+│   ├── database_utils.py         # Database maintenance utilities
+│   ├── insertSampleUsers.py      # Sample user data insertion
+│   ├── insertSampleRelationships.py # Sample relationship data
+│   ├── setup.py                  # One-step setup script
+│   ├── test_api.py               # API testing script
+│   └── README.md                 # Database code documentation
+├── requirements.txt              # Python dependencies
+└── swift_code/                   # iOS client application
+    └── nexus/                    # Main app code
+        ├── AppCoordinator.swift  # Navigation and state management
+        ├── Models.swift          # Combined data models
+        ├── NetworkManager.swift  # API communication
+        ├── ContentView.swift     # Container view
+        ├── HomeView.swift        # Home screen
+        ├── UserListView.swift    # User listing
+        ├── UserListRow.swift     # User list items
+        ├── UserDetailView.swift  # User detail view
         ├── EditProfileView.swift # Profile editing
-        ├── LoginView.swift      # Authentication UI
-        ├── UIComponents.swift   # Reusable UI components
-        └── NexusApp.swift       # App entry point
+        ├── LoginView.swift       # Authentication UI
+        ├── UIComponents.swift    # Reusable UI components
+        └── NexusApp.swift        # App entry point
 ```
 
 ## Getting Started
@@ -120,12 +122,14 @@ nexus/
 
 2. **Set Up Database**
    ```
+   cd database_code
    python setup.py
    ```
    This script creates the database schema and populates it with sample data.
 
 3. **Start API Server**
    ```
+   cd database_code
    python api.py
    ```
 
@@ -162,6 +166,7 @@ nexus/
 The project includes a consolidated utility script for database management:
 
 ```
+cd database_code
 python database_utils.py [command] [args]
 ```
 
@@ -177,6 +182,7 @@ Available commands:
 Run the comprehensive API test suite:
 
 ```
+cd database_code
 python test_api.py
 ```
 
@@ -198,7 +204,6 @@ This tests:
    - Implement offline mode with local caching
    - Add push notifications
    - Enhance user profile editing
-   - Implement message exchange functionality
 
 ## Key Technologies
 

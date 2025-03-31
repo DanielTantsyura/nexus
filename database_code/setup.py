@@ -7,18 +7,36 @@ This script:
 2. Inserts sample users
 3. Inserts sample relationships
 4. Sets up login credentials
+
+WARNING: This script drops and recreates tables, so all existing data will be lost.
+Only use this script when setting up the database for the first time or when you're
+willing to lose all existing data.
 """
 
 from createDatabase import create_database
 from insertSampleUsers import insert_sample_users
 from insertSampleRelationships import insert_sample_relationships
 from database_utils import DatabaseUtils
+import sys
+import time
 
 def setup_database():
     """Set up the database with schema and sample data."""
     print("\n=== Setting up Nexus Database ===\n")
     
-    print("Step 1: Creating database schema...")
+    print("⚠️ WARNING: This will delete all existing data in the database! ⚠️")
+    print("The schema has been updated with new fields for users, relationships, and logins.")
+    print("Continuing will drop and recreate all tables, and all existing data will be lost.")
+    
+    confirm = input("\nDo you want to continue? (y/n): ")
+    if confirm.lower() != 'y':
+        print("Database setup cancelled.")
+        return False
+    
+    print("\nContinuing with database setup in 3 seconds...")
+    time.sleep(3)
+    
+    print("\nStep 1: Creating database schema...")
     if create_database():
         print("✅ Database schema created successfully.\n")
     else:

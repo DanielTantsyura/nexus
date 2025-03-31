@@ -108,16 +108,52 @@ def add_connection():
     user_id = data.get('user_id')
     contact_id = data.get('contact_id')
     description = data.get('description', '')
+    custom_note = data.get('custom_note', None)
+    tags = data.get('tags', None)
     
     if not user_id or not contact_id:
         return jsonify({"error": "Missing user_id or contact_id"}), 400
     
     db.connect()
     try:
-        success = db.add_connection(user_id, contact_id, description)
+        success = db.add_connection(user_id, contact_id, description, custom_note, tags)
         if success:
             return jsonify({"success": True}), 201
         return jsonify({"error": "Failed to add connection"}), 400
+    finally:
+        db.disconnect()
+
+@app.route('/connections/update', methods=['PUT'])
+def update_connection_details():
+    """Update a connection with notes, tags, or update last viewed timestamp."""
+    data = request.json
+    user_id = data.get('user_id')
+    contact_id = data.get('contact_id')
+    
+    if not user_id or not contact_id:
+        return jsonify({"error": "Missing user_id or contact_id"}), 400
+    
+    # Check if we're just updating the last_viewed timestamp
+    update_timestamp_only = data.get('update_timestamp_only', False)
+    
+    db.connect()
+    try:
+        if update_timestamp_only:
+            success = db.update_last_viewed(user_id, contact_id)
+        else:
+            update_data = {}
+            if 'description' in data:
+                update_data['relationship_description'] = data['description']
+            if 'custom_note' in data:
+                update_data['custom_note'] = data['custom_note']
+            if 'tags' in data:
+                update_data['tags'] = data['tags']
+                
+            success = db.update_connection(user_id, contact_id, update_data)
+            
+        if success:
+            return jsonify({"success": True})
+        return jsonify({"error": "Failed to update connection"}), 400
     finally:
         db.disconnect()
 

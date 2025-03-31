@@ -157,8 +157,9 @@ class DatabaseManager:
             u.id, u.username, u.first_name, u.last_name,
             u.email, u.phone_number, u.location, u.university,
             u.field_of_interest, u.high_school, u.gender, u.ethnicity,
-            u.uni_major, u.job_title, u.current_company,
-            r.relationship_description
+            u.uni_major, u.job_title, u.current_company, u.profile_image_url,
+            u.linkedin_url, r.relationship_description, r.custom_note,
+            r.tags, r.last_viewed
         FROM relationships r
         JOIN users u ON r.contact_id = u.id
         WHERE r.user_id = %s
@@ -187,11 +188,13 @@ class DatabaseManager:
         INSERT INTO users (
             username, first_name, last_name, email, phone_number,
             location, university, field_of_interest, high_school,
-            gender, ethnicity, uni_major, job_title, current_company
+            gender, ethnicity, uni_major, job_title, current_company,
+            profile_image_url, linkedin_url
         ) VALUES (
             %(username)s, %(first_name)s, %(last_name)s, %(email)s, %(phone_number)s,
             %(location)s, %(university)s, %(field_of_interest)s, %(high_school)s,
-            %(gender)s, %(ethnicity)s, %(uni_major)s, %(job_title)s, %(current_company)s
+            %(gender)s, %(ethnicity)s, %(uni_major)s, %(job_title)s, %(current_company)s,
+            %(profile_image_url)s, %(linkedin_url)s
         ) RETURNING id;
         """
         
@@ -204,7 +207,7 @@ class DatabaseManager:
             print(f"Error adding user: {e}")
             raise
     
-    def add_connection(self, user_id: int, contact_id: int, description: str) -> bool:
+    def add_connection(self, user_id: int, contact_id: int, description: str, custom_note: str = None, tags: str = None) -> bool:
         """
         Add a new connection between two users in both directions.
         
@@ -212,21 +215,23 @@ class DatabaseManager:
             user_id: ID of the first user
             contact_id: ID of the second user
             description: Description of the relationship
+            custom_note: Optional detailed note about the connection
+            tags: Optional comma-separated tags for the connection
             
         Returns:
             True if successful, False otherwise
         """
         query = """
-        INSERT INTO relationships (user_id, contact_id, relationship_description)
-        VALUES (%s, %s, %s);
+        INSERT INTO relationships (user_id, contact_id, relationship_description, custom_note, tags, last_viewed)
+        VALUES (%s, %s, %s, %s, %s, NOW());
         """
         
         try:
             # First direction: user_id -> contact_id
-            self.cursor.execute(query, (user_id, contact_id, description))
+            self.cursor.execute(query, (user_id, contact_id, description, custom_note, tags))
             
             # Second direction: contact_id -> user_id (create the reciprocal connection)
-            self.cursor.execute(query, (contact_id, user_id, description))
+            self.cursor.execute(query, (contact_id, user_id, description, custom_note, tags))
             
             self.connection.commit()
             return True
@@ -309,8 +314,8 @@ class DatabaseManager:
             True if successful, False otherwise
         """
         query = """
-        INSERT INTO logins (user_id, username, passkey)
-        VALUES (%s, %s, %s)
+        INSERT INTO logins (user_id, username, passkey, last_login)
+        VALUES (%s, %s, %s, NOW())
         """
         
         try:
@@ -339,13 +344,93 @@ class DatabaseManager:
         WHERE username = %s AND passkey = %s
         """
         
+        update_last_login_query = """
+        UPDATE logins
+        SET last_login = NOW()
+        WHERE username = %s AND passkey = %s
+        """
+        
         try:
             self.cursor.execute(query, (username, passkey))
             result = self.cursor.fetchone()
+            
+            if result:
+                # Update last login timestamp
+                self.cursor.execute(update_last_login_query, (username, passkey))
+                self.connection.commit()
+                
             return result['user_id'] if result else None
         except Exception as e:
             print(f"Error validating login: {e}")
             return None
+
+    def update_connection(self, user_id: int, contact_id: int, data: Dict[str, Any]) -> bool:
+        """
+        Update a connection with custom notes, tags, or other metadata.
+        
+        Args:
+            user_id: ID of the user
+            contact_id: ID of the contact
+            data: Dictionary of fields to update (description, custom_note, tags)
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        # Build the SET clause dynamically based on provided fields
+        set_clauses = []
+        params = []
+        
+        for key, value in data.items():
+            if key in ['relationship_description', 'custom_note', 'tags']:
+                set_clauses.append(f"{key} = %s")
+                params.append(value)
+        
+        # Always update the last_viewed timestamp
+        set_clauses.append("last_viewed = NOW()")
+        
+        # Add user_id and contact_id for the WHERE clause
+        params.extend([user_id, contact_id])
+        
+        query = f"""
+        UPDATE relationships
+        SET {', '.join(set_clauses)}
+        WHERE user_id = %s AND contact_id = %s;
+        """
+        
+        try:
+            self.cursor.execute(query, params)
+            self.connection.commit()
+            return True
+        except Exception as e:
+            self.connection.rollback()
+            print(f"Error updating connection: {e}")
+            return False
+            
+    def update_last_viewed(self, user_id: int, contact_id: int) -> bool:
+        """
+        Update the last_viewed timestamp for a connection.
+        
+        Args:
+            user_id: ID of the user viewing the connection
+            contact_id: ID of the contact being viewed
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        query = """
+        UPDATE relationships
+        SET last_viewed = NOW()
+        WHERE user_id = %s AND contact_id = %s;
+        """
+        
+        try:
+            self.cursor.execute(query, (user_id, contact_id))
+            self.connection.commit()
+            return True
+        except Exception as e:
+            self.connection.rollback()
+            print(f"Error updating last viewed timestamp: {e}")
+            return False
 
 
 # Example usage

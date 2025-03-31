@@ -14,7 +14,7 @@ struct ContentView: View {
         Group {
             if coordinator.activeScreen == .login {
                 LoginView()
-            } else {
+        } else {
                 mainNavigationView
             }
         }
