@@ -1,8 +1,15 @@
 import SwiftUI
 
+/// View that displays a searchable list of users
 struct UserListView: View {
+    // MARK: - Properties
+    
     @EnvironmentObject private var coordinator: AppCoordinator
+    
+    /// Text currently entered in the search field
     @State private var searchText = ""
+    
+    // MARK: - View Body
     
     var body: some View {
         VStack(spacing: 0) {
@@ -18,8 +25,9 @@ struct UserListView: View {
         }
     }
     
-    // MARK: - Subviews
+    // MARK: - UI Components
     
+    /// Search bar for filtering users
     private var searchBarView: some View {
         HStack {
             HStack {
@@ -63,6 +71,7 @@ struct UserListView: View {
         .padding(.vertical, 8)
     }
     
+    /// Main content view that changes based on the current state
     @ViewBuilder
     private var contentView: some View {
         if coordinator.networkManager.isLoading && !coordinator.initialLoadComplete {
@@ -84,6 +93,7 @@ struct UserListView: View {
         }
     }
     
+    /// List of users when data is available
     private var userListView: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
@@ -112,6 +122,7 @@ struct UserListView: View {
     
     // MARK: - Helper Methods
     
+    /// Returns a filtered list of users, excluding the current user
     private var filteredUsers: [User] {
         // Filter out the current user
         guard let currentUserId = coordinator.networkManager.userId else {
@@ -123,6 +134,7 @@ struct UserListView: View {
         }
     }
     
+    /// Executes a search based on the current search text
     private func performSearch() {
         if searchText.isEmpty {
             coordinator.refreshData()
@@ -131,6 +143,8 @@ struct UserListView: View {
         }
     }
 }
+
+// MARK: - Previews
 
 #Preview {
     NavigationView {

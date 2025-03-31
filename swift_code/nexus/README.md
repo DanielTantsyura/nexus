@@ -10,12 +10,14 @@ A modern social networking application written in SwiftUI that connects to the N
   - Detailed user profiles with comprehensive information
   - Edit profile functionality for the current user
   - Responsive loading states with retry mechanisms
+  - Standardized UI components for consistent visual language
 
 - **Architecture**:
   - MVVM + Coordinator pattern for clean separation of concerns
   - Centralized state management via AppCoordinator
   - Error handling and recovery strategies
   - Persistent login with UserDefaults
+  - Comprehensive documentation for all components
 
 ## Requirements
 
@@ -63,20 +65,42 @@ A modern social networking application written in SwiftUI that connects to the N
   - `AppCoordinator.swift`: Navigation and state management
 
 - **Views**:
-  - `ContentView.swift`: Main container view
+  - `ContentView.swift`: Main container view with SwiftUI navigation
   - `LoginView.swift`: Authentication screen
   - `HomeView.swift`: User profile and navigation hub
   - `UserListView.swift`: Browse and search users
   - `UserListRow.swift`: Individual user row component
-  - `UserDetailView.swift`: User profile and connections
+  - `UserDetailView.swift`: User profile and connections management
   - `EditProfileView.swift`: Update user profile information
 
 - **Data Layer**:
-  - `NetworkManager.swift`: API communication
-  - `Models.swift`: Combined data models for User, Connection, and Authentication
+  - `NetworkManager.swift`: API communication with standardized error handling
+  - `Models.swift`: Data models with comprehensive documentation
 
 - **UI Components**:
-  - `UIComponents.swift`: Reusable UI components and styles
+  - `UIComponents.swift`: Reusable UI components, button styles, and status views
+
+## Code Quality
+
+### Documentation Standards
+
+Every component in the application follows a consistent documentation approach:
+
+- **File Header**: Brief description of the file's purpose
+- **Type Documentation**: Detailed description for all classes, structs, and enums
+- **Property Documentation**: Purpose of each property
+- **Method Documentation**: Purpose, parameters, and return values
+- **Section Markers**: Clear organization with MARK comments
+
+### Component Organization
+
+Each view is organized into logical sections:
+
+- **Properties**: State and environment objects
+- **View Body**: Main view structure
+- **UI Components**: Subviews and reusable components
+- **Data Management**: Methods for handling data
+- **Helpers**: Utility methods and computed properties
 
 ## Application Architecture
 
@@ -92,16 +116,16 @@ The AppCoordinator is the central navigation controller that:
 
 #### NetworkManager
 
-The NetworkManager handles all API communication:
+The NetworkManager handles all API communication with standardized error handling:
 - User authentication
 - Profile data fetching
 - User search and listing
 - Connection management
-- Error handling
+- Consistent error reporting and recovery
 
 #### Models
 
-The `Models.swift` file contains all data structures:
+The `Models.swift` file contains well-documented data structures:
 - **User**: Represents user profile data
 - **Connection**: Represents connection data
 - **Login**: Authentication data structures
@@ -120,7 +144,7 @@ The UIComponents.swift file provides reusable UI elements:
   - `InfoRow`: Displays labeled information
   - `SectionCard`: Card container with title and content
 
-- **State Views**:
+- **Status Views**:
   - `LoadingView`: Display during data loading
   - `ErrorView`: Display error states with retry option
   - `EmptyStateView`: Display when no data is available
@@ -141,17 +165,18 @@ The UIComponents.swift file provides reusable UI elements:
 
 ### Navigation Structure
 
+The app uses SwiftUI's NavigationStack for clean, consistent navigation:
 - **Login → Home**: After successful authentication
-- **Home → UserList**: Browse all users button
-- **Home → EditProfile**: Edit profile button
-- **UserList → UserDetail**: Tap on user row
-- **UserDetail → AddConnection**: Plus button
+- **Home → UserList**: Direct NavigationLink
+- **Home → EditProfile**: Coordinator-managed navigation
+- **UserList → UserDetail**: Tapping on a user row
+- **UserDetail → Connection Management**: Built-in functionality
 
 ### Reactive Programming
 
 - **@Published** properties in NetworkManager and AppCoordinator provide reactivity
 - **@EnvironmentObject** ensures views have access to shared state
-- **onChange** handlers respond to state changes
+- **@State** and **@Binding** manage view-specific state
 
 ## View Features
 
@@ -159,16 +184,17 @@ The UIComponents.swift file provides reusable UI elements:
 - Displays current user profile with comprehensive details
 - Navigation to other app sections
 - Auto-retry mechanism for loading profile data
-- Manual refresh button for fallback
+- Modular subviews for better maintainability
 
 ### User List
 - Browse all users in the network
 - Real-time search functionality
 - Pull-to-refresh for latest data
-- Clear empty and error states
+- Clear empty and error states using standard components
 
 ### Edit Profile
 - Update personal and professional information
+- Organized form with logical sections
 - Form validation and error handling
 - Immediate profile refresh after updates
 

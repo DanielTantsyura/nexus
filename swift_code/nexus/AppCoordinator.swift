@@ -2,16 +2,25 @@ import SwiftUI
 import Combine
 
 /// Available application screens
-enum ActiveScreen {
+enum ActiveScreen: Equatable {
+    /// Login screen
     case login
+    
+    /// Home dashboard screen
     case home
+    
+    /// List of all users
     case userList
+    
+    /// Detailed view of a specific user
     case userDetail
+    
+    /// Profile editing screen
     case editProfile
 }
 
 /// Centralized application coordinator that manages state and navigation
-class AppCoordinator: ObservableObject {
+final class AppCoordinator: ObservableObject {
     // MARK: - Published Properties
     
     /// Network manager for API communication
@@ -35,6 +44,17 @@ class AppCoordinator: ObservableObject {
     
     /// Initialize the coordinator
     init() {
+        setupInitialState()
+    }
+    
+    deinit {
+        loadTimer?.invalidate()
+    }
+    
+    // MARK: - Setup
+    
+    /// Set up the initial state of the coordinator
+    private func setupInitialState() {
         // Check if user is already logged in
         if networkManager.isLoggedIn {
             activeScreen = .home
@@ -43,22 +63,23 @@ class AppCoordinator: ObservableObject {
         
         // Set up a timer to check if data loaded successfully
         loadTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: false) { [weak self] _ in
-            if self?.networkManager.isLoggedIn == true && 
-               self?.networkManager.users.isEmpty == true && 
-               self?.networkManager.errorMessage == nil {
-                print("Initial load didn't get users, retrying...")
-                self?.refresh()
+            guard let self = self else { return }
+            
+            if self.networkManager.isLoggedIn && 
+               self.networkManager.users.isEmpty && 
+               self.networkManager.errorMessage == nil {
+                self.refresh()
             }
         }
-    }
-    
-    deinit {
-        loadTimer?.invalidate()
     }
     
     // MARK: - Authentication Methods
     
     /// Handle user login
+    /// - Parameters:
+    ///   - username: The username to log in with
+    ///   - password: The password to authenticate with
+    ///   - completion: Closure called with success flag
     func login(username: String, password: String, completion: @escaping (Bool) -> Void) {
         networkManager.login(username: username, password: password) { [weak self] result in
             switch result {
@@ -110,14 +131,14 @@ class AppCoordinator: ObservableObject {
         activeScreen = .home
         
         // Ensure user data is refreshed
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            self.networkManager.fetchCurrentUser()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.networkManager.fetchCurrentUser()
         }
     }
     
     /// Navigate to a user's detail view
+    /// - Parameter user: The user to display details for
     func showUserDetail(user: User) {
-        print("Navigating to user detail for \(user.fullName) (ID: \(user.id))")
         // Store selected user
         networkManager.selectedUser = user
         
@@ -150,8 +171,8 @@ class AppCoordinator: ObservableObject {
         activeScreen = .userList
         
         // Ensure user list is refreshed
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            self.networkManager.fetchUsers()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.networkManager.fetchUsers()
         }
     }
     
@@ -164,7 +185,7 @@ class AppCoordinator: ObservableObject {
     
     // MARK: - Private Methods
     
-    /// Internal refresh method
+    /// Internal refresh method based on the active screen
     private func refresh() {
         initialLoadComplete = false
         networkManager.isLoading = true
@@ -176,22 +197,18 @@ class AppCoordinator: ObservableObject {
         case .login:
             // Nothing to refresh on login screen
             break
+            
         case .home:
-            // On home screen, fetch both current user and all users
-            if networkManager.userId != nil {
-                networkManager.fetchCurrentUser()
-                
-                // After a small delay, fetch the user list as well
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    self.networkManager.fetchUsers()
-                }
-            }
+            refreshHomeScreen()
+            
         case .userList:
             networkManager.fetchUsers()
+            
         case .userDetail:
             if let user = networkManager.selectedUser {
                 networkManager.getConnections(userId: user.id)
             }
+            
         case .editProfile:
             if networkManager.userId != nil {
                 networkManager.fetchCurrentUser()
@@ -199,8 +216,20 @@ class AppCoordinator: ObservableObject {
         }
         
         // Set initial load complete after a delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.initialLoadComplete = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.initialLoadComplete = true
+        }
+    }
+    
+    /// Refreshes data specific to the home screen
+    private func refreshHomeScreen() {
+        if networkManager.userId != nil {
+            networkManager.fetchCurrentUser()
+            
+            // After a small delay, fetch the user list as well
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                self?.networkManager.fetchUsers()
+            }
         }
     }
 } 

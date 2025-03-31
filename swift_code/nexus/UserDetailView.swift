@@ -32,10 +32,10 @@ struct UserDetailView: View {
             retryTimer?.invalidate()
             retryTimer = nil
         }
-        .onChange(of: user.id) { 
+        .onChange(of: user.id) { _, _ in
             loadConnections(forceReload: true)
         }
-        .onChange(of: coordinator.networkManager.connections) { newConnections in
+        .onChange(of: coordinator.networkManager.connections) { _, _ in
             updateLocalConnections()
         }
         .sheet(isPresented: $showingAddConnectionSheet, onDismiss: {
@@ -279,7 +279,20 @@ struct ConnectionRow: View {
                 id: connection.id,
                 username: connection.username,
                 firstName: connection.firstName,
-                lastName: connection.lastName
+                lastName: connection.lastName,
+                email: connection.email,
+                phoneNumber: connection.phoneNumber,
+                location: connection.location,
+                university: connection.university,
+                fieldOfInterest: connection.fieldOfInterest,
+                highSchool: connection.highSchool,
+                birthday: nil,
+                createdAt: nil,
+                currentCompany: nil,
+                gender: connection.gender,
+                ethnicity: connection.ethnicity,
+                uniMajor: connection.uniMajor,
+                jobTitle: connection.jobTitle
             )
             UserAvatar(user: userForAvatar, size: 40)
             
@@ -304,12 +317,12 @@ struct ConnectionRow: View {
             }
         }
         .padding(.vertical, 8)
-        .alert("Remove Connection", isPresented: $showingRemoveAlert) {
+        .alert("Remove Connection", isPresented: $showingRemoveAlert, presenting: connection) { _ in
             Button("Cancel", role: .cancel) { }
             Button("Remove", role: .destructive) {
                 onRemove()
             }
-        } message: {
+        } message: { _ in
             Text("Are you sure you want to remove this connection?")
         }
     }
@@ -414,7 +427,15 @@ struct AddConnectionView: View {
             phoneNumber: "555-1234",
             location: "New York",
             university: "NYU",
-            fieldOfInterest: "Computer Science"
+            fieldOfInterest: "Computer Science",
+            highSchool: nil,
+            birthday: nil,
+            createdAt: nil,
+            currentCompany: "Tech Corp",
+            gender: nil,
+            ethnicity: nil,
+            uniMajor: "Computer Science",
+            jobTitle: "Software Engineer"
         ))
         .environmentObject(AppCoordinator())
     }
