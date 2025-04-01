@@ -43,6 +43,10 @@ struct ContentView: View {
                         UserListView()
                             .navigationTitle("All Users")
                             .navigationBarTitleDisplayMode(.large)
+                    case .createContact:
+                        CreateContactView()
+                            .navigationTitle("Create Contact")
+                            .navigationBarTitleDisplayMode(.large)
                     default:
                         HomeView()
                     }

@@ -459,6 +459,104 @@ class NetworkManager: ObservableObject {
         }.resume()
     }
     
+    // MARK: - Contact Management Methods
+    
+    /// Creates a new contact from free-form text and establishes a relationship with the current user
+    /// - Parameters:
+    ///   - contactText: Free-form text with contact information
+    ///   - tags: List of tags to apply to the relationship
+    ///   - completion: Closure called with result of operation
+    func createContact(contactText: String, tags: [String], completion: @escaping (Result<String, Error>) -> Void) {
+        guard let userId = self.userId else {
+            completion(.failure(NSError(domain: "NetworkManager", code: 401, userInfo: [NSLocalizedDescriptionKey: "Not logged in"])))
+            return
+        }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        guard let url = URL(string: "\(baseURL)/contacts/create") else {
+            isLoading = false
+            errorMessage = "Invalid URL"
+            completion(.failure(NSError(domain: "NetworkManager", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
+            return
+        }
+        
+        let contactData: [String: Any] = [
+            "text": contactText,
+            "user_id": userId,
+            "tags": tags
+        ]
+        
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: contactData) else {
+            isLoading = false
+            errorMessage = "Failed to encode contact data"
+            completion(.failure(NSError(domain: "NetworkManager", code: 400, userInfo: [NSLocalizedDescriptionKey: "Failed to encode contact data"])))
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = jsonData
+        
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.isLoading = false
+                
+                if let error = error {
+                    self.errorMessage = error.localizedDescription
+                    completion(.failure(error))
+                    return
+                }
+                
+                if let httpResponse = response as? HTTPURLResponse, !(200...299).contains(httpResponse.statusCode) {
+                    let statusError = NSError(domain: "NetworkManager", code: httpResponse.statusCode, 
+                                              userInfo: [NSLocalizedDescriptionKey: "Server error: \(httpResponse.statusCode)"])
+                    
+                    if let data = data, let errorResponse = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let errorMessage = errorResponse["message"] as? String {
+                        self.errorMessage = errorMessage
+                    } else {
+                        self.errorMessage = "Server error: \(httpResponse.statusCode)"
+                    }
+                    
+                    completion(.failure(statusError))
+                    return
+                }
+                
+                guard let data = data else {
+                    self.errorMessage = "No data received"
+                    completion(.failure(NSError(domain: "NetworkManager", code: 0, userInfo: [NSLocalizedDescriptionKey: "No data received"])))
+                    return
+                }
+                
+                do {
+                    if let responseDict = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let success = responseDict["success"] as? Bool,
+                       let message = responseDict["message"] as? String {
+                        
+                        if success {
+                            // Refresh users list in the background
+                            self.fetchUsers()
+                            completion(.success(message))
+                        } else {
+                            self.errorMessage = message
+                            completion(.failure(NSError(domain: "NetworkManager", code: 0, userInfo: [NSLocalizedDescriptionKey: message])))
+                        }
+                    } else {
+                        self.errorMessage = "Invalid response format"
+                        completion(.failure(NSError(domain: "NetworkManager", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid response format"])))
+                    }
+                } catch {
+                    self.errorMessage = "Failed to parse response: \(error.localizedDescription)"
+                    completion(.failure(error))
+                }
+            }
+        }.resume()
+    }
+    
     // MARK: - Helper Methods
     
     /// Generic method to fetch and decode data from the API

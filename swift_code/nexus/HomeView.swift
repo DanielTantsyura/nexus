@@ -218,15 +218,29 @@ struct HomeView: View {
     /// Navigation section with available actions
     private var navigationSection: some View {
         SectionCard(title: "Connect with the Network") {
-            // Use direct navigation
-            NavigationLink(value: ActiveScreen.userList) {
-                navigationButton(
-                    title: "Browse All Users",
-                    icon: "person.3.fill",
-                    color: .green
-                )
+            VStack(spacing: 12) {
+                // Browse all users
+                NavigationLink(value: ActiveScreen.userList) {
+                    navigationButton(
+                        title: "Browse All Users",
+                        icon: "person.3.fill",
+                        color: .green
+                    )
+                }
+                .buttonStyle(.plain)
+                
+                // Create new contact
+                Button(action: {
+                    coordinator.showCreateContact()
+                }) {
+                    navigationButton(
+                        title: "Create New Contact",
+                        icon: "person.badge.plus",
+                        color: .blue
+                    )
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
     }
     

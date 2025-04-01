@@ -17,6 +17,9 @@ enum ActiveScreen: Equatable {
     
     /// Profile editing screen
     case editProfile
+    
+    /// Create new contact screen
+    case createContact
 }
 
 /// Centralized application coordinator that manages state and navigation
@@ -122,6 +125,20 @@ final class AppCoordinator: ObservableObject {
         activeScreen = .editProfile
     }
     
+    /// Navigate to the create contact screen
+    func showCreateContact() {
+        navigationPath.append(ActiveScreen.createContact)
+        activeScreen = .createContact
+    }
+    
+    /// Navigate back from create contact to home
+    func backFromCreateContact() {
+        if !navigationPath.isEmpty {
+            navigationPath.removeLast()
+        }
+        activeScreen = .home
+    }
+    
     /// Navigate back from edit profile to home
     func backFromEditProfile() {
         // No need to clear navigation path, the system will handle this
@@ -213,6 +230,10 @@ final class AppCoordinator: ObservableObject {
             if networkManager.userId != nil {
                 networkManager.fetchCurrentUser()
             }
+            
+        case .createContact:
+            // Nothing to refresh for contact creation
+            break
         }
         
         // Set initial load complete after a delay
