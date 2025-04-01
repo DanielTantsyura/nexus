@@ -723,4 +723,55 @@ class NetworkManager: ObservableObject {
         }
         fetchAllUsers()
     }
+    
+    /// Fetches recent tags used by the current user
+    /// - Parameter completion: Closure called with result of operation
+    func fetchUserRecentTags(completion: @escaping (Result<[String], Error>) -> Void) {
+        guard let userId = self.userId else {
+            completion(.failure(NSError(domain: "NetworkManager", code: 401, userInfo: [NSLocalizedDescriptionKey: "Not logged in"])))
+            return
+        }
+        
+        guard let url = URL(string: "\(baseURL)/users/\(userId)/recent-tags") else {
+            errorMessage = "Invalid URL"
+            completion(.failure(NSError(domain: "NetworkManager", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                
+                if let error = error {
+                    self.errorMessage = error.localizedDescription
+                    completion(.failure(error))
+                    return
+                }
+                
+                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
+                    let error = NSError(domain: "NetworkManager", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Server error: \(httpResponse.statusCode)"])
+                    self.errorMessage = "Server error: \(httpResponse.statusCode)"
+                    completion(.failure(error))
+                    return
+                }
+                
+                guard let data = data else {
+                    self.errorMessage = "No data received"
+                    completion(.failure(NSError(domain: "NetworkManager", code: 0, userInfo: [NSLocalizedDescriptionKey: "No data received"])))
+                    return
+                }
+                
+                do {
+                    let tags = try JSONDecoder().decode([String].self, from: data)
+                    completion(.success(tags))
+                } catch {
+                    self.errorMessage = "Failed to decode recent tags: \(error.localizedDescription)"
+                    completion(.failure(error))
+                }
+            }
+        }.resume()
+    }
 }

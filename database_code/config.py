@@ -18,4 +18,8 @@ API_DEBUG = True
 
 # iOS app settings
 IOS_SIMULATOR_URL = "http://127.0.0.1:8080"
-IOS_DEVICE_URL = "http://10.0.0.232:8080"  # Replace with your actual IP as needed 
+IOS_DEVICE_URL = "http://10.0.0.232:8080"  # Replace with your actual IP as needed
+
+# User tag settings
+DEFAULT_TAGS = "Entrepreneurship,Finance,Physicality,Student,Close Friend,Recently Met"
+MAX_RECENT_TAGS = 6 

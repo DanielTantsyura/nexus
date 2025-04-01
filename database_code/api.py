@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, request
 from database_operations import DatabaseManager
 from flask_cors import CORS
-from config import API_HOST, API_PORT, API_DEBUG
+from config import API_HOST, API_PORT, API_DEBUG, DEFAULT_TAGS
 import newUser  # Import the new contact processing module
 
 app = Flask(__name__)
@@ -59,6 +59,19 @@ def create_contact():
     
     # Process the text and create the contact
     success, message, new_user_id = newUser.create_new_contact(text, tags, user_id)
+    
+    if success and tags:
+        # Update the user's recent tags
+        db.connect()
+        try:
+            # Only update recent tags if custom tags were provided
+            # Get the default tags list to compare against
+            default_tags_list = DEFAULT_TAGS.split(',')
+            custom_tags = [tag for tag in tags if tag not in default_tags_list]
+            if custom_tags:
+                db.update_user_recent_tags(user_id, custom_tags)
+        finally:
+            db.disconnect()
     
     if success:
         return jsonify({
@@ -245,6 +258,16 @@ def validate_login():
         if user_id:
             return jsonify({"user_id": user_id})
         return jsonify({"error": "Invalid login credentials"}), 401
+    finally:
+        db.disconnect()
+
+@app.route('/users/<int:user_id>/recent-tags', methods=['GET'])
+def get_user_recent_tags(user_id):
+    """Get a user's recently used tags."""
+    db.connect()
+    try:
+        recent_tags = db.get_user_recent_tags(user_id)
+        return jsonify(recent_tags)
     finally:
         db.disconnect()
 

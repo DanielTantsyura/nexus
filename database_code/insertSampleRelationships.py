@@ -11,12 +11,14 @@ def insert_sample_relationships():
         cursor = conn.cursor()
         
         # First, query to get the user IDs by name
-        get_user_id_sql = "SELECT id, first_name FROM users;"
+        get_user_id_sql = "SELECT id, first_name, last_name FROM users;"
         cursor.execute(get_user_id_sql)
         
         user_ids = {}
-        for id, first_name in cursor.fetchall():
+        user_full_names = {}
+        for id, first_name, last_name in cursor.fetchall():
             user_ids[first_name.lower()] = id
+            user_full_names[f"{first_name.lower()} {last_name.lower()}"] = id
         
         print(f"Found {len(user_ids)} users in the database")
         
@@ -74,23 +76,141 @@ def insert_sample_relationships():
                     'tags': "high school,entrepreneur,investing,startups",
                     'last_viewed': datetime.datetime.now() - datetime.timedelta(days=1)
                 })
+                
+            # Connection to Elon Musk
+            elon_id = user_ids.get('elon')
+            if elon_id:
+                relationships.append({
+                    'user_id': daniel_id,
+                    'contact_id': elon_id,
+                    'description': "Met at tech conference",
+                    'custom_note': "Briefly chatted at the AI Summit 2023. Expressed interest in my startup idea.",
+                    'tags': "tech,AI,entrepreneurship,VIP",
+                    'last_viewed': datetime.datetime.now() - datetime.timedelta(days=15)
+                })
+                
+            # Connection to Steve Jobs
+            steve_id = user_full_names.get('steve jobs')
+            if steve_id:
+                relationships.append({
+                    'user_id': daniel_id,
+                    'contact_id': steve_id,
+                    'description': "Mentor",
+                    'custom_note': "Read his biography and attended a talk he gave at Stanford. Major inspiration for my work.",
+                    'tags': "inspiration,design,leadership,tech",
+                    'last_viewed': datetime.datetime.now() - datetime.timedelta(days=60)
+                })
         else:
             print("Warning: Daniel not found in the database")
         
-        # Add Max-Soren connection - only need to define one direction
+        # Add Max's connections
         max_id = user_ids.get('max')
-        soren_id = user_ids.get('soren')
-        if max_id and soren_id:
+        if max_id:
+            # Connection to Soren
+            soren_id = user_ids.get('soren')
+            if soren_id:
+                relationships.append({
+                    'user_id': max_id,
+                    'contact_id': soren_id,
+                    'description': "College friends",
+                    'custom_note': "Met through Daniel at a campus event. Good at explaining complex economics concepts.",
+                    'tags': "college,economics,academic",
+                    'last_viewed': datetime.datetime.now() - datetime.timedelta(days=7)
+                })
+                
+            # Connection to Sheryl Sandberg
+            sheryl_id = user_ids.get('sheryl')
+            if sheryl_id:
+                relationships.append({
+                    'user_id': max_id,
+                    'contact_id': sheryl_id,
+                    'description': "Professional contact",
+                    'custom_note': "Met at a leadership conference in 2022. Discussed potential business collaborations.",
+                    'tags': "business,leadership,networking,tech",
+                    'last_viewed': datetime.datetime.now() - datetime.timedelta(days=20)
+                })
+        
+        # Add Corwin's connections
+        corwin_id = user_ids.get('corwin')
+        if corwin_id:
+            # Connection to Mark Zuckerberg
+            mark_id = user_ids.get('mark')
+            if mark_id:
+                relationships.append({
+                    'user_id': corwin_id,
+                    'contact_id': mark_id,
+                    'description': "Tech investor connection",
+                    'custom_note': "Met at Harvard alumni event. Discussed potential investment in my startup.",
+                    'tags': "investor,tech,harvard,networking",
+                    'last_viewed': datetime.datetime.now() - datetime.timedelta(days=12)
+                })
+                
+            # Connection to Satya Nadella
+            satya_id = user_ids.get('satya')
+            if satya_id:
+                relationships.append({
+                    'user_id': corwin_id,
+                    'contact_id': satya_id,
+                    'description': "Professional mentor",
+                    'custom_note': "Attended his talk on cloud computing. Had a brief conversation afterwards about my business ideas.",
+                    'tags': "mentor,cloud,business,technology",
+                    'last_viewed': datetime.datetime.now() - datetime.timedelta(days=45)
+                })
+        
+        # Add Steve Jobs connections
+        steve_id = user_full_names.get('steve jobs')
+        if steve_id:
+            # Connection to Elon Musk
+            elon_id = user_ids.get('elon')
+            if elon_id:
+                relationships.append({
+                    'user_id': steve_id,
+                    'contact_id': elon_id,
+                    'description': "Fellow innovator",
+                    'custom_note': "Met at several tech conferences. Admire his work in electric vehicles and space exploration.",
+                    'tags': "innovation,tech,entrepreneurship,visionary",
+                    'last_viewed': datetime.datetime.now() - datetime.timedelta(days=180)
+                })
+                
+            # Connection to Mark Zuckerberg
+            mark_id = user_ids.get('mark')
+            if mark_id:
+                relationships.append({
+                    'user_id': steve_id,
+                    'contact_id': mark_id,
+                    'description': "Silicon Valley connection",
+                    'custom_note': "Provided early mentorship on product design and company vision.",
+                    'tags': "mentor,design,tech,leadership",
+                    'last_viewed': datetime.datetime.now() - datetime.timedelta(days=365)
+                })
+        
+        # Add tech titans connections
+        elon_id = user_ids.get('elon')
+        if elon_id:
+            # Connection to Satya Nadella
+            satya_id = user_ids.get('satya')
+            if satya_id:
+                relationships.append({
+                    'user_id': elon_id,
+                    'contact_id': satya_id,
+                    'description': "Industry peer",
+                    'custom_note': "Collaborated on AI safety initiatives. Potential partnership between Tesla and Microsoft on cloud computing.",
+                    'tags': "AI,tech,business,cloud",
+                    'last_viewed': datetime.datetime.now() - datetime.timedelta(days=30)
+                })
+        
+        # Add Sheryl to Mark connection
+        sheryl_id = user_ids.get('sheryl')
+        mark_id = user_ids.get('mark')
+        if sheryl_id and mark_id:
             relationships.append({
-                'user_id': max_id,
-                'contact_id': soren_id,
-                'description': "College friends",
-                'custom_note': "Met through Daniel at a campus event. Good at explaining complex economics concepts.",
-                'tags': "college,economics,academic",
-                'last_viewed': datetime.datetime.now() - datetime.timedelta(days=7)
+                'user_id': sheryl_id,
+                'contact_id': mark_id,
+                'description': "Colleague and friend",
+                'custom_note': "Worked together at Meta for many years. Close professional relationship and friendship.",
+                'tags': "work,leadership,meta,business",
+                'last_viewed': datetime.datetime.now() - datetime.timedelta(days=5)
             })
-        else:
-            print(f"Warning: Max or Soren not found in the database. Max ID: {max_id}, Soren ID: {soren_id}")
         
         # Insert the relationships
         relationship_sql = """

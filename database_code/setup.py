@@ -26,14 +26,9 @@ def setup_database():
     
     print("⚠️ WARNING: This will delete all existing data in the database! ⚠️")
     print("The schema has been updated with new fields for users, relationships, and logins.")
-    print("Continuing will drop and recreate all tables, and all existing data will be lost.")
+    print("All existing data will be lost.")
     
-    confirm = input("\nDo you want to continue? (y/n): ")
-    if confirm.lower() != 'y':
-        print("Database setup cancelled.")
-        return False
-    
-    print("\nContinuing with database setup in 3 seconds...")
+    print("\nProceeding with database setup in 3 seconds...")
     time.sleep(3)
     
     print("\nStep 1: Creating database schema...")

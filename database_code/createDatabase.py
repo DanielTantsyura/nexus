@@ -28,6 +28,7 @@ CREATE TABLE users (
     job_title VARCHAR(100),
     profile_image_url VARCHAR(255),
     linkedin_url VARCHAR(255),
+    recent_tags TEXT,
     created_at TIMESTAMP DEFAULT NOW()
 );
 

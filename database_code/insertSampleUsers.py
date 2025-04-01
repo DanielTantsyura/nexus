@@ -1,5 +1,6 @@
 import psycopg2
-from config import DATABASE_URL
+from config import DATABASE_URL, DEFAULT_TAGS
+from datetime import datetime
 
 # Sample data as a list of dictionaries
 sample_data = [
@@ -9,6 +10,7 @@ sample_data = [
         "last_name": "Tantsyura",
         "email": "dan.tantsyura@gmail.com",
         "phone_number": "2033135627",
+        "birthday": "1999-04-15",
         "location": "Westchester, New York",
         "university": "CMU",
         "field_of_interest": "Business, Investing, Networking, Long Term Success",
@@ -19,7 +21,8 @@ sample_data = [
         "job_title": "Product Manager",
         "current_company": "Nexus Inc.",
         "profile_image_url": "https://randomuser.me/api/portraits/men/1.jpg",
-        "linkedin_url": "https://linkedin.com/in/danieltantsyura"
+        "linkedin_url": "https://linkedin.com/in/danieltantsyura",
+        "recent_tags": DEFAULT_TAGS
     },
     {
         "username": "sorendupont",
@@ -27,6 +30,7 @@ sample_data = [
         "last_name": "Dupont",
         "email": None,
         "phone_number": "6467998920",
+        "birthday": "1998-11-23",
         "location": "Brooklyn, New York",
         "university": "CMU",
         "field_of_interest": "Libertarian Economics, Math Competitions and Research, Coding",
@@ -37,7 +41,8 @@ sample_data = [
         "job_title": "Researcher",
         "current_company": "Tech Innovations",
         "profile_image_url": "https://randomuser.me/api/portraits/men/2.jpg",
-        "linkedin_url": "https://linkedin.com/in/sorendupont"
+        "linkedin_url": "https://linkedin.com/in/sorendupont",
+        "recent_tags": DEFAULT_TAGS
     },
     {
         "username": None,
@@ -45,6 +50,7 @@ sample_data = [
         "last_name": "Battaglia",
         "email": None,
         "phone_number": "2014191029",
+        "birthday": None,
         "location": "North New Jersey",
         "university": "CMU",
         "field_of_interest": "Communication, Business",
@@ -55,7 +61,8 @@ sample_data = [
         "job_title": "Business Development",
         "current_company": "Eagle Corp",
         "profile_image_url": "https://randomuser.me/api/portraits/men/3.jpg",
-        "linkedin_url": None
+        "linkedin_url": None,
+        "recent_tags": DEFAULT_TAGS
     },
     {
         "username": "stanosipenko",
@@ -63,6 +70,7 @@ sample_data = [
         "last_name": "Osipenko",
         "email": "osipenko@cmu.edu",
         "phone_number": None,
+        "birthday": "1997-08-12",
         "location": "London",
         "university": "CMU",
         "field_of_interest": "Self Improvement, Coding Competitions, Physicality",
@@ -73,7 +81,8 @@ sample_data = [
         "job_title": "Software Engineer",
         "current_company": "London Tech",
         "profile_image_url": "https://randomuser.me/api/portraits/men/4.jpg",
-        "linkedin_url": "https://linkedin.com/in/stanosipenko"
+        "linkedin_url": "https://linkedin.com/in/stanosipenko",
+        "recent_tags": DEFAULT_TAGS
     },
     {
         "username": "corwincheung",
@@ -81,6 +90,7 @@ sample_data = [
         "last_name": "Cheung",
         "email": "corwintcheung@gmail.com",
         "phone_number": "9173706098",
+        "birthday": "1999-02-28",
         "location": "NYC, New York",
         "university": "Harvard",
         "field_of_interest": "Entrepreneurship, Self Development, Physicality, Reading",
@@ -91,7 +101,108 @@ sample_data = [
         "job_title": "Entrepreneur",
         "current_company": "Self-employed",
         "profile_image_url": "https://randomuser.me/api/portraits/men/5.jpg",
-        "linkedin_url": "https://linkedin.com/in/corwincheung"
+        "linkedin_url": "https://linkedin.com/in/corwincheung",
+        "recent_tags": DEFAULT_TAGS
+    },
+    {
+        "username": "stevejobs",
+        "first_name": "Steve",
+        "last_name": "Jobs",
+        "email": "steve@apple.com",
+        "phone_number": "4085551234",
+        "birthday": "1955-02-24",
+        "location": "Palo Alto, California",
+        "university": "Reed College (dropped out)",
+        "field_of_interest": "Technology, Design, Innovation",
+        "high_school": "Homestead High School",
+        "gender": "Male",
+        "ethnicity": "White",
+        "uni_major": None,
+        "job_title": "Co-founder and CEO",
+        "current_company": "Apple Inc.",
+        "profile_image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dc/Steve_Jobs_Headshot_2010-CROP_%28cropped_2%29.jpg/800px-Steve_Jobs_Headshot_2010-CROP_%28cropped_2%29.jpg",
+        "linkedin_url": None,
+        "recent_tags": DEFAULT_TAGS
+    },
+    {
+        "username": "elonmusk",
+        "first_name": "Elon",
+        "last_name": "Musk",
+        "email": "elon@tesla.com",
+        "phone_number": None,
+        "birthday": "1971-06-28",
+        "location": "Austin, Texas",
+        "university": "University of Pennsylvania",
+        "field_of_interest": "Space Exploration, Electric Vehicles, AI, Renewable Energy",
+        "high_school": "Pretoria Boys High School",
+        "gender": "Male",
+        "ethnicity": None,
+        "uni_major": "Physics and Economics",
+        "job_title": "CEO",
+        "current_company": "Tesla, SpaceX, X",
+        "profile_image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Elon_Musk_Royal_Society_%28crop2%29.jpg/800px-Elon_Musk_Royal_Society_%28crop2%29.jpg",
+        "linkedin_url": None,
+        "recent_tags": DEFAULT_TAGS
+    },
+    {
+        "username": "sherylsandberg",
+        "first_name": "Sheryl",
+        "last_name": "Sandberg",
+        "email": "sheryl@meta.com",
+        "phone_number": "6505551234",
+        "birthday": "1969-08-28",
+        "location": "Menlo Park, California",
+        "university": "Harvard University",
+        "field_of_interest": "Leadership, Women in Tech, Management",
+        "high_school": None,
+        "gender": "Female",
+        "ethnicity": None,
+        "uni_major": "Economics",
+        "job_title": "Former COO",
+        "current_company": "Meta Platforms",
+        "profile_image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Sheryl_Sandberg_2013.jpg/800px-Sheryl_Sandberg_2013.jpg",
+        "linkedin_url": "https://linkedin.com/in/sherylsandberg",
+        "recent_tags": DEFAULT_TAGS
+    },
+    {
+        "username": "markzuckerberg",
+        "first_name": "Mark",
+        "last_name": "Zuckerberg",
+        "email": None,
+        "phone_number": None,
+        "birthday": "1984-05-14",
+        "location": "Palo Alto, California",
+        "university": "Harvard University (dropped out)",
+        "field_of_interest": "Social Media, Virtual Reality, Artificial Intelligence",
+        "high_school": "Phillips Exeter Academy",
+        "gender": "Male",
+        "ethnicity": "White",
+        "uni_major": "Computer Science",
+        "job_title": "Co-founder and CEO",
+        "current_company": "Meta Platforms",
+        "profile_image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Mark_Zuckerberg_F8_2019_Keynote_%2832830578717%29_%28cropped%29.jpg/800px-Mark_Zuckerberg_F8_2019_Keynote_%2832830578717%29_%28cropped%29.jpg",
+        "linkedin_url": None,
+        "recent_tags": DEFAULT_TAGS
+    },
+    {
+        "username": "satyandella",
+        "first_name": "Satya",
+        "last_name": "Nadella",
+        "email": "satya@microsoft.com",
+        "phone_number": "4255551234",
+        "birthday": "1967-08-19",
+        "location": "Redmond, Washington",
+        "university": "University of Wisconsin-Milwaukee",
+        "field_of_interest": "Cloud Computing, Business Transformation, AI",
+        "high_school": None,
+        "gender": "Male",
+        "ethnicity": "Indian",
+        "uni_major": "Computer Science",
+        "job_title": "CEO",
+        "current_company": "Microsoft",
+        "profile_image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Satya_Nadella.jpg/800px-Satya_Nadella.jpg",
+        "linkedin_url": "https://linkedin.com/in/satyanadella",
+        "recent_tags": DEFAULT_TAGS
     }
 ]
 
@@ -100,16 +211,16 @@ def insert_sample_users():
     # SQL INSERT command template - adjusted to match our table schema
     insert_sql = """
     INSERT INTO users (
-        username, first_name, last_name, email, phone_number,
+        username, first_name, last_name, email, phone_number, birthday,
         location, university, field_of_interest, high_school,
         gender, ethnicity, uni_major, job_title, current_company,
-        profile_image_url, linkedin_url
+        profile_image_url, linkedin_url, recent_tags
     )
     VALUES (
-        %(username)s, %(first_name)s, %(last_name)s, %(email)s, %(phone_number)s,
+        %(username)s, %(first_name)s, %(last_name)s, %(email)s, %(phone_number)s, %(birthday)s,
         %(location)s, %(university)s, %(field_of_interest)s, %(high_school)s,
         %(gender)s, %(ethnicity)s, %(uni_major)s, %(job_title)s, %(current_company)s,
-        %(profile_image_url)s, %(linkedin_url)s
+        %(profile_image_url)s, %(linkedin_url)s, %(recent_tags)s
     );
     """
 

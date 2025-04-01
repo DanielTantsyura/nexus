@@ -1,7 +1,7 @@
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from typing import List, Dict, Optional, Any, Tuple
-from config import DATABASE_URL
+from config import DATABASE_URL, DEFAULT_TAGS, MAX_RECENT_TAGS
 
 class DatabaseManager:
     """
@@ -189,19 +189,25 @@ class DatabaseManager:
             username, first_name, last_name, email, phone_number,
             location, university, field_of_interest, high_school,
             gender, ethnicity, uni_major, job_title, current_company,
-            profile_image_url, linkedin_url
+            profile_image_url, linkedin_url, recent_tags
         ) VALUES (
             %(username)s, %(first_name)s, %(last_name)s, %(email)s, %(phone_number)s,
             %(location)s, %(university)s, %(field_of_interest)s, %(high_school)s,
             %(gender)s, %(ethnicity)s, %(uni_major)s, %(job_title)s, %(current_company)s,
-            %(profile_image_url)s, %(linkedin_url)s
+            %(profile_image_url)s, %(linkedin_url)s, %(recent_tags)s
         ) RETURNING id;
         """
         
+        # Ensure the recent_tags field is present, set to default tags if not provided
+        if 'recent_tags' not in user_data or user_data['recent_tags'] is None:
+            user_data['recent_tags'] = DEFAULT_TAGS
+        
         try:
             self.cursor.execute(query, user_data)
+            user_id = self.cursor.fetchone()['id']
             self.connection.commit()
-            return self.cursor.fetchone()['id']
+            print(f"User created with ID: {user_id}")
+            return user_id
         except Exception as e:
             self.connection.rollback()
             print(f"Error adding user: {e}")
@@ -268,34 +274,66 @@ class DatabaseManager:
 
     def update_user(self, user_id: int, user_data: Dict[str, Any]) -> bool:
         """
-        Update user information.
+        Update an existing user in the database.
         
         Args:
-            user_id: ID of the user to update
-            user_data: Dictionary of fields to update
+            user_id: The ID of the user to update
+            user_data: Dictionary containing updated user information
             
         Returns:
-            True if successful, False otherwise
+            True if update was successful, False otherwise
         """
         # Build the SET clause dynamically based on provided fields
         set_clauses = []
-        params = []
-        for key, value in user_data.items():
-            set_clauses.append(f"{key} = %s")
-            params.append(value)
+        params = {'id': user_id}
         
-        params.append(user_id)  # Add user_id for the WHERE clause
+        # Map of user_data keys to database columns
+        field_mapping = {
+            'username': 'username',
+            'first_name': 'first_name',
+            'last_name': 'last_name',
+            'email': 'email',
+            'phone_number': 'phone_number',
+            'location': 'location',
+            'university': 'university',
+            'field_of_interest': 'field_of_interest',
+            'high_school': 'high_school',
+            'gender': 'gender',
+            'ethnicity': 'ethnicity',
+            'uni_major': 'uni_major',
+            'job_title': 'job_title',
+            'current_company': 'current_company',
+            'profile_image_url': 'profile_image_url',
+            'linkedin_url': 'linkedin_url',
+            'recent_tags': 'recent_tags'
+        }
+        
+        for key, db_column in field_mapping.items():
+            if key in user_data:
+                set_clauses.append(f"{db_column} = %({key})s")
+                params[key] = user_data[key]
+        
+        if not set_clauses:
+            print("No fields to update")
+            return False
         
         query = f"""
         UPDATE users
         SET {', '.join(set_clauses)}
-        WHERE id = %s;
+        WHERE id = %(id)s
         """
         
         try:
             self.cursor.execute(query, params)
+            rows_affected = self.cursor.rowcount
             self.connection.commit()
-            return True
+            
+            if rows_affected > 0:
+                print(f"User {user_id} updated successfully")
+                return True
+            else:
+                print(f"No user found with ID {user_id}")
+                return False
         except Exception as e:
             self.connection.rollback()
             print(f"Error updating user: {e}")
@@ -430,6 +468,89 @@ class DatabaseManager:
         except Exception as e:
             self.connection.rollback()
             print(f"Error updating last viewed timestamp: {e}")
+            return False
+
+    def get_user_recent_tags(self, user_id: int) -> Optional[List[str]]:
+        """
+        Get a user's recently used tags.
+        
+        Args:
+            user_id: The ID of the user
+            
+        Returns:
+            List of recent tags or None if not found
+        """
+        query = """
+        SELECT recent_tags FROM users
+        WHERE id = %s;
+        """
+        
+        try:
+            self.cursor.execute(query, (user_id,))
+            result = self.cursor.fetchone()
+            
+            if result and result['recent_tags']:
+                # Convert the comma-separated string to a list
+                return result['recent_tags'].split(',')
+            return []
+        except Exception as e:
+            print(f"Error retrieving recent tags: {e}")
+            return []
+    
+    def update_user_recent_tags(self, user_id: int, new_tags: List[str], max_tags: int = MAX_RECENT_TAGS) -> bool:
+        """
+        Update a user's recently used tags.
+        
+        Args:
+            user_id: The ID of the user
+            new_tags: List of new tags to add to the recent tags
+            max_tags: Maximum number of tags to keep in the recent tags list
+            
+        Returns:
+            True if update was successful, False otherwise
+        """
+        # First, get the current recent tags
+        current_tags = self.get_user_recent_tags(user_id)
+        
+        # Create a unique list of tags with new tags at the front
+        updated_tags = []
+        
+        # Add new tags first (if they're not already in the current tags)
+        for tag in new_tags:
+            if tag and tag not in updated_tags and tag not in current_tags:
+                updated_tags.append(tag)
+        
+        # Then add existing tags
+        for tag in current_tags:
+            if tag and tag not in updated_tags:
+                updated_tags.append(tag)
+        
+        # Limit to max_tags
+        updated_tags = updated_tags[:max_tags]
+        
+        # Convert list to comma-separated string
+        tags_string = ','.join(updated_tags) if updated_tags else None
+        
+        # Update the user record
+        query = """
+        UPDATE users
+        SET recent_tags = %s
+        WHERE id = %s
+        """
+        
+        try:
+            self.cursor.execute(query, (tags_string, user_id))
+            self.connection.commit()
+            
+            if self.cursor.rowcount > 0:
+                print(f"Recent tags updated for user {user_id}")
+                return True
+            else:
+                print(f"No user found with ID {user_id}")
+                return False
+        except Exception as e:
+            self.connection.rollback()
+            print(f"Error updating recent tags: {e}")
             return False
 
 

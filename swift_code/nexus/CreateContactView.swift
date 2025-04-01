@@ -19,6 +19,9 @@ struct CreateContactView: View {
     /// Collection of tags added to the contact
     @State private var selectedTags: [String] = []
     
+    /// Recent tags used by the user
+    @State private var recentTags: [String] = []
+    
     /// Controls whether the keyboard is active
     @FocusState private var isContactTextFieldFocused: Bool
     
@@ -30,6 +33,9 @@ struct CreateContactView: View {
     
     /// Whether a submit operation is in progress
     @State private var isSubmitting = false
+    
+    /// Whether recent tags are loading
+    @State private var isLoadingRecentTags = false
     
     // MARK: - View Body
     
@@ -67,6 +73,9 @@ struct CreateContactView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 isContactTextFieldFocused = true
             }
+            
+            // Fetch recent tags
+            fetchRecentTags()
         }
         .disabled(isSubmitting)
         .overlay(
@@ -193,6 +202,32 @@ struct CreateContactView: View {
                     }
                 }
                 
+                // Recent tags
+                if !recentTags.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Recent Tags")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        
+                        FlowLayout(spacing: 8) {
+                            ForEach(recentTags, id: \.self) { tag in
+                                Button(action: {
+                                    addTag(tag)
+                                }) {
+                                    Text(tag)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(selectedTags.contains(tag) ? Color.blue.opacity(0.2) : Color.purple.opacity(0.2))
+                                        .foregroundColor(selectedTags.contains(tag) ? .blue : .purple)
+                                        .cornerRadius(16)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
+                        }
+                    }
+                    .padding(.top, 8)
+                }
+                
                 Divider()
                 
                 // Custom tag creation
@@ -272,6 +307,23 @@ struct CreateContactView: View {
     
     // MARK: - Action Methods
     
+    /// Fetch recent tags from the API
+    private func fetchRecentTags() {
+        isLoadingRecentTags = true
+        
+        coordinator.networkManager.fetchUserRecentTags { result in
+            isLoadingRecentTags = false
+            
+            switch result {
+            case .success(let tags):
+                self.recentTags = tags
+            case .failure(let error):
+                print("Failed to fetch recent tags: \(error.localizedDescription)")
+                // Don't show an error banner, just silently fail for recent tags
+            }
+        }
+    }
+    
     /// Adds a tag to the selected tags
     /// - Parameter tag: The tag to add
     private func addTag(_ tag: String) {
@@ -320,6 +372,9 @@ struct CreateContactView: View {
                     successMessage = message
                 }
                 clearForm()
+                
+                // Refresh recent tags after adding a contact with new tags
+                fetchRecentTags()
                 
             case .failure(let error):
                 // Show error message

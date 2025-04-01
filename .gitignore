@@ -4,7 +4,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-venv/
 env/
 build/
 develop-eggs/
@@ -20,14 +19,23 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+venv/
 
-# IDE
+# Environment variables
+.env
+.venv
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE files
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# OS
+# OS specific
 .DS_Store
 .DS_Store?
 ._*
@@ -36,28 +44,5 @@ var/
 ehthumbs.db
 Thumbs.db
 
-# Project specific
-*.log
-.env
-
-# Swift/Xcode
-## User settings
-xcuserdata/
-
-## Obj-C/Swift specific
-*.hmap
-*.ipa
-*.dSYM.zip
-*.dSYM
-
-## Playgrounds
-timeline.xctimeline
-playground.xcworkspace
-
-# Swift Package Manager
-.build/
-.swiftpm/
-
-# CocoaPods
-Pods/
-*.xcworkspace
+# Test results
+test_results.json 
