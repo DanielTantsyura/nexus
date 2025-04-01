@@ -23,17 +23,12 @@ struct HomeView: View {
                 // Current user profile section
                 currentUserSection
                 
-                // Navigation options
-                navigationSection
+                // Settings section with logout
+                settingsSection
                 
                 Spacer(minLength: 50)
             }
             .padding()
-        }
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                logoutButton
-            }
         }
         .alert(isPresented: $showLogoutConfirmation) {
             logoutAlert
@@ -51,13 +46,31 @@ struct HomeView: View {
     
     // MARK: - UI Components
     
-    /// Logout button in the toolbar
-    private var logoutButton: some View {
-        Button(action: {
-            showLogoutConfirmation = true
-        }) {
-            Image(systemName: "rectangle.portrait.and.arrow.right")
-                .foregroundColor(.red)
+    /// Settings section with logout option
+    private var settingsSection: some View {
+        SectionCard(title: "Settings") {
+            Button(action: {
+                showLogoutConfirmation = true
+            }) {
+                HStack {
+                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                        .font(.title3)
+                        .foregroundColor(.white)
+                        .frame(width: 36, height: 36)
+                        .background(Color.red)
+                        .cornerRadius(10)
+                    
+                    Text("Logout")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    Spacer()
+                }
+                .padding()
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(10)
+            }
+            .buttonStyle(.plain)
         }
     }
     
@@ -213,63 +226,6 @@ struct HomeView: View {
                 }
             }
         }
-    }
-    
-    /// Navigation section with available actions
-    private var navigationSection: some View {
-        SectionCard(title: "Connect with the Network") {
-            VStack(spacing: 12) {
-                // Browse all users
-                NavigationLink(value: ActiveScreen.userList) {
-                    navigationButton(
-                        title: "Browse All Users",
-                        icon: "person.3.fill",
-                        color: .green
-                    )
-                }
-                .buttonStyle(.plain)
-                
-                // Create new contact
-                Button(action: {
-                    coordinator.showCreateContact()
-                }) {
-                    navigationButton(
-                        title: "Create New Contact",
-                        icon: "person.badge.plus",
-                        color: .blue
-                    )
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-    
-    /// Creates a styled navigation button
-    /// - Parameters:
-    ///   - title: Button title
-    ///   - icon: SF Symbol name for the icon
-    ///   - color: Background color for the icon
-    private func navigationButton(title: String, icon: String, color: Color) -> some View {
-        HStack {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundColor(.white)
-                .frame(width: 36, height: 36)
-                .background(color)
-                .cornerRadius(10)
-            
-            Text(title)
-                .font(.headline)
-                .foregroundColor(.primary)
-            
-            Spacer()
-            
-            Image(systemName: "chevron.right")
-                .foregroundColor(.gray)
-        }
-        .padding()
-        .background(Color.gray.opacity(0.1))
-        .cornerRadius(10)
     }
     
     // MARK: - Data Management

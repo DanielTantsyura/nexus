@@ -14,43 +14,9 @@ struct ContentView: View {
         Group {
             if coordinator.activeScreen == .login {
                 LoginView()
-        } else {
-                mainNavigationView
+            } else {
+                MainTabView()
             }
-        }
-    }
-    
-    // MARK: - Navigation Components
-    
-    /// Main navigation structure of the application after login
-    ///
-    /// Uses NavigationStack to manage the navigation hierarchy with paths
-    /// defined in the coordinator.
-    private var mainNavigationView: some View {
-        NavigationStack(path: $coordinator.navigationPath) {
-            // Base view is always HomeView
-            HomeView()
-                .navigationTitle("Nexus")
-                .navigationBarTitleDisplayMode(.large)
-                .navigationDestination(for: User.self) { user in
-                    UserDetailView(user: user)
-                }
-                .navigationDestination(for: ActiveScreen.self) { screen in
-                    switch screen {
-                    case .editProfile:
-                        EditProfileView()
-                    case .userList:
-                        UserListView()
-                            .navigationTitle("All Users")
-                            .navigationBarTitleDisplayMode(.large)
-                    case .createContact:
-                        CreateContactView()
-                            .navigationTitle("Create Contact")
-                            .navigationBarTitleDisplayMode(.large)
-                    default:
-                        HomeView()
-                    }
-                }
         }
     }
 }

@@ -38,6 +38,15 @@ final class AppCoordinator: ObservableObject {
     /// Track if initial loading has completed
     @Published var initialLoadComplete = false
     
+    /// Currently selected tab
+    @Published var selectedTab: TabSelection = .network
+    
+    /// Network tab navigation path
+    @Published var networkTabPath = NavigationPath()
+    
+    /// Profile tab navigation path
+    @Published var profileTabPath = NavigationPath()
+    
     // MARK: - Private Properties
     
     /// Timer to retry loading data if needed
@@ -76,6 +85,27 @@ final class AppCoordinator: ObservableObject {
         }
     }
     
+    // MARK: - Tab Navigation
+    
+    /// Set the active tab
+    /// - Parameter tab: The tab to select
+    func selectTab(_ tab: TabSelection) {
+        selectedTab = tab
+        
+        // Update current navigation path based on selected tab
+        switch tab {
+        case .network:
+            navigationPath = networkTabPath
+            activeScreen = .userList
+        case .profile:
+            navigationPath = profileTabPath
+            activeScreen = .home
+        case .addNew:
+            // Just set the active screen, no navigation path changes
+            activeScreen = .addNew
+        }
+    }
+    
     // MARK: - Authentication Methods
     
     /// Handle user login
@@ -87,7 +117,8 @@ final class AppCoordinator: ObservableObject {
         networkManager.login(username: username, password: password) { [weak self] result in
             switch result {
             case .success(_):
-                self?.activeScreen = .home
+                self?.activeScreen = .userList
+                self?.selectedTab = .network
                 self?.refresh()
                 completion(true)
             case .failure(_):
@@ -101,6 +132,8 @@ final class AppCoordinator: ObservableObject {
         networkManager.logout()
         activeScreen = .login
         navigationPath = NavigationPath()
+        networkTabPath = NavigationPath()
+        profileTabPath = NavigationPath()
     }
     
     // MARK: - Navigation Methods
@@ -108,20 +141,32 @@ final class AppCoordinator: ObservableObject {
     /// Navigate to the home screen
     func showHomeScreen() {
         // Only clear path when explicitly returning to home
-        navigationPath = NavigationPath()
+        if selectedTab == .profile {
+            profileTabPath = NavigationPath()
+        } else {
+            selectedTab = .profile
+            profileTabPath = NavigationPath()
+        }
+        navigationPath = profileTabPath
         activeScreen = .home
     }
     
     /// Navigate to the user list screen
     func showUserList() {
-        // Add to navigation path instead of clearing it
-        navigationPath.append(ActiveScreen.userList)
+        if selectedTab == .network {
+            networkTabPath = NavigationPath()
+        } else {
+            selectedTab = .network
+            networkTabPath = NavigationPath()
+        }
+        navigationPath = networkTabPath
         activeScreen = .userList
     }
     
     /// Navigate to the edit profile screen
     func showEditProfile() {
-        navigationPath.append(ActiveScreen.editProfile)
+        profileTabPath.append(ActiveScreen.editProfile)
+        navigationPath = profileTabPath
         activeScreen = .editProfile
     }
     
@@ -142,9 +187,10 @@ final class AppCoordinator: ObservableObject {
     /// Navigate back from edit profile to home
     func backFromEditProfile() {
         // No need to clear navigation path, the system will handle this
-        if !navigationPath.isEmpty {
-            navigationPath.removeLast()
+        if !profileTabPath.isEmpty {
+            profileTabPath.removeLast()
         }
+        navigationPath = profileTabPath
         activeScreen = .home
         
         // Ensure user data is refreshed
@@ -168,8 +214,14 @@ final class AppCoordinator: ObservableObject {
         // First fetch connections
         networkManager.getConnections(userId: user.id)
         
-        // Then navigate
-        navigationPath.append(user)
+        // Then navigate based on which tab we're in
+        if selectedTab == .network {
+            networkTabPath.append(user)
+            navigationPath = networkTabPath
+        } else {
+            profileTabPath.append(user)
+            navigationPath = profileTabPath
+        }
         
         // Schedule another connection fetch after navigation is complete
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
@@ -180,8 +232,16 @@ final class AppCoordinator: ObservableObject {
     /// Navigate back to the user list
     func backToUserList() {
         // No need to clear navigation path, the system will handle this
-        if !navigationPath.isEmpty {
-            navigationPath.removeLast()
+        if selectedTab == .network {
+            if !networkTabPath.isEmpty {
+                networkTabPath.removeLast()
+            }
+            navigationPath = networkTabPath
+        } else {
+            if !profileTabPath.isEmpty {
+                profileTabPath.removeLast()
+            }
+            navigationPath = profileTabPath
         }
         
         // Then set the active screen
