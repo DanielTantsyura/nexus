@@ -6,8 +6,8 @@ enum ActiveScreen: Equatable {
     /// Login screen
     case login
     
-    /// Home dashboard screen
-    case home
+    /// Profile dashboard screen
+    case profile
     
     /// List of all users
     case userList
@@ -69,7 +69,7 @@ final class AppCoordinator: ObservableObject {
     private func setupInitialState() {
         // Check if user is already logged in
         if networkManager.isLoggedIn {
-            activeScreen = .home
+            activeScreen = .profile
             refreshData()
         }
         
@@ -99,7 +99,7 @@ final class AppCoordinator: ObservableObject {
             activeScreen = .userList
         case .profile:
             navigationPath = profileTabPath
-            activeScreen = .home
+            activeScreen = .profile
         case .addNew:
             // Just set the active screen, no navigation path changes
             activeScreen = .addNew
@@ -138,9 +138,9 @@ final class AppCoordinator: ObservableObject {
     
     // MARK: - Navigation Methods
     
-    /// Navigate to the home screen
-    func showHomeScreen() {
-        // Only clear path when explicitly returning to home
+    /// Navigate to the profile screen
+    func showProfileScreen() {
+        // Only clear path when explicitly returning to profile
         if selectedTab == .profile {
             profileTabPath = NavigationPath()
         } else {
@@ -148,7 +148,7 @@ final class AppCoordinator: ObservableObject {
             profileTabPath = NavigationPath()
         }
         navigationPath = profileTabPath
-        activeScreen = .home
+        activeScreen = .profile
     }
     
     /// Navigate to the user list screen
@@ -191,7 +191,7 @@ final class AppCoordinator: ObservableObject {
             profileTabPath.removeLast()
         }
         navigationPath = profileTabPath
-        activeScreen = .home
+        activeScreen = .profile
         
         // Ensure user data is refreshed
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
@@ -275,8 +275,8 @@ final class AppCoordinator: ObservableObject {
             // Nothing to refresh on login screen
             break
             
-        case .home:
-            refreshHomeScreen()
+        case .profile:
+            refreshProfileScreen()
             
         case .userList:
             networkManager.fetchUsers()
@@ -302,8 +302,8 @@ final class AppCoordinator: ObservableObject {
         }
     }
     
-    /// Refreshes data specific to the home screen
-    private func refreshHomeScreen() {
+    /// Refreshes data specific to the profile screen
+    private func refreshProfileScreen() {
         if networkManager.userId != nil {
             networkManager.fetchCurrentUser()
             

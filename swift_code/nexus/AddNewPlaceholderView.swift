@@ -21,11 +21,6 @@ struct AddNewPlaceholderView: View {
             Text("This feature is coming soon!")
                 .font(.subheadline)
                 .foregroundColor(.gray)
-            
-            Text("A coworker is building this functionality")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .padding(.top, 10)
         }
         .padding()
         .navigationTitle("Add New")

@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Main home dashboard view displaying user profile and navigation options
-struct HomeView: View {
+/// Main profile dashboard view displaying user profile and navigation options
+struct ProfileView: View {
     // MARK: - Properties
     
     @EnvironmentObject private var coordinator: AppCoordinator
@@ -35,7 +35,7 @@ struct HomeView: View {
         }
         .onAppear {
             // Refresh current user data when view appears
-            coordinator.activeScreen = .home
+            coordinator.activeScreen = .profile
             loadUserData()
         }
         .onDisappear {
@@ -273,6 +273,6 @@ struct HomeView: View {
 // MARK: - Previews
 
 #Preview {
-    HomeView()
+    ProfileView()
         .environmentObject(AppCoordinator())
 } 
