@@ -1,14 +1,32 @@
+"""
+Creates the database schema for the Nexus application.
+
+This module contains functions to create the database schema with tables for:
+- users: Store user profiles and personal information
+- logins: Store login credentials and authentication data
+- relationships: Store bidirectional connections between users
+
+The schema supports both one-way and two-way relationship properties, where:
+- relationship_type is bidirectional (shared in both directions)
+- note, tags, and last_viewed are unidirectional (specific to each direction)
+"""
+
 import psycopg2
+import os
+from dotenv import load_dotenv
 from config import DATABASE_URL
 
-# Define your SQL commands
-sql_commands = """
--- Drop existing tables (if they exist) to ensure schema updates
+# Load environment variables
+load_dotenv()
+
+# SQL commands to create database schema
+SQL_COMMANDS = """
+-- Drop existing tables if they exist
 DROP TABLE IF EXISTS relationships;
 DROP TABLE IF EXISTS logins;
 DROP TABLE IF EXISTS users;
 
--- Create the expanded users table
+-- Create users table
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE,
@@ -16,68 +34,88 @@ CREATE TABLE users (
     last_name VARCHAR(50) NOT NULL,
     email VARCHAR(100) UNIQUE,
     phone_number VARCHAR(20),
-    birthday DATE,
     location VARCHAR(100),
-    high_school VARCHAR(100),
     university VARCHAR(100),
-    field_of_interest VARCHAR(100),
-    current_company VARCHAR(100),
+    field_of_interest VARCHAR(200),
+    high_school VARCHAR(100),
     gender VARCHAR(50),
-    ethnicity VARCHAR(100),
+    ethnicity VARCHAR(50),
     uni_major VARCHAR(100),
     job_title VARCHAR(100),
-    profile_image_url VARCHAR(255),
-    linkedin_url VARCHAR(255),
-    recent_tags TEXT,
-    created_at TIMESTAMP DEFAULT NOW()
+    current_company VARCHAR(100),
+    profile_image_url VARCHAR(200),
+    linkedin_url VARCHAR(200),
+    recent_tags TEXT
 );
 
--- Create the login table
+-- Create logins table for authentication
 CREATE TABLE logins (
     id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    username VARCHAR(50) NOT NULL UNIQUE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    username VARCHAR(50) NOT NULL,
     passkey VARCHAR(100) NOT NULL,
     last_login TIMESTAMP,
-    created_at TIMESTAMP DEFAULT NOW()
+    CONSTRAINT unique_user_id UNIQUE (user_id)
 );
 
--- Create the relationships table
+-- Create relationships table 
+-- NOTE: 
+-- - relationship_type is bidirectional (shared in both directions)
+-- - note, tags, and last_viewed are unidirectional (specific to each direction)
 CREATE TABLE relationships (
     id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    contact_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    relationship_description VARCHAR(255),
-    custom_note TEXT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    contact_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    relationship_type VARCHAR(50) NOT NULL,
+    note TEXT,
     tags TEXT,
     last_viewed TIMESTAMP,
-    created_at TIMESTAMP DEFAULT NOW(),
-    UNIQUE (user_id, contact_id)
+    CONSTRAINT unique_relationship UNIQUE (user_id, contact_id)
 );
 """
 
-def create_database():
-    """Creates the database schema for the Nexus application."""
-    try:
-        # Connect to your Railway Postgres instance
-        conn = psycopg2.connect(DATABASE_URL)
-        cursor = conn.cursor()
-
-        # Execute SQL commands; note that execute() might not handle multiple statements in one call
-        # So we split on semicolons and run each one separately
-        for command in sql_commands.strip().split(';'):
-            if command.strip():
-                cursor.execute(command)
+def create_database(connection_string: str = DATABASE_URL) -> bool:
+    """
+    Create the database schema by executing SQL commands.
+    
+    Args:
+        connection_string: PostgreSQL connection string
         
+    Returns:
+        True if successful, False otherwise
+    """
+    conn = None
+    try:
+        print("Connecting to PostgreSQL database...")
+        conn = psycopg2.connect(connection_string)
+        cursor = conn.cursor()
+        
+        print("Creating database schema...")
+        cursor.execute(SQL_COMMANDS)
+        
+        # Commit the changes
         conn.commit()
-        print("Tables dropped and recreated successfully with updated schema.")
-
-        cursor.close()
-        conn.close()
+        
+        print("Database schema created successfully.")
         return True
-    except Exception as e:
-        print("An error occurred:", e)
+        
+    except (Exception, psycopg2.DatabaseError) as error:
+        print(f"Error creating database schema: {error}")
+        if conn:
+            conn.rollback()
         return False
+        
+    finally:
+        if conn:
+            cursor.close()
+            conn.close()
+            print("Database connection closed.")
 
 if __name__ == "__main__":
-    create_database()
+    # Create the database schema
+    success = create_database()
+    
+    if success:
+        print("Database setup completed successfully.")
+    else:
+        print("Database setup failed.")

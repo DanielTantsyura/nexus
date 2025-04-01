@@ -44,5 +44,13 @@ venv/
 ehthumbs.db
 Thumbs.db
 
-# Test results
-test_results.json 
+# Test results and test files
+test_results.json
+test_*.py
+*_test.py
+
+# Database test data
+test_samples.json
+
+# Keep necessary setup files
+!setup.py 

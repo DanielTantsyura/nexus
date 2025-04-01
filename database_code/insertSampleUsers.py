@@ -1,248 +1,143 @@
-import psycopg2
+"""
+Insert sample users into the Nexus database for testing and demonstration.
+
+This module provides a function to populate the database with sample user profiles
+for testing purposes. It creates diverse user profiles with various fields populated
+to demonstrate the application's functionality.
+"""
+
+import json
+import os
+from typing import List, Dict, Any, Optional
+from database_operations import DatabaseManager
 from config import DATABASE_URL, DEFAULT_TAGS
-from datetime import datetime
 
-# Sample data as a list of dictionaries
-sample_data = [
-    {
-        "username": "danieltantsyura",
-        "first_name": "Daniel",
-        "last_name": "Tantsyura",
-        "email": "dan.tantsyura@gmail.com",
-        "phone_number": "2033135627",
-        "birthday": "1999-04-15",
-        "location": "Westchester, New York",
-        "university": "CMU",
-        "field_of_interest": "Business, Investing, Networking, Long Term Success",
-        "high_school": "Riverdale",
-        "gender": "Male",
-        "ethnicity": "White",
-        "uni_major": "Computer Science",
-        "job_title": "Product Manager",
-        "current_company": "Nexus Inc.",
-        "profile_image_url": "https://randomuser.me/api/portraits/men/1.jpg",
-        "linkedin_url": "https://linkedin.com/in/danieltantsyura",
-        "recent_tags": DEFAULT_TAGS
-    },
-    {
-        "username": "sorendupont",
-        "first_name": "Soren",
-        "last_name": "Dupont",
-        "email": None,
-        "phone_number": "6467998920",
-        "birthday": "1998-11-23",
-        "location": "Brooklyn, New York",
-        "university": "CMU",
-        "field_of_interest": "Libertarian Economics, Math Competitions and Research, Coding",
-        "high_school": None,
-        "gender": "Male",
-        "ethnicity": "White",
-        "uni_major": "Mathematics",
-        "job_title": "Researcher",
-        "current_company": "Tech Innovations",
-        "profile_image_url": "https://randomuser.me/api/portraits/men/2.jpg",
-        "linkedin_url": "https://linkedin.com/in/sorendupont",
-        "recent_tags": DEFAULT_TAGS
-    },
-    {
-        "username": None,
-        "first_name": "Max",
-        "last_name": "Battaglia",
-        "email": None,
-        "phone_number": "2014191029",
-        "birthday": None,
-        "location": "North New Jersey",
-        "university": "CMU",
-        "field_of_interest": "Communication, Business",
-        "high_school": None,
-        "gender": "Male",
-        "ethnicity": "White",
-        "uni_major": "Business Administration",
-        "job_title": "Business Development",
-        "current_company": "Eagle Corp",
-        "profile_image_url": "https://randomuser.me/api/portraits/men/3.jpg",
-        "linkedin_url": None,
-        "recent_tags": DEFAULT_TAGS
-    },
-    {
-        "username": "stanosipenko",
-        "first_name": "Stan",
-        "last_name": "Osipenko",
-        "email": "osipenko@cmu.edu",
-        "phone_number": None,
-        "birthday": "1997-08-12",
-        "location": "London",
-        "university": "CMU",
-        "field_of_interest": "Self Improvement, Coding Competitions, Physicality",
-        "high_school": None,
-        "gender": "Male",
-        "ethnicity": "White",
-        "uni_major": "Computer Science",
-        "job_title": "Software Engineer",
-        "current_company": "London Tech",
-        "profile_image_url": "https://randomuser.me/api/portraits/men/4.jpg",
-        "linkedin_url": "https://linkedin.com/in/stanosipenko",
-        "recent_tags": DEFAULT_TAGS
-    },
-    {
-        "username": "corwincheung",
-        "first_name": "Corwin",
-        "last_name": "Cheung",
-        "email": "corwintcheung@gmail.com",
-        "phone_number": "9173706098",
-        "birthday": "1999-02-28",
-        "location": "NYC, New York",
-        "university": "Harvard",
-        "field_of_interest": "Entrepreneurship, Self Development, Physicality, Reading",
-        "high_school": "Riverdale",
-        "gender": "Male",
-        "ethnicity": "Asian",
-        "uni_major": "Economics",
-        "job_title": "Entrepreneur",
-        "current_company": "Self-employed",
-        "profile_image_url": "https://randomuser.me/api/portraits/men/5.jpg",
-        "linkedin_url": "https://linkedin.com/in/corwincheung",
-        "recent_tags": DEFAULT_TAGS
-    },
-    {
-        "username": "stevejobs",
-        "first_name": "Steve",
-        "last_name": "Jobs",
-        "email": "steve@apple.com",
-        "phone_number": "4085551234",
-        "birthday": "1955-02-24",
-        "location": "Palo Alto, California",
-        "university": "Reed College (dropped out)",
-        "field_of_interest": "Technology, Design, Innovation",
-        "high_school": "Homestead High School",
-        "gender": "Male",
-        "ethnicity": "White",
-        "uni_major": None,
-        "job_title": "Co-founder and CEO",
-        "current_company": "Apple Inc.",
-        "profile_image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dc/Steve_Jobs_Headshot_2010-CROP_%28cropped_2%29.jpg/800px-Steve_Jobs_Headshot_2010-CROP_%28cropped_2%29.jpg",
-        "linkedin_url": None,
-        "recent_tags": DEFAULT_TAGS
-    },
-    {
-        "username": "elonmusk",
-        "first_name": "Elon",
-        "last_name": "Musk",
-        "email": "elon@tesla.com",
-        "phone_number": None,
-        "birthday": "1971-06-28",
-        "location": "Austin, Texas",
-        "university": "University of Pennsylvania",
-        "field_of_interest": "Space Exploration, Electric Vehicles, AI, Renewable Energy",
-        "high_school": "Pretoria Boys High School",
-        "gender": "Male",
-        "ethnicity": None,
-        "uni_major": "Physics and Economics",
-        "job_title": "CEO",
-        "current_company": "Tesla, SpaceX, X",
-        "profile_image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Elon_Musk_Royal_Society_%28crop2%29.jpg/800px-Elon_Musk_Royal_Society_%28crop2%29.jpg",
-        "linkedin_url": None,
-        "recent_tags": DEFAULT_TAGS
-    },
-    {
-        "username": "sherylsandberg",
-        "first_name": "Sheryl",
-        "last_name": "Sandberg",
-        "email": "sheryl@meta.com",
-        "phone_number": "6505551234",
-        "birthday": "1969-08-28",
-        "location": "Menlo Park, California",
-        "university": "Harvard University",
-        "field_of_interest": "Leadership, Women in Tech, Management",
-        "high_school": None,
-        "gender": "Female",
-        "ethnicity": None,
-        "uni_major": "Economics",
-        "job_title": "Former COO",
-        "current_company": "Meta Platforms",
-        "profile_image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Sheryl_Sandberg_2013.jpg/800px-Sheryl_Sandberg_2013.jpg",
-        "linkedin_url": "https://linkedin.com/in/sherylsandberg",
-        "recent_tags": DEFAULT_TAGS
-    },
-    {
-        "username": "markzuckerberg",
-        "first_name": "Mark",
-        "last_name": "Zuckerberg",
-        "email": None,
-        "phone_number": None,
-        "birthday": "1984-05-14",
-        "location": "Palo Alto, California",
-        "university": "Harvard University (dropped out)",
-        "field_of_interest": "Social Media, Virtual Reality, Artificial Intelligence",
-        "high_school": "Phillips Exeter Academy",
-        "gender": "Male",
-        "ethnicity": "White",
-        "uni_major": "Computer Science",
-        "job_title": "Co-founder and CEO",
-        "current_company": "Meta Platforms",
-        "profile_image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Mark_Zuckerberg_F8_2019_Keynote_%2832830578717%29_%28cropped%29.jpg/800px-Mark_Zuckerberg_F8_2019_Keynote_%2832830578717%29_%28cropped%29.jpg",
-        "linkedin_url": None,
-        "recent_tags": DEFAULT_TAGS
-    },
-    {
-        "username": "satyandella",
-        "first_name": "Satya",
-        "last_name": "Nadella",
-        "email": "satya@microsoft.com",
-        "phone_number": "4255551234",
-        "birthday": "1967-08-19",
-        "location": "Redmond, Washington",
-        "university": "University of Wisconsin-Milwaukee",
-        "field_of_interest": "Cloud Computing, Business Transformation, AI",
-        "high_school": None,
-        "gender": "Male",
-        "ethnicity": "Indian",
-        "uni_major": "Computer Science",
-        "job_title": "CEO",
-        "current_company": "Microsoft",
-        "profile_image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Satya_Nadella.jpg/800px-Satya_Nadella.jpg",
-        "linkedin_url": "https://linkedin.com/in/satyanadella",
-        "recent_tags": DEFAULT_TAGS
-    }
-]
-
-def insert_sample_users():
-    """Insert sample users into the database."""
-    # SQL INSERT command template - adjusted to match our table schema
-    insert_sql = """
-    INSERT INTO users (
-        username, first_name, last_name, email, phone_number, birthday,
-        location, university, field_of_interest, high_school,
-        gender, ethnicity, uni_major, job_title, current_company,
-        profile_image_url, linkedin_url, recent_tags
-    )
-    VALUES (
-        %(username)s, %(first_name)s, %(last_name)s, %(email)s, %(phone_number)s, %(birthday)s,
-        %(location)s, %(university)s, %(field_of_interest)s, %(high_school)s,
-        %(gender)s, %(ethnicity)s, %(uni_major)s, %(job_title)s, %(current_company)s,
-        %(profile_image_url)s, %(linkedin_url)s, %(recent_tags)s
-    );
+def insert_sample_users() -> Optional[List[Dict[str, Any]]]:
     """
-
+    Insert sample users into the database.
+    
+    Returns:
+        List of dictionaries containing user data if successful, None otherwise
+    """
+    # Sample user data
+    users = [
+        {
+            "username": "johndoe",
+            "first_name": "John",
+            "last_name": "Doe",
+            "email": "john.doe@example.com",
+            "phone_number": "555-123-4567",
+            "location": "New York, NY",
+            "university": "Stanford University",
+            "field_of_interest": "Computer Science, Artificial Intelligence",
+            "high_school": "Brooklyn Tech High School",
+            "gender": "Male",
+            "ethnicity": "White",
+            "uni_major": "Computer Science",
+            "job_title": "Software Engineer",
+            "current_company": "Google",
+            "profile_image_url": "https://randomuser.me/api/portraits/men/1.jpg",
+            "linkedin_url": "https://linkedin.com/in/johndoe",
+            "recent_tags": DEFAULT_TAGS
+        },
+        {
+            "username": "janedoe",
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "email": "jane.doe@example.com",
+            "phone_number": "555-987-6543",
+            "location": "San Francisco, CA",
+            "university": "UC Berkeley",
+            "field_of_interest": "Data Science, Machine Learning",
+            "high_school": "Mission High School",
+            "gender": "Female",
+            "ethnicity": "Asian",
+            "uni_major": "Statistics",
+            "job_title": "Data Scientist",
+            "current_company": "Meta",
+            "profile_image_url": "https://randomuser.me/api/portraits/women/1.jpg",
+            "linkedin_url": "https://linkedin.com/in/janedoe",
+            "recent_tags": DEFAULT_TAGS
+        },
+        {
+            "username": "msmith",
+            "first_name": "Michael",
+            "last_name": "Smith",
+            "email": "michael.smith@example.com",
+            "phone_number": "555-456-7890",
+            "location": "Chicago, IL",
+            "university": "University of Chicago",
+            "field_of_interest": "Finance, Economics",
+            "high_school": "Whitney M. Young Magnet High School",
+            "gender": "Male",
+            "ethnicity": "Black",
+            "uni_major": "Economics",
+            "job_title": "Financial Analyst",
+            "current_company": "Goldman Sachs",
+            "profile_image_url": "https://randomuser.me/api/portraits/men/2.jpg",
+            "linkedin_url": "https://linkedin.com/in/michaelsmith",
+            "recent_tags": DEFAULT_TAGS
+        },
+        {
+            "username": "ejohnson",
+            "first_name": "Emily",
+            "last_name": "Johnson",
+            "email": "emily.johnson@example.com",
+            "phone_number": "555-789-0123",
+            "location": "Boston, MA",
+            "university": "Harvard University",
+            "field_of_interest": "Medicine, Research",
+            "high_school": "Boston Latin School",
+            "gender": "Female",
+            "ethnicity": "White",
+            "uni_major": "Biology",
+            "job_title": "Medical Researcher",
+            "current_company": "Massachusetts General Hospital",
+            "profile_image_url": "https://randomuser.me/api/portraits/women/2.jpg",
+            "linkedin_url": "https://linkedin.com/in/emilyjohnson",
+            "recent_tags": DEFAULT_TAGS
+        },
+        {
+            "username": "dwilliams",
+            "first_name": "David",
+            "last_name": "Williams",
+            "email": "david.williams@example.com",
+            "phone_number": "555-234-5678",
+            "location": "Seattle, WA",
+            "university": "University of Washington",
+            "field_of_interest": "Engineering, Robotics",
+            "high_school": "Roosevelt High School",
+            "gender": "Male",
+            "ethnicity": "Hispanic",
+            "uni_major": "Mechanical Engineering",
+            "job_title": "Robotics Engineer",
+            "current_company": "Amazon",
+            "profile_image_url": "https://randomuser.me/api/portraits/men/3.jpg",
+            "linkedin_url": "https://linkedin.com/in/davidwilliams",
+            "recent_tags": DEFAULT_TAGS
+        }
+    ]
+    
+    # Insert users into the database
     try:
-        # Connect to the Railway Postgres instance
-        conn = psycopg2.connect(DATABASE_URL)
-        cursor = conn.cursor()
-
-        # Insert each sample record
-        for person in sample_data:
-            cursor.execute(insert_sql, person)
-
-        # Commit the transaction
-        conn.commit()
-        print("Sample user data inserted successfully.")
-
-        cursor.close()
-        conn.close()
-        return True
+        print(f"Inserting {len(users)} sample users...")
+        with DatabaseManager(DATABASE_URL) as db:
+            for user in users:
+                user_id = db.add_user(user)
+                print(f"Added user: {user['first_name']} {user['last_name']} (ID: {user_id})")
+                
+                # Set up login credentials for each user
+                db.add_user_login(user_id, user['username'], "password")
+        
+        return users
     except Exception as e:
-        print("An error occurred:", e)
-        return False
+        print(f"Error inserting sample users: {e}")
+        return None
 
 if __name__ == "__main__":
-    insert_sample_users()
+    # When run directly, insert sample users
+    result = insert_sample_users()
+    if result:
+        print(f"Successfully inserted {len(result)} sample users")
+    else:
+        print("Failed to insert sample users")

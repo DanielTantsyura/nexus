@@ -1,70 +1,115 @@
 #!/usr/bin/env python
 """
-Unified setup script for the Nexus application.
+Setup script for initializing the Nexus database.
 
-This script:
-1. Creates the database schema
-2. Inserts sample users
-3. Inserts sample relationships
-4. Sets up login credentials
+This script provides a comprehensive setup process for the Nexus application:
+1. Creates the database schema (tables for users, logins, relationships)
+2. Inserts sample users if requested
+3. Creates initial relationships between sample users
+4. Sets up login credentials for all users
 
-WARNING: This script drops and recreates tables, so all existing data will be lost.
-Only use this script when setting up the database for the first time or when you're
-willing to lose all existing data.
+WARNING: Running this script will drop and recreate all tables,
+resulting in the loss of all existing data!
 """
 
+import sys
+import os
+import time
+from dotenv import load_dotenv
+from config import DATABASE_URL, DEFAULT_TAGS
 from createDatabase import create_database
+from database_operations import DatabaseManager
 from insertSampleUsers import insert_sample_users
 from insertSampleRelationships import insert_sample_relationships
-from database_utils import DatabaseUtils
-import sys
-import time
 
-def setup_database():
-    """Set up the database with schema and sample data."""
-    print("\n=== Setting up Nexus Database ===\n")
+# Load environment variables
+load_dotenv()
+
+def setup_database(include_sample_data: bool = True, password: str = "password") -> bool:
+    """
+    Set up the Nexus database with schema and optional sample data.
     
-    print("⚠️ WARNING: This will delete all existing data in the database! ⚠️")
-    print("The schema has been updated with new fields for users, relationships, and logins.")
-    print("All existing data will be lost.")
-    
-    print("\nProceeding with database setup in 3 seconds...")
-    time.sleep(3)
-    
-    print("\nStep 1: Creating database schema...")
-    if create_database():
-        print("✅ Database schema created successfully.\n")
-    else:
-        print("❌ Failed to create database schema.\n")
-        return False
-    
-    print("Step 2: Inserting sample users...")
-    if insert_sample_users():
-        print("✅ Sample users inserted successfully.\n")
-    else:
-        print("❌ Failed to insert sample users.\n")
-        return False
-    
-    print("Step 3: Inserting sample relationships...")
-    if insert_sample_relationships():
-        print("✅ Sample relationships inserted successfully.\n")
-    else:
-        print("❌ Failed to insert sample relationships.\n")
-        return False
-    
-    print("Step 4: Setting up user passwords...")
-    db_utils = DatabaseUtils()
+    Args:
+        include_sample_data: Whether to include sample users and relationships
+        password: Default password to set for all users
+        
+    Returns:
+        True if setup was successful, False otherwise
+    """
     try:
-        db_utils.update_passwords("password")
-        print("✅ User passwords configured successfully.\n")
+        print("\n===== NEXUS DATABASE SETUP =====")
+        print("WARNING: This will drop and recreate all tables!")
+        
+        # Step 1: Create database schema
+        print("\n[Step 1/4] Creating database schema...")
+        if not create_database(DATABASE_URL):
+            print("❌ Database schema creation failed. Aborting setup.")
+            return False
+        print("✅ Database schema created successfully")
+        
+        # If no sample data is requested, finish here
+        if not include_sample_data:
+            print("\nSetup completed without sample data.")
+            return True
+        
+        # Step 2: Insert sample users
+        print("\n[Step 2/4] Inserting sample users...")
+        sample_users = insert_sample_users()
+        if not sample_users:
+            print("❌ Failed to insert sample users. Aborting setup.")
+            return False
+        print(f"✅ {len(sample_users)} sample users inserted successfully")
+        
+        # Step 3: Insert sample relationships
+        print("\n[Step 3/4] Creating sample relationships...")
+        if not insert_sample_relationships(sample_users):
+            print("❌ Failed to create sample relationships. Continuing anyway...")
+        else:
+            print("✅ Sample relationships created successfully")
+        
+        # Step 4: Set up login credentials
+        print("\n[Step 4/4] Setting up login credentials...")
+        with DatabaseManager(DATABASE_URL) as db:
+            if not db.update_passwords(password):
+                print("❌ Failed to set up login credentials. Continuing anyway...")
+            else:
+                print(f"✅ Login credentials set up with password: '{password}'")
+        
+        # Verify the setup was successful
+        print("\nVerifying database setup...")
+        with DatabaseManager(DATABASE_URL) as db:
+            db.check_database()
+        
+        print("\n===== SETUP COMPLETED SUCCESSFULLY =====")
+        print(f"Sample data was {'included' if include_sample_data else 'not included'}")
+        print(f"Default password for all users: '{password}'")
+        
+        return True
+        
     except Exception as e:
-        print(f"❌ Failed to set up user passwords: {e}\n")
+        print(f"\n❌ ERROR: Database setup failed: {str(e)}")
         return False
-    
-    print("\n=== Database setup completed successfully! ===\n")
-    print("You can now run the API with: python api.py")
-    print("Default username/password for all users is: <username>/password")
-    return True
 
 if __name__ == "__main__":
-    setup_database()
+    # Parse command line arguments
+    include_samples = True
+    password = "password"
+    
+    # Check for --no-samples flag
+    if "--no-samples" in sys.argv:
+        include_samples = False
+    
+    # Check for --password argument
+    for i, arg in enumerate(sys.argv):
+        if arg == "--password" and i+1 < len(sys.argv):
+            password = sys.argv[i+1]
+    
+    # Run the setup
+    success = setup_database(include_sample_data=include_samples, password=password)
+    
+    if not success:
+        print("\nDatabase setup failed. See errors above.")
+        sys.exit(1)
+    
+    print("\nDatabase is ready to use!")
+    sys.exit(0)
