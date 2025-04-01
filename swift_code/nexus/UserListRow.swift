@@ -7,6 +7,8 @@ struct UserListRow: View {
     /// User model to display
     let user: User
     
+    @State private var showingEditContactSheet = false
+    
     var body: some View {
         HStack(spacing: 12) {
             // Avatar
@@ -23,6 +25,13 @@ struct UserListRow: View {
                 .foregroundColor(.gray)
         }
         .padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .onLongPressGesture {
+            showingEditContactSheet = true
+        }
+        .sheet(isPresented: $showingEditContactSheet) {
+            EditProfileView(user: user)
+        }
     }
     
     /// User information display including name, education, location, and job

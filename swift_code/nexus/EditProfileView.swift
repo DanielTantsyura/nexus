@@ -7,6 +7,14 @@ struct EditProfileView: View {
     @EnvironmentObject private var coordinator: AppCoordinator
     @Environment(\.dismiss) private var dismiss
     
+    /// Optional user to edit. If nil, edit current user profile
+    var user: User?
+    
+    /// Whether the view is in a sheet or in the navigation stack
+    private var isInSheet: Bool {
+        return user != nil
+    }
+    
     /// Alert control properties
     @State private var showingSaveAlert = false
     @State private var saveAlertMessage = ""
@@ -31,6 +39,63 @@ struct EditProfileView: View {
     // MARK: - View Body
     
     var body: some View {
+        Group {
+            if isInSheet {
+                // For contacts, show in a NavigationView
+                NavigationView {
+                    profileEditContent
+                        .navigationTitle("Edit Contact")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarLeading) {
+                                Button("Cancel") {
+                                    dismiss()
+                                }
+                            }
+                            
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                Button("Save") {
+                                    saveProfile()
+                                }
+                                .disabled(coordinator.networkManager.isLoading)
+                            }
+                        }
+                }
+            } else {
+                // For current user, use existing navigation stack
+                profileEditContent
+                    .navigationTitle("Edit Profile")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+        }
+        .onAppear {
+            if !isInSheet {
+                coordinator.activeScreen = .editProfile
+            }
+            loadUserData()
+        }
+        .alert(isPresented: $showingSaveAlert) {
+            Alert(
+                title: Text(saveSuccess ? "Success" : "Error"),
+                message: Text(saveAlertMessage),
+                dismissButton: .default(Text("OK")) {
+                    if saveSuccess {
+                        if isInSheet {
+                            dismiss()
+                        } else {
+                            // Navigate back
+                            coordinator.navigationPath.removeLast()
+                        }
+                    }
+                }
+            )
+        }
+    }
+    
+    // MARK: - UI Components
+    
+    /// Content view for profile editing
+    private var profileEditContent: some View {
         ScrollView {
             VStack(spacing: 20) {
                 // Avatar display
@@ -41,32 +106,14 @@ struct EditProfileView: View {
             }
             .padding(.vertical)
         }
-        .navigationTitle("Edit Profile")
-        .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            coordinator.activeScreen = .editProfile
-            loadUserData()
-        }
-        .alert(isPresented: $showingSaveAlert) {
-            Alert(
-                title: Text(saveSuccess ? "Success" : "Error"),
-                message: Text(saveAlertMessage),
-                dismissButton: .default(Text("OK")) {
-                    if saveSuccess {
-                        // Navigate back
-                        coordinator.navigationPath.removeLast()
-                    }
-                }
-            )
-        }
     }
-    
-    // MARK: - UI Components
     
     /// Avatar display section
     private var avatarSection: some View {
         Group {
-            if let currentUser = coordinator.networkManager.currentUser {
+            if let userToEdit = user {
+                UserAvatar(user: userToEdit, size: 100)
+            } else if let currentUser = coordinator.networkManager.currentUser {
                 UserAvatar(user: currentUser, size: 100)
             }
         }
@@ -106,20 +153,22 @@ struct EditProfileView: View {
                 }
             }
             
-            // Save button
-            Button(action: saveProfile) {
-                if coordinator.networkManager.isLoading {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                } else {
-                    Text("Save Changes")
-                        .font(.headline)
-                        .foregroundColor(.white)
+            // Save button (only show for current user profile)
+            if !isInSheet {
+                Button(action: saveProfile) {
+                    if coordinator.networkManager.isLoading {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    } else {
+                        Text("Save Changes")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                    }
                 }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(coordinator.networkManager.isLoading)
+                .padding(.top, 10)
             }
-            .buttonStyle(PrimaryButtonStyle())
-            .disabled(coordinator.networkManager.isLoading)
-            .padding(.top, 10)
         }
         .padding()
     }
@@ -167,27 +216,35 @@ struct EditProfileView: View {
     
     /// Loads user data into form fields
     private func loadUserData() {
-        guard let currentUser = coordinator.networkManager.currentUser else { return }
+        // Determine which user to load data from
+        let userToLoad: User?
+        if let user = user {
+            // Load contact data
+            userToLoad = user
+        } else {
+            // Load current user data
+            userToLoad = coordinator.networkManager.currentUser
+        }
         
-        firstName = currentUser.firstName ?? ""
-        lastName = currentUser.lastName ?? ""
-        email = currentUser.email ?? ""
-        phoneNumber = currentUser.phoneNumber ?? ""
-        location = currentUser.location ?? ""
-        university = currentUser.university ?? ""
-        uniMajor = currentUser.uniMajor ?? ""
-        highSchool = currentUser.highSchool ?? ""
-        jobTitle = currentUser.jobTitle ?? ""
-        company = currentUser.currentCompany ?? ""
-        interests = currentUser.fieldOfInterest ?? ""
-        gender = currentUser.gender ?? ""
-        ethnicity = currentUser.ethnicity ?? ""
+        guard let userData = userToLoad else { return }
+        
+        firstName = userData.firstName ?? ""
+        lastName = userData.lastName ?? ""
+        email = userData.email ?? ""
+        phoneNumber = userData.phoneNumber ?? ""
+        location = userData.location ?? ""
+        university = userData.university ?? ""
+        uniMajor = userData.uniMajor ?? ""
+        highSchool = userData.highSchool ?? ""
+        jobTitle = userData.jobTitle ?? ""
+        company = userData.currentCompany ?? ""
+        interests = userData.fieldOfInterest ?? ""
+        gender = userData.gender ?? ""
+        ethnicity = userData.ethnicity ?? ""
     }
     
     /// Saves updated profile information to the API
     private func saveProfile() {
-        guard let userId = coordinator.networkManager.userId else { return }
-        
         let userData: [String: Any] = [
             "first_name": firstName,
             "last_name": lastName,
@@ -204,11 +261,14 @@ struct EditProfileView: View {
             "ethnicity": ethnicity
         ]
         
+        // Determine which user ID to use for the update
+        let userId = user?.id ?? (coordinator.networkManager.userId ?? 0)
+        
         coordinator.networkManager.updateUserProfile(userId: userId, userData: userData) { success in
             saveSuccess = success
             saveAlertMessage = success 
-                ? "Your profile has been updated successfully."
-                : coordinator.networkManager.errorMessage ?? "Failed to update profile."
+                ? isInSheet ? "Contact information has been updated successfully." : "Your profile has been updated successfully."
+                : coordinator.networkManager.errorMessage ?? (isInSheet ? "Failed to update contact." : "Failed to update profile.")
             showingSaveAlert = true
         }
     }
@@ -216,9 +276,32 @@ struct EditProfileView: View {
 
 // MARK: - Previews
 
-#Preview {
+#Preview("Edit Profile") {
     NavigationView {
         EditProfileView()
             .environmentObject(AppCoordinator())
     }
+}
+
+#Preview("Edit Contact") {
+    EditProfileView(user: User(
+        id: 1,
+        username: "johndoe",
+        firstName: "John",
+        lastName: "Doe",
+        email: "john@example.com",
+        phoneNumber: "555-1234",
+        location: "New York",
+        university: "NYU",
+        fieldOfInterest: "Computer Science",
+        highSchool: nil,
+        birthday: nil,
+        createdAt: nil,
+        currentCompany: "Tech Corp",
+        gender: nil,
+        ethnicity: nil,
+        uniMajor: "Computer Science",
+        jobTitle: "Software Engineer"
+    ))
+    .environmentObject(AppCoordinator())
 } 
