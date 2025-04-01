@@ -6,7 +6,7 @@ struct NexusApp: App {
     
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            NetworkView()
                 .environmentObject(coordinator)
         }
     }

@@ -20,50 +20,55 @@ struct MainTabView: View {
     // MARK: - View Body
     
     var body: some View {
-        TabView(selection: selection) {
-            // Network Tab
-            networkTabView
-                .tabItem {
-                    Text("Network")
-                }
-                .tag(TabSelection.network.rawValue)
+        ZStack(alignment: .bottom) {
+            // Main content
+            TabView(selection: selection) {
+                // Network Tab
+                networkTabView
+                    .tabItem {
+                        Text("Network")
+                    }
+                    .tag(TabSelection.network.rawValue)
+                
+                // Add New Tab (Middle Button)
+                addNewTabView
+                    .tabItem {
+                        Text("")
+                    }
+                    .tag(TabSelection.addNew.rawValue)
+                
+                // Profile Tab
+                profileTabView
+                    .tabItem {
+                        Text("Profile")
+                    }
+                    .tag(TabSelection.profile.rawValue)
+            }
             
-            // Add New Tab (Middle Button)
-            addNewTabView
-                .tabItem {
-                    Text("")
-                }
-                .tag(TabSelection.addNew.rawValue)
-            
-            // Profile Tab
-            profileTabView
-                .tabItem {
-                    Text("Profile")
-                }
-                .tag(TabSelection.profile.rawValue)
-        }
-        .overlay(
-            // Custom middle button
+            // Custom middle button overlay positioned above the tab bar
             VStack {
                 Spacer()
                 addButton
-                    .offset(y: -5) // Adjust to position above tab bar
+                    .offset(y: -8) // Position above tab bar and home indicator
             }
-        )
+            .ignoresSafeArea()
+        }
         .onAppear {
             // Style tab bar to have text only
             let appearance = UITabBarAppearance()
             appearance.configureWithDefaultBackground()
             
-            // Normal tabs
+            // Normal tabs - larger font
             let normalAttributes: [NSAttributedString.Key: Any] = [
-                .foregroundColor: UIColor.lightGray
+                .foregroundColor: UIColor.lightGray,
+                .font: UIFont.systemFont(ofSize: 20, weight: .medium)
             ]
             appearance.stackedLayoutAppearance.normal.titleTextAttributes = normalAttributes
             
-            // Selected tabs
+            // Selected tabs - larger font
             let selectedAttributes: [NSAttributedString.Key: Any] = [
-                .foregroundColor: UIColor.black
+                .foregroundColor: UIColor.black,
+                .font: UIFont.systemFont(ofSize: 20, weight: .semibold)
             ]
             appearance.stackedLayoutAppearance.selected.titleTextAttributes = selectedAttributes
             
@@ -71,11 +76,81 @@ struct MainTabView: View {
             appearance.stackedLayoutAppearance.normal.iconColor = .clear
             appearance.stackedLayoutAppearance.selected.iconColor = .clear
             
+            // Adjust vertical positioning
+            appearance.stackedLayoutAppearance.normal.titlePositionAdjustment = UIOffset(horizontal: 0, vertical: -5)
+            appearance.stackedLayoutAppearance.selected.titlePositionAdjustment = UIOffset(horizontal: 0, vertical: -5)
+            
+            // Increase tab bar height
+            let tabBarHeight: CGFloat = 80
+            
+            // Apply the custom appearance to the tab bar
             UITabBar.appearance().standardAppearance = appearance
             if #available(iOS 15.0, *) {
                 UITabBar.appearance().scrollEdgeAppearance = appearance
             }
+            
+            // Increase the tab bar height
+            UITabBar.appearance().frame.size.height = tabBarHeight
+            UITabBar.appearance().bounds.size.height = tabBarHeight
+            
+            // Use fill equally to distribute tabs evenly
+            UITabBar.appearance().itemPositioning = .fill
+            
+            // Create a custom layout using a subclass to adjust tab positioning
+            setupTabBarItemPositioning()
         }
+        .edgesIgnoringSafeArea(.bottom) // Make tab bar extend to screen edges
+    }
+    
+    // MARK: - Tab Bar Positioning
+    
+    /// Sets up custom tab bar item positioning
+    private func setupTabBarItemPositioning() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                  let window = windowScene.windows.first,
+                  let rootViewController = window.rootViewController else {
+                return
+            }
+            
+            if let tabBarController = findTabBarController(in: rootViewController) {
+                // Get the tab bar
+                let tabBar = tabBarController.tabBar
+                
+                // Ensure we have 3 tab bar items
+                guard let items = tabBar.items, items.count == 3 else { return }
+                
+                // Calculate screen width and determine center points for each half
+                let screenWidth = window.bounds.width
+                
+                // Adjust the first tab (Network) - position in center of left half
+                // Move it right toward the center of the left half (screenWidth/4)
+                items[0].titlePositionAdjustment = UIOffset(horizontal: 42, vertical: 0)
+                
+                // Skip the middle tab (already hidden)
+                
+                // Adjust the last tab (Profile) - position in center of right half
+                // Move it left toward the center of the right half (-screenWidth/4)
+                items[2].titlePositionAdjustment = UIOffset(horizontal: -42, vertical: 0)
+            }
+        }
+    }
+    
+    /// Recursively finds the UITabBarController in the view controller hierarchy
+    private func findTabBarController(in viewController: UIViewController) -> UITabBarController? {
+        if let tabBarController = viewController as? UITabBarController {
+            return tabBarController
+        }
+        
+        if let navigationController = viewController as? UINavigationController {
+            return findTabBarController(in: navigationController.visibleViewController ?? navigationController)
+        }
+        
+        if let presentedController = viewController.presentedViewController {
+            return findTabBarController(in: presentedController)
+        }
+        
+        return nil
     }
     
     // MARK: - Tab Components
@@ -107,10 +182,10 @@ struct MainTabView: View {
         }
     }
     
-    /// Profile tab view (HomeView)
+    /// Profile tab view (ProfileView)
     private var profileTabView: some View {
         NavigationStack(path: $coordinator.profileTabPath) {
-            HomeView()
+            ProfileView()
                 .navigationTitle("Profile")
                 .navigationBarTitleDisplayMode(.large)
                 .navigationDestination(for: User.self) { user in
@@ -125,7 +200,7 @@ struct MainTabView: View {
                             .navigationTitle("All Users")
                             .navigationBarTitleDisplayMode(.large)
                     default:
-                        HomeView()
+                        ProfileView()
                     }
                 }
         }
@@ -139,11 +214,11 @@ struct MainTabView: View {
             ZStack {
                 Circle()
                     .fill(Color.green)
-                    .frame(width: 56, height: 56)
+                    .frame(width: 70, height: 70)
                     .shadow(radius: 2)
                 
                 Image(systemName: "plus")
-                    .font(.system(size: 22, weight: .bold))
+                    .font(.system(size: 28, weight: .bold))
                     .foregroundColor(.white)
             }
         }

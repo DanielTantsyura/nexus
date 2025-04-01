@@ -1,22 +1,29 @@
 import SwiftUI
 
-// MARK: - Main Content View
+// MARK: - Main Network View
 
 /// The main content view for the Nexus application
 /// 
 /// This view serves as the entry point and orchestrates navigation between different screens,
 /// handling the transition from login to the main application interface.
-struct ContentView: View {
+struct NetworkView: View {
     /// App coordinator that manages navigation and application state
     @EnvironmentObject var coordinator: AppCoordinator
     
     var body: some View {
-        Group {
-            if coordinator.activeScreen == .login {
-                LoginView()
-            } else {
-                MainTabView()
-            }
+        // Only show MainTabView after login, otherwise show LoginView with no tab bar
+        if coordinator.activeScreen == .login {
+            LoginView()
+                .onAppear {
+                    // Hide tab bar when login screen appears
+                    UITabBar.appearance().isHidden = true
+                }
+        } else {
+            MainTabView()
+                .onAppear {
+                    // Show tab bar when main app appears
+                    UITabBar.appearance().isHidden = false
+                }
         }
     }
 }
@@ -40,7 +47,7 @@ extension EnvironmentValues {
 // MARK: - Preview
 
 #Preview {
-    ContentView()
+    NetworkView()
         .environmentObject(AppCoordinator())
 }
 
