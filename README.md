@@ -10,16 +10,24 @@ Nexus is a modern social networking platform with a Flask-based backend API and 
 
 ### Backend Improvements
 
-1. **Database Utilities Consolidation**
-   - Combined multiple utility scripts into a unified `database_utils.py`
-   - Created a structured `DatabaseUtils` class with comprehensive methods for database operations
-   - Added proper error handling and connection management
-   - Implemented a command-line interface for easier utility execution
+1. **Database Operations Consolidation**
+   - Consolidated `DatabaseUtils` and `DatabaseManager` into a single comprehensive class
+   - Implemented context managers for improved resource management
+   - Enhanced error handling throughout all database operations
+   - Added bidirectional relationship support with clear separation of one-way and two-way properties
+   - Implemented last login tracking for user activity monitoring
 
-2. **Documentation Enhancements**
-   - Updated README files with clearer project structure information
-   - Improved API endpoint documentation
-   - Enhanced setup instructions
+2. **API Enhancements**
+   - Added command-line arguments for flexible port configuration
+   - Improved API response formats with consistent error handling
+   - Added endpoints for login tracking and relationship management
+   - Better organized endpoints with detailed documentation
+
+3. **Documentation Improvements**
+   - Created comprehensive README files with detailed setup instructions
+   - Added extensive docstrings to all modules and functions
+   - Documented database schema with clear explanation of relationship structure
+   - Added troubleshooting guides for common issues
 
 ### iOS Client Improvements
 
@@ -47,7 +55,8 @@ Nexus is a modern social networking platform with a Flask-based backend API and 
 
 - **Flask-based RESTful API**: Clean separation of routes and database operations
 - **PostgreSQL Database**: Robust data storage with proper connection management
-- **Utility Scripts**: Consolidated database management utilities
+- **Comprehensive Database Manager**: Unified class for all database operations
+- **Environment Configuration**: Flexible settings via environment variables
 
 ### iOS Client
 
@@ -68,11 +77,13 @@ Nexus is a modern social networking platform with a Flask-based backend API and 
   - Bidirectional connections between users with relationship types
   - View and manage user connections
   - Automatic relationship synchronization
+  - Separate one-way and two-way relationship properties
 
 - **Authentication**:
   - Secure login system with username/password authentication
   - User-specific data access
   - Persistent login with UserDefaults storage
+  - Last login tracking for user activity monitoring
 
 - **Modern UI**:
   - Clean, responsive SwiftUI interface
@@ -87,8 +98,8 @@ nexus/
 │   ├── api.py                    # Flask API server
 │   ├── config.py                 # Configuration settings
 │   ├── createDatabase.py         # Database schema creation
-│   ├── database_operations.py    # Core database operations
-│   ├── database_utils.py         # Database maintenance utilities
+│   ├── database_operations.py    # Unified database management class
+│   ├── newUser.py                # Natural language contact creation
 │   ├── insertSampleUsers.py      # Sample user data insertion
 │   ├── insertSampleRelationships.py # Sample relationship data
 │   ├── setup.py                  # One-step setup script
@@ -120,20 +131,43 @@ nexus/
    pip install -r requirements.txt
    ```
 
-2. **Set Up Database**
+2. **Create .env File**
+   Create a `.env` file in the project root with:
+   ```
+   DATABASE_URL=postgresql://username:password@localhost:5432/nexus
+   API_PORT=8080
+   OPENAI_API_KEY=your_openai_api_key
+   ```
+
+3. **Set Up Database**
    ```
    cd database_code
    python setup.py
    ```
    This script creates the database schema and populates it with sample data.
 
-3. **Start API Server**
+   For setup without sample data:
+   ```
+   python setup.py --no-samples
+   ```
+
+   To customize the default password:
+   ```
+   python setup.py --password custompassword
+   ```
+
+4. **Start API Server**
    ```
    cd database_code
    python api.py
    ```
 
-4. **API Endpoints**
+   To use a custom port:
+   ```
+   python api.py --port 9000
+   ```
+
+5. **API Endpoints**
 
    | Endpoint | Method | Description |
    |----------|--------|-------------|
@@ -141,13 +175,16 @@ nexus/
    | `/users` | POST | Create a new user |
    | `/users/{user_id}` | GET | Get user by ID |
    | `/users/{user_id}` | PUT | Update a user |
-   | `/users/{username}` | GET | Get user by username |
-   | `/users/search?term={search_term}` | GET | Search for users |
-   | `/users/{user_id}/connections` | GET | Get user connections |
+   | `/users/search?q={search_term}` | GET | Search for users |
+   | `/connections/{user_id}` | GET | Get user connections |
    | `/connections` | POST | Create a new connection |
+   | `/connections` | PUT | Update a connection |
    | `/connections` | DELETE | Remove a connection |
-   | `/login` | POST | Create login credentials |
-   | `/login/validate` | POST | Validate user credentials |
+   | `/contacts/create` | POST | Create a contact from text |
+   | `/login` | POST | Validate login credentials |
+   | `/users/{user_id}/update-last-login` | POST | Update last login timestamp |
+   | `/utils/check-database` | GET | Check database state |
+   | `/utils/update-passwords` | POST | Update all user passwords |
 
 ### iOS Client Setup
 
@@ -161,21 +198,34 @@ nexus/
    - Select a device or simulator
    - Run the application (⌘+R)
 
-## Database Utilities
+## Database Features
 
-The project includes a consolidated utility script for database management:
+### Relationship Management
 
-```
-cd database_code
-python database_utils.py [command] [args]
-```
+The relationship system supports both one-way and two-way properties:
 
-Available commands:
+- **Two-way properties**: `relationship_type` is shared in both directions
+- **One-way properties**: `note`, `tags`, and `last_viewed` are specific to each direction
 
-- `check` - View current database state
-- `passwords [password]` - Update all user passwords
-- `clean [threshold]` - Remove test data
-- `login <user_id> <username> <password>` - Ensure a specific user has login credentials
+This design allows users to maintain their own perspective on the relationship while sharing a common relationship type.
+
+### Login Tracking
+
+The system tracks when users log in or open the application:
+
+- The `last_login` field in the `logins` table is automatically updated when:
+  - A user successfully logs in through the `/login` endpoint
+  - The app is opened and calls the `/users/{id}/update-last-login` endpoint
+
+This tracking enables features like showing "last seen" information, detecting inactive accounts, and providing activity analytics.
+
+### Natural Language Processing
+
+The system uses OpenAI's API to extract structured user data from free-form text:
+
+- Process text descriptions into structured user profiles
+- Extract additional notes that don't fit standard fields
+- Automatically create contacts with proper relationship data
 
 ## Testing
 
@@ -197,7 +247,7 @@ This tests:
 1. **Backend**
    - Implement authentication middleware
    - Add pagination for large data sets
-   - Create comprehensive test suite
+   - Support for multiple relationship types
    - Add user profile image support
 
 2. **iOS Client**
@@ -212,6 +262,7 @@ This tests:
 - **Flask** - Web framework
 - **PostgreSQL** - Relational database
 - **psycopg2** - PostgreSQL adapter
+- **OpenAI API** - Natural language processing
 
 ### iOS Client
 - **Swift 5.7+**
