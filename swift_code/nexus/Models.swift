@@ -57,6 +57,9 @@ struct User: Identifiable, Codable, Hashable {
     /// Current job title
     let jobTitle: String?
     
+    /// Last login timestamp
+    let lastLogin: String?
+    
     // MARK: - Coding Keys
     
     /// Maps Swift property names to JSON field names
@@ -78,6 +81,7 @@ struct User: Identifiable, Codable, Hashable {
         case ethnicity
         case uniMajor = "uni_major"
         case jobTitle = "job_title"
+        case lastLogin = "last_login"
     }
     
     // MARK: - Computed Properties
@@ -206,9 +210,17 @@ struct LoginResponse: Codable {
     /// ID of the authenticated user
     let userId: Int
     
+    /// Last login timestamp (can be nil for first-time login)
+    let lastLogin: String?
+    
+    /// User data returned from login
+    let user: User?
+    
     /// Maps Swift property names to JSON field names
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
+        case lastLogin = "last_login"
+        case user
     }
 }
 

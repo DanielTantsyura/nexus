@@ -72,6 +72,8 @@ final class AppCoordinator: ObservableObject {
         if networkManager.isLoggedIn {
             activeScreen = .profile
             refreshData()
+            // Update last login when the app is opened
+            networkManager.updateLastLogin()
         }
         
         // Set up a timer to check if data loaded successfully

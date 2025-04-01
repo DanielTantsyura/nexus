@@ -78,7 +78,7 @@ class NetworkManager: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        guard let url = URL(string: "\(baseURL)/login/validate") else {
+        guard let url = URL(string: "\(baseURL)/login") else {
             handleError("Invalid URL", error: .unknownError, completion: completion)
             return
         }
@@ -129,7 +129,13 @@ class NetworkManager: ObservableObject {
                     
                     // Save session and fetch user data
                     self.saveSession(userId: loginResponse.userId)
-                    self.fetchCurrentUser()
+                    
+                    // If user data is included in the response, use it directly
+                    if let user = loginResponse.user {
+                        self.currentUser = user
+                    } else {
+                        self.fetchCurrentUser()
+                    }
                     
                     completion(.success(loginResponse.userId))
                 } catch {
@@ -137,6 +143,32 @@ class NetworkManager: ObservableObject {
                                     error: .unknownError, 
                                     completion: completion)
                 }
+            }
+        }.resume()
+    }
+    
+    /// Updates the last login timestamp for the current user when the app is opened
+    func updateLastLogin() {
+        guard let userId = self.userId else { return }
+        
+        guard let url = URL(string: "\(baseURL)/users/\(userId)/update-last-login") else {
+            print("Invalid URL for updating last login")
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        URLSession.shared.dataTask(with: request) { _, response, error in
+            if let error = error {
+                print("Error updating last login: \(error.localizedDescription)")
+                return
+            }
+            
+            if let httpResponse = response as? HTTPURLResponse, !(200...299).contains(httpResponse.statusCode) {
+                print("Server error updating last login: \(httpResponse.statusCode)")
+                return
             }
         }.resume()
     }
@@ -720,6 +752,7 @@ class NetworkManager: ObservableObject {
         if let userId = self.userId {
             fetchCurrentUser()
             getConnections(userId: userId)
+            updateLastLogin()
         }
         fetchAllUsers()
     }
