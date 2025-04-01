@@ -201,14 +201,23 @@ struct Login: Codable {
     /// Username for authentication
     let username: String
     
-    /// Password or passkey for authentication
-    let passkey: String
+    /// Password for authentication
+    let password: String
+    
+    /// Maps Swift property names to JSON field names
+    enum CodingKeys: String, CodingKey {
+        case username
+        case password
+    }
 }
 
 /// Response from a successful login
 struct LoginResponse: Codable {
     /// ID of the authenticated user
     let userId: Int
+    
+    /// Authentication token for subsequent requests
+    let token: String
     
     /// Last login timestamp (can be nil for first-time login)
     let lastLogin: String?
@@ -219,6 +228,7 @@ struct LoginResponse: Codable {
     /// Maps Swift property names to JSON field names
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
+        case token = "auth_token"
         case lastLogin = "last_login"
         case user
     }

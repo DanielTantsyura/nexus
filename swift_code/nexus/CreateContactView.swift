@@ -85,6 +85,7 @@ struct CreateContactView: View {
                 }
             }
         )
+        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
     
     // MARK: - UI Components
@@ -145,7 +146,7 @@ struct CreateContactView: View {
     private var contactTextArea: some View {
         SectionCard(title: "Contact Information") {
             TextEditor(text: $contactText)
-                .frame(minHeight: 150)
+                .frame(minHeight: 150, maxHeight: .infinity)
                 .padding(4)
                 .background(Color(.systemGray6))
                 .cornerRadius(8)
@@ -154,6 +155,7 @@ struct CreateContactView: View {
                     RoundedRectangle(cornerRadius: 8)
                         .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                 )
+                .ignoresSafeArea(.keyboard, edges: .bottom)
         }
     }
     
@@ -362,25 +364,38 @@ struct CreateContactView: View {
         isSubmitting = true
         
         // Call the API to create the contact
-        coordinator.networkManager.createContact(contactText: contactText, tags: selectedTags) { result in
+        guard let userId = coordinator.networkManager.userId else {
+            isSubmitting = false
+            errorMessage = "User ID not found"
+            return
+        }
+        
+        coordinator.networkManager.addConnection(
+            userId: userId,
+            connectionId: nil,  // This will be determined by the server based on the contact text
+            relationshipType: contactText,
+            tags: selectedTags
+        ) { result in
             isSubmitting = false
             
             switch result {
-            case .success(let message):
-                // Show success message and clear form
+            case true:
                 withAnimation {
-                    successMessage = message
+                    successMessage = "Contact created successfully"
+                    contactText = ""
+                    selectedTags = []
                 }
-                clearForm()
                 
-                // Refresh recent tags after adding a contact with new tags
-                fetchRecentTags()
+                // Refresh the contacts list
+                coordinator.refreshData()
                 
-            case .failure(let error):
-                // Show error message
-                withAnimation {
-                    errorMessage = error.localizedDescription
+                // Navigate back after a short delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    coordinator.backFromCreateContact()
                 }
+                
+            case false:
+                errorMessage = "Failed to create contact"
             }
         }
     }

@@ -35,6 +35,9 @@ class NetworkManager: ObservableObject {
     /// Set of cancellables for Combine operations
     private var cancellables = Set<AnyCancellable>()
     
+    /// Authentication token for API requests
+    private var authToken: String?
+    
     /// Base URL for the API
     private let baseURL: String = {
         #if targetEnvironment(simulator)
@@ -55,16 +58,83 @@ class NetworkManager: ObservableObject {
     
     /// Restores user session from UserDefaults if available
     private func restoreSession() {
-        if let savedUserId = UserDefaults.standard.object(forKey: "userId") as? Int {
+        if let savedUserId = UserDefaults.standard.object(forKey: "userId") as? Int,
+           let savedToken = UserDefaults.standard.string(forKey: "authToken") {
             self.userId = savedUserId
+            self.authToken = savedToken
             self.isLoggedIn = true
             self.fetchCurrentUser()
         }
     }
     
     /// Saves the user session to UserDefaults
-    private func saveSession(userId: Int) {
+    private func saveSession(userId: Int, token: String) {
         UserDefaults.standard.set(userId, forKey: "userId")
+        UserDefaults.standard.set(token, forKey: "authToken")
+        self.authToken = token
+    }
+    
+    /// Adds authentication headers to a URLRequest
+    private func addAuthHeaders(to request: inout URLRequest) {
+        if let token = authToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+    }
+    
+    /// Handles session expiration
+    private func handleSessionExpiration() {
+        // Only handle expiration if we're actually logged in
+        guard isLoggedIn else { return }
+        
+        // Try to refresh the token first
+        refreshAuthToken { [weak self] success in
+            guard let self = self else { return }
+            
+            if !success {
+                // If token refresh fails, clear session and notify user
+                DispatchQueue.main.async {
+                    self.logout()
+                    self.errorMessage = "Your session has expired. Please log in again."
+                }
+            }
+        }
+    }
+    
+    /// Refreshes the authentication token
+    private func refreshAuthToken(completion: @escaping (Bool) -> Void) {
+        guard let userId = userId, let currentToken = authToken else {
+            completion(false)
+            return
+        }
+        
+        guard let url = URL(string: "\(baseURL)/refresh-token") else {
+            completion(false)
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(currentToken)", forHTTPHeaderField: "Authorization")
+        
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            guard let self = self,
+                  let data = data,
+                  let response = response as? HTTPURLResponse,
+                  (200...299).contains(response.statusCode),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let newToken = json["token"] as? String else {
+                DispatchQueue.main.async {
+                    completion(false)
+                }
+                return
+            }
+            
+            DispatchQueue.main.async {
+                self.authToken = newToken
+                UserDefaults.standard.set(newToken, forKey: "authToken")
+                completion(true)
+            }
+        }.resume()
     }
     
     // MARK: - Authentication Methods
@@ -83,7 +153,7 @@ class NetworkManager: ObservableObject {
             return
         }
         
-        let loginData = Login(username: username, passkey: password)
+        let loginData = Login(username: username, password: password)
         
         guard let jsonData = try? JSONEncoder().encode(loginData) else {
             handleError("Failed to encode login data", error: .unknownError, completion: completion)
@@ -94,6 +164,8 @@ class NetworkManager: ObservableObject {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = jsonData
+        
+        print("Sending login request with data: \(String(data: jsonData, encoding: .utf8) ?? "")")  // Debug print
         
         URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             DispatchQueue.main.async {
@@ -106,12 +178,17 @@ class NetworkManager: ObservableObject {
                 }
                 
                 if let httpResponse = response as? HTTPURLResponse {
+                    print("Login response status code: \(httpResponse.statusCode)")  // Debug print
+                    
                     if httpResponse.statusCode == 401 {
                         self.handleError("Invalid username or password", error: .invalidCredentials, completion: completion)
                         return
                     }
                     
                     if !(200...299).contains(httpResponse.statusCode) {
+                        if let data = data, let errorString = String(data: data, encoding: .utf8) {
+                            print("Server error response: \(errorString)")  // Debug print
+                        }
                         self.handleError("Server error: \(httpResponse.statusCode)", error: .unknownError, completion: completion)
                         return
                     }
@@ -128,7 +205,7 @@ class NetworkManager: ObservableObject {
                     self.isLoggedIn = true
                     
                     // Save session and fetch user data
-                    self.saveSession(userId: loginResponse.userId)
+                    self.saveSession(userId: loginResponse.userId, token: loginResponse.token)
                     
                     // If user data is included in the response, use it directly
                     if let user = loginResponse.user {
@@ -139,6 +216,10 @@ class NetworkManager: ObservableObject {
                     
                     completion(.success(loginResponse.userId))
                 } catch {
+                    print("Login response decode error: \(error)")  // Debug print
+                    if let dataString = String(data: data, encoding: .utf8) {
+                        print("Raw response data: \(dataString)")  // Debug print
+                    }
                     self.handleError("Failed to decode login response: \(error.localizedDescription)", 
                                     error: .unknownError, 
                                     completion: completion)
@@ -179,6 +260,7 @@ class NetworkManager: ObservableObject {
         currentUser = nil
         isLoggedIn = false
         UserDefaults.standard.removeObject(forKey: "userId")
+        UserDefaults.standard.removeObject(forKey: "authToken")
     }
     
     // MARK: - User API Methods
@@ -201,163 +283,82 @@ class NetworkManager: ObservableObject {
         }
     }
     
-    /// Handles session expiration by logging the user out
-    private func handleSessionExpiration() {
-        isLoggedIn = false
-        userId = nil
-        UserDefaults.standard.removeObject(forKey: "userId")
-        errorMessage = "Your session has expired. Please log in again."
-    }
-    
     /// Fetches a user by their ID with retry functionality
-    /// - Parameters:
-    ///   - id: The ID of the user to fetch
-    ///   - retryCount: Number of retries if the request fails with a 404 or network error
-    ///   - completion: Closure called with the result
-    func fetchUser(withId id: Int, retryCount: Int = 0, completion: @escaping (Result<User, Error>) -> Void) {
-        fetchUserInternal(withId: id, currentRetry: 0, maxRetries: retryCount, completion: completion)
-    }
-    
-    /// Internal implementation of fetchUser with retry functionality
-    /// - Parameters:
-    ///   - id: The ID of the user to fetch
-    ///   - currentRetry: Current retry attempt
-    ///   - maxRetries: Maximum number of retry attempts
-    ///   - completion: Closure called with the result
-    private func fetchUserInternal(withId id: Int, currentRetry: Int, maxRetries: Int, completion: @escaping (Result<User, Error>) -> Void) {
-        isLoading = true
-        errorMessage = nil
-        
-        let endpoint = "/users/\(id)"
-        
-        guard let url = URL(string: "\(baseURL)\(endpoint)") else {
-            isLoading = false
-            errorMessage = "Invalid URL"
-            completion(.failure(NSError(domain: "NetworkManager", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
+    private func fetchUser(withId id: Int, retryCount: Int = 3, completion: @escaping (Result<User, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/users/\(id)") else {
+            completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
             return
         }
         
         var request = URLRequest(url: url)
-        // Avoid caching issues - always get fresh data
-        request.cachePolicy = .reloadIgnoringLocalCacheData
+        addAuthHeaders(to: &request)
         
         URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            guard let self = self else { return }
+            
             DispatchQueue.main.async {
-                guard let self = self else { return }
-                
-                // Keep isLoading true during retries unless it's the last attempt
-                if currentRetry >= maxRetries {
-                    self.isLoading = false
-                }
-                
-                // Handle network error with retry
                 if let error = error {
-                    // If we have retries left, try again after a short delay
-                    if currentRetry < maxRetries {
-                        self.retryFetchUser(id: id, currentRetry: currentRetry, maxRetries: maxRetries, error: error, completion: completion)
-                        return
-                    }
-                    
-                    self.errorMessage = "Network error: \(error.localizedDescription)"
-                    completion(.failure(error))
+                    print("Error fetching user: \(error.localizedDescription)")
+                    self.retryFetchUserIfNeeded(id: id, retryCount: retryCount, error: error, completion: completion)
                     return
                 }
                 
-                if let httpResponse = response as? HTTPURLResponse {
-                    // Handle HTTP error with retry
-                    if httpResponse.statusCode == 404 || httpResponse.statusCode >= 500 {
-                        // Server error or not found - might be temporary due to database issues
-                        if currentRetry < maxRetries {
-                            let serverError = NSError(
-                                domain: "NetworkManager",
-                                code: httpResponse.statusCode,
-                                userInfo: [NSLocalizedDescriptionKey: "Server error: \(httpResponse.statusCode)"]
-                            )
-                            self.retryFetchUser(id: id, currentRetry: currentRetry, maxRetries: maxRetries, error: serverError, completion: completion)
-                            return
-                        }
-                        
-                        if httpResponse.statusCode == 404 {
-                            // User not found after retries
-                            let notFoundError = NSError(
-                                domain: "NetworkManager",
-                                code: 404,
-                                userInfo: [NSLocalizedDescriptionKey: "User not found"]
-                            )
-                            self.errorMessage = "User not found"
-                            completion(.failure(notFoundError))
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])))
+                    return
+                }
+                
+                switch httpResponse.statusCode {
+                case 200:
+                    guard let data = data else {
+                        completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "No data received"])))
+                        return
+                    }
+                    
+                    do {
+                        let user = try JSONDecoder().decode(User.self, from: data)
+                        completion(.success(user))
+                    } catch {
+                        print("Error decoding user: \(error.localizedDescription)")
+                        completion(.failure(error))
+                    }
+                    
+                case 401:
+                    // Token expired, try to refresh
+                    self.refreshAuthToken { success in
+                        if success && retryCount > 0 {
+                            // Retry with new token
+                            self.fetchUser(withId: id, retryCount: retryCount - 1, completion: completion)
                         } else {
-                            // Server error after retries
-                            let serverError = NSError(
-                                domain: "NetworkManager",
-                                code: httpResponse.statusCode,
-                                userInfo: [NSLocalizedDescriptionKey: "Server error: \(httpResponse.statusCode)"]
-                            )
-                            self.errorMessage = "Server error: \(httpResponse.statusCode)"
-                            completion(.failure(serverError))
+                            self.handleSessionExpiration()
+                            completion(.failure(NSError(domain: "", code: 401, userInfo: [NSLocalizedDescriptionKey: "Session expired"])))
                         }
-                        return
-                    } else if httpResponse.statusCode != 200 {
-                        // Other non-success status codes
-                        let serverError = NSError(
-                            domain: "NetworkManager",
-                            code: httpResponse.statusCode,
-                            userInfo: [NSLocalizedDescriptionKey: "Server error: \(httpResponse.statusCode)"]
-                        )
-                        self.errorMessage = "Server error: \(httpResponse.statusCode)"
-                        completion(.failure(serverError))
-                        return
-                    }
-                }
-                
-                guard let data = data else {
-                    // No data with retry
-                    if currentRetry < maxRetries {
-                        let noDataError = NSError(
-                            domain: "NetworkManager",
-                            code: 0,
-                            userInfo: [NSLocalizedDescriptionKey: "No data received"]
-                        )
-                        self.retryFetchUser(id: id, currentRetry: currentRetry, maxRetries: maxRetries, error: noDataError, completion: completion)
-                        return
                     }
                     
-                    let error = NSError(
-                        domain: "NetworkManager",
-                        code: 0,
-                        userInfo: [NSLocalizedDescriptionKey: "No data received"]
-                    )
-                    self.errorMessage = "No data received"
-                    completion(.failure(error))
-                    return
-                }
-                
-                do {
-                    let user = try JSONDecoder().decode(User.self, from: data)
-                    self.isLoading = false
-                    completion(.success(user))
-                } catch {
-                    // JSON decoding error with retry
-                    if currentRetry < maxRetries {
-                        self.retryFetchUser(id: id, currentRetry: currentRetry, maxRetries: maxRetries, error: error, completion: completion)
-                        return
-                    }
+                case 404:
+                    completion(.failure(NSError(domain: "", code: 404, userInfo: [NSLocalizedDescriptionKey: "User not found"])))
                     
-                    self.errorMessage = "Failed to decode user: \(error.localizedDescription)"
-                    completion(.failure(error))
+                default:
+                    if retryCount > 0 {
+                        print("Retrying fetchUser (attempt \(4-retryCount)/3) for user ID \(id)")
+                        self.fetchUser(withId: id, retryCount: retryCount - 1, completion: completion)
+                    } else {
+                        completion(.failure(NSError(domain: "", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Server error: \(httpResponse.statusCode)"])))
+                    }
                 }
             }
         }.resume()
     }
     
-    /// Retries fetching a user after a delay
-    private func retryFetchUser(id: Int, currentRetry: Int, maxRetries: Int, error: Error, completion: @escaping (Result<User, Error>) -> Void) {
-        let retryDelay = Double(currentRetry + 1) * 0.5 // Increasing delay for each retry
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + retryDelay) { [weak self] in
-            guard let self = self else { return }
-            print("Retrying fetchUser (attempt \(currentRetry + 1)/\(maxRetries)) for user ID \(id)")
-            self.fetchUserInternal(withId: id, currentRetry: currentRetry + 1, maxRetries: maxRetries, completion: completion)
+    /// Retries fetching user data if needed
+    private func retryFetchUserIfNeeded(id: Int, retryCount: Int, error: Error, completion: @escaping (Result<User, Error>) -> Void) {
+        if retryCount > 0 {
+            print("Retrying fetchUser (attempt \(4-retryCount)/3) for user ID \(id)")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                self.fetchUser(withId: id, retryCount: retryCount - 1, completion: completion)
+            }
+        } else {
+            completion(.failure(error))
         }
     }
     
@@ -640,32 +641,37 @@ class NetworkManager: ObservableObject {
     }
     
     /// Adds a connection between two users
-    func addConnection(userId: Int, connectionId: Int, relationshipType: String, completion: @escaping (Bool) -> Void) {
+    /// - Parameters:
+    ///   - userId: ID of the user to add the connection to
+    ///   - connectionId: ID of the user to connect with (optional, server can determine from text)
+    ///   - relationshipType: Description of how the users know each other
+    ///   - tags: Optional array of tags to categorize the connection
+    ///   - completion: Closure called with success/failure result
+    func addConnection(userId: Int, connectionId: Int?, relationshipType: String, tags: [String]? = nil, completion: @escaping (Bool) -> Void) {
         isLoading = true
         errorMessage = nil
         
         guard let url = URL(string: "\(baseURL)/users/\(userId)/connections") else {
-            isLoading = false
-            errorMessage = "Invalid URL"
+            handleError("Invalid URL")
             completion(false)
             return
         }
         
-        struct ConnectionRequest: Codable {
-            let connectionId: Int
-            let relationshipDescription: String
-            
-            enum CodingKeys: String, CodingKey {
-                case connectionId = "connection_id"
-                case relationshipDescription = "relationship_description"
-            }
+        // Prepare request data
+        var requestData: [String: Any] = [
+            "relationship_type": relationshipType
+        ]
+        
+        if let connectionId = connectionId {
+            requestData["connection_id"] = connectionId
         }
         
-        let connectionRequest = ConnectionRequest(connectionId: connectionId, relationshipDescription: relationshipType)
+        if let tags = tags, !tags.isEmpty {
+            requestData["tags"] = tags
+        }
         
-        guard let jsonData = try? JSONEncoder().encode(connectionRequest) else {
-            isLoading = false
-            errorMessage = "Failed to encode connection data"
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: requestData) else {
+            handleError("Failed to encode request data")
             completion(false)
             return
         }
@@ -681,19 +687,23 @@ class NetworkManager: ObservableObject {
                 self.isLoading = false
                 
                 if let error = error {
-                    self.errorMessage = error.localizedDescription
+                    self.handleError(error.localizedDescription)
                     completion(false)
                     return
                 }
                 
-                if let httpResponse = response as? HTTPURLResponse, !(200...299).contains(httpResponse.statusCode) {
-                    self.errorMessage = "Server error: \(httpResponse.statusCode)"
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    self.handleError("Invalid response")
                     completion(false)
                     return
                 }
                 
-                // Refresh connections list
-                self.getConnections(userId: userId)
+                if !(200...299).contains(httpResponse.statusCode) {
+                    self.handleError("Server error: \(httpResponse.statusCode)")
+                    completion(false)
+                    return
+                }
+                
                 completion(true)
             }
         }.resume()
@@ -741,10 +751,12 @@ class NetworkManager: ObservableObject {
     // MARK: - Helper Methods
     
     /// Handles API errors and executes the completion handler
-    private func handleError(_ message: String, error: AuthError, completion: @escaping (Result<Int, AuthError>) -> Void) {
+    private func handleError(_ message: String, error: AuthError? = nil, completion: ((Result<Int, AuthError>) -> Void)? = nil) {
         isLoading = false
         errorMessage = message
-        completion(.failure(error))
+        if let error = error, let completion = completion {
+            completion(.failure(error))
+        }
     }
     
     /// Refreshes all data from the server

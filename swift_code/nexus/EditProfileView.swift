@@ -39,35 +39,17 @@ struct EditProfileView: View {
     // MARK: - View Body
     
     var body: some View {
-        Group {
-            if isInSheet {
-                // For contacts, show in a NavigationView
-                NavigationView {
-                    profileEditContent
-                        .navigationTitle("Edit Contact")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarLeading) {
-                                Button("Cancel") {
-                                    dismiss()
-                                }
-                            }
-                            
-                            ToolbarItem(placement: .navigationBarTrailing) {
-                                Button("Save") {
-                                    saveProfile()
-                                }
-                                .disabled(coordinator.networkManager.isLoading)
-                            }
-                        }
-                }
-            } else {
-                // For current user, use existing navigation stack
-                profileEditContent
-                    .navigationTitle("Edit Profile")
-                    .navigationBarTitleDisplayMode(.inline)
+        ScrollView {
+            VStack(spacing: 20) {
+                // Avatar display
+                avatarSection
+                
+                // Form fields
+                formFieldsSection
             }
+            .padding()
         }
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .onAppear {
             if !isInSheet {
                 coordinator.activeScreen = .editProfile
@@ -205,10 +187,11 @@ struct EditProfileView: View {
                 .foregroundColor(.gray)
             
             TextEditor(text: text)
-                .frame(minHeight: 100)
+                .frame(minHeight: 100, maxHeight: .infinity)
                 .padding(4)
                 .background(Color.gray.opacity(0.1))
                 .cornerRadius(8)
+                .ignoresSafeArea(.keyboard, edges: .bottom)
         }
     }
     
@@ -263,7 +246,8 @@ struct EditProfileView: View {
             gender: gender,
             ethnicity: ethnicity,
             uniMajor: uniMajor,
-            jobTitle: jobTitle
+            jobTitle: jobTitle,
+            lastLogin: user?.lastLogin
         )
         
         coordinator.networkManager.updateUser(updatedUser) { success in
@@ -303,7 +287,8 @@ struct EditProfileView: View {
         gender: nil,
         ethnicity: nil,
         uniMajor: "Computer Science",
-        jobTitle: "Software Engineer"
+        jobTitle: "Software Engineer",
+        lastLogin: "2024-04-01T13:34:22Z"
     ))
     .environmentObject(AppCoordinator())
 } 

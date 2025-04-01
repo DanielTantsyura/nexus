@@ -344,7 +344,8 @@ struct ConnectionRow: View {
             gender: connection.gender,
             ethnicity: connection.ethnicity,
             uniMajor: connection.uniMajor,
-            jobTitle: connection.jobTitle
+            jobTitle: connection.jobTitle,
+            lastLogin: nil
         )
     }
 }
@@ -450,7 +451,8 @@ struct AddConnectionView: View {
             gender: "Male",
             ethnicity: nil,
             uniMajor: "Computer Science",
-            jobTitle: "Software Engineer"
+            jobTitle: "Software Engineer",
+            lastLogin: "2024-04-01T13:34:22Z"
         ))
         .environmentObject(AppCoordinator())
     }

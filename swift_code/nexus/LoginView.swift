@@ -18,23 +18,39 @@ struct LoginView: View {
     /// Content of the alert message
     @State private var alertMessage = ""
     
+    /// Focus state for text fields
+    @FocusState private var focusedField: Field?
+    
+    /// Represents the input fields that can have focus
+    private enum Field: Hashable {
+        case username
+        case password
+    }
+    
     // MARK: - View Body
     
     var body: some View {
-        VStack(spacing: 30) {
-            logoSection
-            loginFormSection
-            errorMessageView
-            helpSection
-            Spacer()
+        ScrollView {
+            VStack(spacing: 30) {
+                logoSection
+                loginFormSection
+                errorMessageView
+                helpSection
+                Spacer(minLength: 50)
+            }
+            .padding(.vertical, 50)
         }
-        .padding(.vertical, 50)
+        .scrollDismissesKeyboard(.immediately)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .alert(isPresented: $showingAlert) {
             Alert(
                 title: Text("Information"),
                 message: Text(alertMessage),
                 dismissButton: .default(Text("OK"))
             )
+        }
+        .onTapGesture {
+            focusedField = nil  // Dismiss keyboard when tapping outside
         }
     }
     
@@ -56,7 +72,7 @@ struct LoginView: View {
                 .font(.largeTitle)
                 .fontWeight(.bold)
             
-            Text("Connect with your professional network")
+            Text("Connect your network")
                 .font(.subheadline)
                 .foregroundColor(.gray)
                 .multilineTextAlignment(.center)
@@ -77,13 +93,23 @@ struct LoginView: View {
     private var credentialFields: some View {
         Group {
             TextField("Username", text: $username)
+                .textContentType(.username)
+                .textInputAutocapitalization(.never)
+                .disableAutocorrection(true)
+                .focused($focusedField, equals: .username)
+                .submitLabel(.next)
+                .onSubmit {
+                    focusedField = .password
+                }
                 .padding()
                 .background(Color.gray.opacity(0.1))
                 .cornerRadius(10)
-                .autocapitalization(.none)
-                .disableAutocorrection(true)
             
             SecureField("Password", text: $password)
+                .textContentType(.password)
+                .focused($focusedField, equals: .password)
+                .submitLabel(.go)
+                .onSubmit(loginUser)
                 .padding()
                 .background(Color.gray.opacity(0.1))
                 .cornerRadius(10)
@@ -115,7 +141,7 @@ struct LoginView: View {
     
     /// Whether the login button should be disabled
     private var isLoginDisabled: Bool {
-        username.isEmpty || password.isEmpty
+        username.isEmpty || password.isEmpty || coordinator.networkManager.isLoading
     }
     
     /// Displays error messages from the network manager
@@ -151,12 +177,14 @@ struct LoginView: View {
     
     /// Shows password hint in an alert
     private func showPasswordHint() {
+        focusedField = nil  // Dismiss keyboard
         showingAlert = true
         alertMessage = "All accounts have password: 'password'"
     }
     
     /// Attempts to log in the user with provided credentials
     private func loginUser() {
+        focusedField = nil  // Dismiss keyboard
         coordinator.login(username: username, password: password) { success in
             if !success {
                 showingAlert = true

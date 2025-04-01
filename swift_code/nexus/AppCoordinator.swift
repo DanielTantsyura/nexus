@@ -1,6 +1,13 @@
 import SwiftUI
 import Combine
 
+/// Represents the available tabs in the application
+enum TabSelection: Int {
+    case network = 0
+    case profile = 1
+    case addNew = 2
+}
+
 /// Available application screens
 enum ActiveScreen: Equatable {
     /// Login screen
@@ -20,6 +27,12 @@ enum ActiveScreen: Equatable {
     
     /// Create new contact screen
     case createContact
+    
+    /// Home screen
+    case home
+    
+    /// Add new screen
+    case addNew
 }
 
 /// Centralized application coordinator that manages state and navigation
