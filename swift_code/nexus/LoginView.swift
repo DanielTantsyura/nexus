@@ -67,6 +67,15 @@ struct LoginView: View {
     /// Login form with username, password inputs and sign in button
     private var loginFormSection: some View {
         VStack(spacing: 16) {
+            credentialFields
+            loginButton
+        }
+        .padding(.horizontal, 40)
+    }
+    
+    /// Username and password input fields
+    private var credentialFields: some View {
+        Group {
             TextField("Username", text: $username)
                 .padding()
                 .background(Color.gray.opacity(0.1))
@@ -78,7 +87,12 @@ struct LoginView: View {
                 .padding()
                 .background(Color.gray.opacity(0.1))
                 .cornerRadius(10)
-            
+        }
+    }
+    
+    /// Login button or progress indicator
+    private var loginButton: some View {
+        Group {
             if coordinator.networkManager.isLoading {
                 ProgressView()
                     .padding()
@@ -93,11 +107,15 @@ struct LoginView: View {
                         .cornerRadius(10)
                 }
                 .buttonStyle(PrimaryButtonStyle())
-                .disabled(username.isEmpty || password.isEmpty)
-                .opacity(username.isEmpty || password.isEmpty ? 0.6 : 1)
+                .disabled(isLoginDisabled)
+                .opacity(isLoginDisabled ? 0.6 : 1)
             }
         }
-        .padding(.horizontal, 40)
+    }
+    
+    /// Whether the login button should be disabled
+    private var isLoginDisabled: Bool {
+        username.isEmpty || password.isEmpty
     }
     
     /// Displays error messages from the network manager
@@ -120,10 +138,7 @@ struct LoginView: View {
                 .font(.caption)
                 .foregroundColor(.gray)
             
-            Button(action: {
-                showingAlert = true
-                alertMessage = "All accounts have password: 'password'"
-            }) {
+            Button(action: showPasswordHint) {
                 Text("Need help signing in?")
                     .font(.caption)
                     .foregroundColor(.blue)
@@ -133,6 +148,12 @@ struct LoginView: View {
     }
     
     // MARK: - Actions
+    
+    /// Shows password hint in an alert
+    private func showPasswordHint() {
+        showingAlert = true
+        alertMessage = "All accounts have password: 'password'"
+    }
     
     /// Attempts to log in the user with provided credentials
     private func loginUser() {

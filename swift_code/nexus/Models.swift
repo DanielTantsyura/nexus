@@ -4,6 +4,8 @@ import Foundation
 
 /// Represents a user in the Nexus application
 struct User: Identifiable, Codable, Hashable {
+    // MARK: - Properties
+    
     /// Unique identifier for the user
     let id: Int
     
@@ -55,6 +57,8 @@ struct User: Identifiable, Codable, Hashable {
     /// Current job title
     let jobTitle: String?
     
+    // MARK: - Coding Keys
+    
     /// Maps Swift property names to JSON field names
     enum CodingKeys: String, CodingKey {
         case id
@@ -76,6 +80,8 @@ struct User: Identifiable, Codable, Hashable {
         case jobTitle = "job_title"
     }
     
+    // MARK: - Computed Properties
+    
     /// Returns the full name of the user
     var fullName: String {
         return "\(firstName ?? "Unknown") \(lastName ?? "User")"
@@ -96,6 +102,8 @@ struct User: Identifiable, Codable, Hashable {
 
 /// Represents a connection between users (similar to a Contact)
 struct Connection: Identifiable, Codable, Hashable {
+    // MARK: - Properties
+    
     /// Unique identifier for the connection (user ID)
     let id: Int
     
@@ -141,6 +149,8 @@ struct Connection: Identifiable, Codable, Hashable {
     /// Job title of the connected user
     let jobTitle: String?
     
+    // MARK: - Coding Keys
+    
     /// Maps Swift property names to JSON field names
     enum CodingKeys: String, CodingKey {
         case id
@@ -159,6 +169,8 @@ struct Connection: Identifiable, Codable, Hashable {
         case uniMajor = "uni_major"
         case jobTitle = "job_title"
     }
+    
+    // MARK: - Computed Properties
     
     /// Returns the full name of the connected user
     var fullName: String {

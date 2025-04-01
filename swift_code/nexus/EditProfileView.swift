@@ -243,28 +243,30 @@ struct EditProfileView: View {
         ethnicity = userData.ethnicity ?? ""
     }
     
-    /// Saves updated profile information to the API
+    /// Saves the current profile or contact information
     private func saveProfile() {
-        let userData: [String: Any] = [
-            "first_name": firstName,
-            "last_name": lastName,
-            "email": email,
-            "phone_number": phoneNumber,
-            "location": location,
-            "university": university,
-            "uni_major": uniMajor,
-            "high_school": highSchool,
-            "job_title": jobTitle,
-            "current_company": company,
-            "field_of_interest": interests,
-            "gender": gender,
-            "ethnicity": ethnicity
-        ]
+        // Create updated user object from form data
+        let updatedUser = User(
+            id: user?.id ?? (coordinator.networkManager.userId ?? 0),
+            username: user?.username,
+            firstName: firstName,
+            lastName: lastName,
+            email: email,
+            phoneNumber: phoneNumber,
+            location: location,
+            university: university,
+            fieldOfInterest: interests,
+            highSchool: highSchool,
+            birthday: user?.birthday,
+            createdAt: user?.createdAt,
+            currentCompany: company,
+            gender: gender,
+            ethnicity: ethnicity,
+            uniMajor: uniMajor,
+            jobTitle: jobTitle
+        )
         
-        // Determine which user ID to use for the update
-        let userId = user?.id ?? (coordinator.networkManager.userId ?? 0)
-        
-        coordinator.networkManager.updateUserProfile(userId: userId, userData: userData) { success in
+        coordinator.networkManager.updateUser(updatedUser) { success in
             saveSuccess = success
             saveAlertMessage = success 
                 ? isInSheet ? "Contact information has been updated successfully." : "Your profile has been updated successfully."

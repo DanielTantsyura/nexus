@@ -52,13 +52,14 @@ final class AppCoordinator: ObservableObject {
     /// Timer to retry loading data if needed
     private var loadTimer: Timer?
     
-    // MARK: - Lifecycle
+    // MARK: - Initialization
     
     /// Initialize the coordinator
     init() {
         setupInitialState()
     }
     
+    /// Clean up resources when deallocated
     deinit {
         loadTimer?.invalidate()
     }
@@ -92,7 +93,6 @@ final class AppCoordinator: ObservableObject {
     func selectTab(_ tab: TabSelection) {
         selectedTab = tab
         
-        // Update current navigation path based on selected tab
         switch tab {
         case .network:
             navigationPath = networkTabPath
@@ -101,7 +101,6 @@ final class AppCoordinator: ObservableObject {
             navigationPath = profileTabPath
             activeScreen = .profile
         case .addNew:
-            // Just set the active screen, no navigation path changes
             activeScreen = .addNew
         }
     }
@@ -186,7 +185,6 @@ final class AppCoordinator: ObservableObject {
     
     /// Navigate back from edit profile to home
     func backFromEditProfile() {
-        // No need to clear navigation path, the system will handle this
         if !profileTabPath.isEmpty {
             profileTabPath.removeLast()
         }
@@ -202,114 +200,79 @@ final class AppCoordinator: ObservableObject {
     /// Navigate to a user's detail view
     /// - Parameter user: The user to display details for
     func showUserDetail(user: User) {
-        // Store selected user
         networkManager.selectedUser = user
-        
-        // Ensure connections are cleared before navigating
-        networkManager.connections = []
-        
-        // Set the active screen first
+        networkTabPath.append(user)
+        navigationPath = networkTabPath
         activeScreen = .userDetail
-        
-        // First fetch connections
-        networkManager.getConnections(userId: user.id)
-        
-        // Then navigate based on which tab we're in
-        if selectedTab == .network {
-            networkTabPath.append(user)
-            navigationPath = networkTabPath
-        } else {
-            profileTabPath.append(user)
-            navigationPath = profileTabPath
-        }
-        
-        // Schedule another connection fetch after navigation is complete
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.networkManager.getConnections(userId: user.id)
-        }
     }
     
-    /// Navigate back to the user list
-    func backToUserList() {
-        // No need to clear navigation path, the system will handle this
-        if selectedTab == .network {
-            if !networkTabPath.isEmpty {
-                networkTabPath.removeLast()
-            }
-            navigationPath = networkTabPath
-        } else {
-            if !profileTabPath.isEmpty {
-                profileTabPath.removeLast()
-            }
-            navigationPath = profileTabPath
+    /// Navigate back from user detail to user list
+    func backFromUserDetail() {
+        if !networkTabPath.isEmpty {
+            networkTabPath.removeLast()
         }
-        
-        // Then set the active screen
+        navigationPath = networkTabPath
         activeScreen = .userList
-        
-        // Ensure user list is refreshed
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            self?.networkManager.fetchUsers()
+    }
+    
+    // MARK: - Data Management
+    
+    /// Refreshes all data from the API
+    func refresh() {
+        loadData()
+    }
+    
+    /// Refreshes all data with a custom delay
+    func refreshWithDelay() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.loadData()
         }
     }
     
-    // MARK: - Data Methods
-    
-    /// Refresh the current data
-    func refreshData() {
-        refresh()
+    /// Loads all required data from the API
+    private func loadData() {
+        guard networkManager.isLoggedIn else { return }
+        
+        networkManager.refreshAll()
+        initialLoadComplete = true
     }
     
-    // MARK: - Private Methods
-    
-    /// Internal refresh method based on the active screen
-    private func refresh() {
-        initialLoadComplete = false
-        networkManager.isLoading = true
+    /// Refreshes data as needed
+    func refreshData() {
+        guard networkManager.isLoggedIn else {
+            // If not logged in, redirect to login screen
+            if activeScreen != .login {
+                activeScreen = .login
+                navigationPath = NavigationPath()
+                networkTabPath = NavigationPath()
+                profileTabPath = NavigationPath()
+            }
+            return
+        }
         
-        // Clear any previous error
+        // Clear any existing error before retrying
         networkManager.errorMessage = nil
         
-        switch activeScreen {
-        case .login:
-            // Nothing to refresh on login screen
-            break
-            
-        case .profile:
-            refreshProfileScreen()
-            
-        case .userList:
-            networkManager.fetchUsers()
-            
-        case .userDetail:
-            if let user = networkManager.selectedUser {
-                networkManager.getConnections(userId: user.id)
-            }
-            
-        case .editProfile:
-            if networkManager.userId != nil {
-                networkManager.fetchCurrentUser()
-            }
-            
-        case .createContact:
-            // Nothing to refresh for contact creation
-            break
-        }
+        // Always fetch all users to ensure the list is up to date
+        networkManager.fetchAllUsers()
         
-        // Set initial load complete after a delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.initialLoadComplete = true
-        }
-    }
-    
-    /// Refreshes data specific to the profile screen
-    private func refreshProfileScreen() {
-        if networkManager.userId != nil {
-            networkManager.fetchCurrentUser()
+        // Always refresh the current user to ensure latest data
+        networkManager.fetchCurrentUser()
+        
+        // If we encounter session expiration or persistent errors, handle them
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            guard let self = self else { return }
             
-            // After a small delay, fetch the user list as well
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                self?.networkManager.fetchUsers()
+            if let errorMessage = self.networkManager.errorMessage {
+                if errorMessage.contains("session has expired") || 
+                   errorMessage.contains("User not found") ||
+                   (errorMessage.contains("404") && self.activeScreen == .profile) {
+                    // Session expired, log out and show login
+                    self.logout()
+                }
+                
+                // Print debug info
+                print("NetworkManager error: \(errorMessage)")
             }
         }
     }
