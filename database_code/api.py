@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request
 from database_operations import DatabaseManager
 from flask_cors import CORS
 from config import API_HOST, API_PORT, API_DEBUG
+import newUser  # Import the new contact processing module
 
 app = Flask(__name__)
 CORS(app)  # Enable cross-origin requests
@@ -38,6 +39,38 @@ def add_user():
         return jsonify({"error": str(e)}), 400
     finally:
         db.disconnect()
+
+@app.route('/contacts/create', methods=['POST'])
+def create_contact():
+    """Create a new contact from free-form text and establish a relationship."""
+    data = request.json
+    
+    # Validate required fields
+    if 'text' not in data or not data['text']:
+        return jsonify({"error": "No contact text provided"}), 400
+    
+    if 'user_id' not in data or not data['user_id']:
+        return jsonify({"error": "User ID is required"}), 400
+    
+    # Extract data
+    text = data['text']
+    user_id = data['user_id']
+    tags = data.get('tags', [])
+    
+    # Process the text and create the contact
+    success, message, new_user_id = newUser.create_new_contact(text, tags, user_id)
+    
+    if success:
+        return jsonify({
+            "success": True,
+            "message": message,
+            "user_id": new_user_id
+        }), 201
+    else:
+        return jsonify({
+            "success": False,
+            "message": message
+        }), 400
 
 @app.route('/users/<int:user_id>', methods=['GET'])
 def get_user_by_id(user_id):

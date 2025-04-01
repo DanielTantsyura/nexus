@@ -18,15 +18,8 @@ enum ActiveScreen: Equatable {
     /// Profile editing screen
     case editProfile
     
-    /// Tab selection enum
-    case addNew
-}
-
-/// Available tab selections
-enum TabSelection: Int {
-    case network = 0
-    case addNew = 1
-    case profile = 2
+    /// Create new contact screen
+    case createContact
 }
 
 /// Centralized application coordinator that manages state and navigation
@@ -176,7 +169,21 @@ final class AppCoordinator: ObservableObject {
         activeScreen = .editProfile
     }
     
-    /// Navigate back from edit profile to profile
+    /// Navigate to the create contact screen
+    func showCreateContact() {
+        navigationPath.append(ActiveScreen.createContact)
+        activeScreen = .createContact
+    }
+    
+    /// Navigate back from create contact to home
+    func backFromCreateContact() {
+        if !navigationPath.isEmpty {
+            navigationPath.removeLast()
+        }
+        activeScreen = .home
+    }
+    
+    /// Navigate back from edit profile to home
     func backFromEditProfile() {
         if !profileTabPath.isEmpty {
             profileTabPath.removeLast()
