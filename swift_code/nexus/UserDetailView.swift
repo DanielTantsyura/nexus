@@ -9,6 +9,7 @@ struct UserDetailView: View {
     @State private var localConnections: [Connection] = []
     @State private var retryTimer: Timer?
     @State private var forceShowEmptyState = false
+    @State private var showingEditContactSheet = false
     
     var body: some View {
         ScrollView {
@@ -23,6 +24,15 @@ struct UserDetailView: View {
         }
         .navigationTitle(user.fullName)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    showingEditContactSheet = true
+                }) {
+                    Image(systemName: "pencil")
+                }
+            }
+        }
         .onAppear {
             coordinator.activeScreen = .userDetail
             loadConnections(forceReload: true)
@@ -137,6 +147,13 @@ struct UserDetailView: View {
                     }
                 }
             }
+        }
+        .contentShape(Rectangle())
+        .onLongPressGesture {
+            showingEditContactSheet = true
+        }
+        .sheet(isPresented: $showingEditContactSheet) {
+            EditProfileView(user: user)
         }
     }
     
