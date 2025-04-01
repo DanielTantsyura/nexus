@@ -15,8 +15,12 @@ load_dotenv()
 # DATABASE SETTINGS
 # ==========================================================================
 
-# Database connection URL (default is PostgreSQL on localhost)
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/nexus")
+# Database connection settings
+# In production, use environment variables for credentials
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL", 
+    "postgresql://postgres:FPrWvNwkoqBIigGDjuBeJmMaJXCrjlgv@switchback.proxy.rlwy.net:50887/railway"
+)
 
 # ==========================================================================
 # API SETTINGS

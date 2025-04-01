@@ -116,7 +116,11 @@ final class AppCoordinator: ObservableObject {
             navigationPath = profileTabPath
             activeScreen = .profile
         case .addNew:
-            activeScreen = .addNew
+            // Simply set the active screen to createContact 
+            // without adding to navigation stack
+            activeScreen = .createContact
+            // Use a fresh navigation path for this tab
+            navigationPath = NavigationPath()
         }
     }
     
@@ -186,16 +190,14 @@ final class AppCoordinator: ObservableObject {
     
     /// Navigate to the create contact screen
     func showCreateContact() {
-        navigationPath.append(ActiveScreen.createContact)
-        activeScreen = .createContact
+        // Simply switch to the addNew tab
+        selectTab(.addNew)
     }
     
     /// Navigate back from create contact to home
     func backFromCreateContact() {
-        if !navigationPath.isEmpty {
-            navigationPath.removeLast()
-        }
-        activeScreen = .home
+        // Return to the network tab
+        selectTab(.network)
     }
     
     /// Navigate back from edit profile to home

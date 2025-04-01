@@ -49,7 +49,7 @@ struct MainTabView: View {
             VStack {
                 Spacer()
                 addButton
-                    .offset(y: -8) // Position above tab bar and home indicator
+                    .offset(y: -22) // Position in the middle (between -30 and -15)
             }
             .ignoresSafeArea()
         }
@@ -168,6 +168,8 @@ struct MainTabView: View {
                     switch screen {
                     case .editProfile:
                         EditProfileView()
+                    case .createContact:
+                        CreateContactView()
                     default:
                         UserListView()
                     }
@@ -178,7 +180,9 @@ struct MainTabView: View {
     /// Add New tab (placeholder)
     private var addNewTabView: some View {
         NavigationStack {
-            AddNewPlaceholderView()
+            CreateContactView()
+                .navigationTitle("Add Contact")
+                .navigationBarTitleDisplayMode(.large)
         }
     }
     
@@ -199,6 +203,10 @@ struct MainTabView: View {
                         UserListView()
                             .navigationTitle("All Users")
                             .navigationBarTitleDisplayMode(.large)
+                    case .createContact:
+                        CreateContactView()
+                            .navigationTitle("Add Contact")
+                            .navigationBarTitleDisplayMode(.large)
                     default:
                         ProfileView()
                     }
@@ -209,17 +217,23 @@ struct MainTabView: View {
     /// Custom add button in the middle of the tab bar
     private var addButton: some View {
         Button(action: {
+            // Switch to the Add New tab directly
             coordinator.selectTab(.addNew)
         }) {
             ZStack {
-                Circle()
+                RoundedRectangle(cornerRadius: 25)
                     .fill(Color.green)
-                    .frame(width: 70, height: 70)
+                    .frame(width: 100, height: 50)
                     .shadow(radius: 2)
                 
-                Image(systemName: "plus")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(.white)
+                HStack(spacing: 6) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 18, weight: .bold))
+                    
+                    Text("Add")
+                        .font(.system(size: 18, weight: .semibold))
+                }
+                .foregroundColor(.white)
             }
         }
     }
