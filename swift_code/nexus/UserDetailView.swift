@@ -4,6 +4,8 @@ import SwiftUI
 struct UserDetailView: View {
     @EnvironmentObject private var coordinator: AppCoordinator
     let user: User
+    
+    // MARK: - State
     @State private var showingAddConnectionSheet = false
     @State private var connectionLoadAttempts = 0
     @State private var localConnections: [Connection] = []
@@ -26,9 +28,7 @@ struct UserDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    showingEditContactSheet = true
-                }) {
+                Button(action: { showingEditContactSheet = true }) {
                     Image(systemName: "pencil")
                 }
             }
@@ -42,12 +42,8 @@ struct UserDetailView: View {
             retryTimer?.invalidate()
             retryTimer = nil
         }
-        .onChange(of: user.id) { _, _ in
-            loadConnections(forceReload: true)
-        }
-        .onChange(of: coordinator.networkManager.connections) { _, _ in
-            updateLocalConnections()
-        }
+        .onChange(of: user.id) { loadConnections(forceReload: true) }
+        .onChange(of: coordinator.networkManager.connections) { updateLocalConnections() }
         .sheet(isPresented: $showingAddConnectionSheet, onDismiss: {
             loadConnections(forceReload: true)
         }) {
@@ -62,98 +58,111 @@ struct UserDetailView: View {
         SectionCard(title: "") {
             VStack(alignment: .leading, spacing: 16) {
                 // Header with name and basic info
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(user.fullName)
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                        
-                        if let jobTitle = user.jobTitle, let company = user.currentCompany {
-                            Text("\(jobTitle) at \(company)")
-                                .font(.headline)
-                                .foregroundColor(.blue)
-                        } else if let jobTitle = user.jobTitle {
-                            Text(jobTitle)
-                                .font(.headline)
-                                .foregroundColor(.blue)
-                        } else if let company = user.currentCompany {
-                            Text("Works at \(company)")
-                                .font(.headline)
-                                .foregroundColor(.blue)
-                        }
-                        
-                        if let location = user.location {
-                            Label(location, systemImage: "location.fill")
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
-                        }
-                    }
-                    Spacer()
-                    UserAvatar(user: user, size: 80)
-                }
-                .padding(.bottom, 8)
+                userHeaderView
                 
                 Divider()
                 
                 // Personal details
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Personal Details")
-                        .font(.headline)
-                        .padding(.vertical, 4)
-                    
-                    Group {
-                        if let gender = user.gender {
-                            InfoRow(icon: "person.fill", title: "Gender", value: gender)
-                        }
-                        
-                        if let ethnicity = user.ethnicity {
-                            InfoRow(icon: "person.2.fill", title: "Ethnicity", value: ethnicity)
-                        }
-                        
-                        if let email = user.email {
-                            InfoRow(icon: "envelope.fill", title: "Email", value: email)
-                        }
-                        
-                        if let phone = user.phoneNumber {
-                            InfoRow(icon: "phone.fill", title: "Phone", value: phone)
-                        }
-                    }
-                }
+                personalDetailsSection
                 
                 Divider()
                 
                 // Education and work
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Education & Work")
-                        .font(.headline)
-                        .padding(.vertical, 4)
-                    
-                    Group {
-                        if let university = user.university {
-                            InfoRow(icon: "building.columns.fill", title: "University", value: university)
-                        }
-                        
-                        if let major = user.uniMajor {
-                            InfoRow(icon: "book.fill", title: "Major", value: major)
-                        }
-                        
-                        if let highSchool = user.highSchool {
-                            InfoRow(icon: "graduationcap.fill", title: "High School", value: highSchool)
-                        }
-                        
-                        if let interests = user.fieldOfInterest {
-                            InfoRow(icon: "star.fill", title: "Interests", value: interests)
-                        }
-                    }
-                }
+                educationWorkSection
             }
         }
         .contentShape(Rectangle())
-        .onLongPressGesture {
-            showingEditContactSheet = true
-        }
+        .onLongPressGesture { showingEditContactSheet = true }
         .sheet(isPresented: $showingEditContactSheet) {
             EditProfileView(user: user)
+        }
+    }
+    
+    /// Header with user's basic information
+    private var userHeaderView: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(user.fullName)
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                
+                if let jobTitle = user.jobTitle, let company = user.currentCompany {
+                    Text("\(jobTitle) at \(company)")
+                        .font(.headline)
+                        .foregroundColor(.blue)
+                } else if let jobTitle = user.jobTitle {
+                    Text(jobTitle)
+                        .font(.headline)
+                        .foregroundColor(.blue)
+                } else if let company = user.currentCompany {
+                    Text("Works at \(company)")
+                        .font(.headline)
+                        .foregroundColor(.blue)
+                }
+                
+                if let location = user.location {
+                    Label(location, systemImage: "location.fill")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                }
+            }
+            Spacer()
+            UserAvatar(user: user, size: 80)
+        }
+        .padding(.bottom, 8)
+    }
+    
+    /// User's personal details section
+    private var personalDetailsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Personal Details")
+                .font(.headline)
+                .padding(.vertical, 4)
+            
+            Group {
+                if let gender = user.gender {
+                    InfoRow(icon: "person.fill", title: "Gender", value: gender)
+                }
+                
+                if let ethnicity = user.ethnicity {
+                    InfoRow(icon: "person.2.fill", title: "Ethnicity", value: ethnicity)
+                }
+                
+                if let email = user.email {
+                    InfoRow(icon: "envelope.fill", title: "Email", value: email)
+                }
+                
+                if let phone = user.phoneNumber {
+                    InfoRow(icon: "phone.fill", title: "Phone", value: phone)
+                }
+            }
+        }
+    }
+    
+    /// User's education and work section
+    private var educationWorkSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Education & Work")
+                .font(.headline)
+                .padding(.vertical, 4)
+            
+            Group {
+                if let university = user.university {
+                    InfoRow(icon: "building.columns.fill", title: "University", value: university)
+                }
+                
+                if let major = user.uniMajor {
+                    InfoRow(icon: "book.fill", title: "Major", value: major)
+                }
+                
+                if let highSchool = user.highSchool {
+                    InfoRow(icon: "graduationcap.fill", title: "High School", value: highSchool)
+                }
+                
+                if let interests = user.fieldOfInterest {
+                    InfoRow(icon: "star.fill", title: "Interests", value: interests)
+                }
+            }
         }
     }
     
@@ -163,10 +172,7 @@ struct UserDetailView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Spacer()
-                    
-                    Button(action: {
-                        showingAddConnectionSheet = true
-                    }) {
+                    Button(action: { showingAddConnectionSheet = true }) {
                         Label("Add Connection", systemImage: "plus")
                             .font(.headline)
                             .foregroundColor(.blue)
@@ -174,40 +180,50 @@ struct UserDetailView: View {
                 }
                 .padding(.bottom, 4)
                 
-                VStack {
-                    if coordinator.networkManager.isLoading && connectionLoadAttempts < 3 {
-                        Text("Loading connections...")
-                            .foregroundColor(.gray)
-                            .frame(height: 120)
-                            .frame(maxWidth: .infinity)
-                    } else if !localConnections.isEmpty {
-                        ForEach(localConnections) { connection in
-                            ConnectionRow(connection: connection, onRemove: {
-                                removeConnection(connection)
-                            })
-                        }
-                    } else {
-                        VStack(spacing: 12) {
-                            Text("No connections found")
-                                .foregroundColor(.gray)
-                                .padding()
-                            
-                            Button(action: {
-                                forceShowEmptyState = false
-                                loadConnections(forceReload: true)
-                            }) {
-                                Label("Refresh", systemImage: "arrow.clockwise")
-                            }
-                            .buttonStyle(.bordered)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(10)
-                    }
-                }
+                connectionsContent
             }
         }
+    }
+    
+    /// Content for the connections section
+    private var connectionsContent: some View {
+        VStack {
+            if coordinator.networkManager.isLoading && connectionLoadAttempts < 3 {
+                Text("Loading connections...")
+                    .foregroundColor(.gray)
+                    .frame(height: 120)
+                    .frame(maxWidth: .infinity)
+            } else if !localConnections.isEmpty {
+                ForEach(localConnections) { connection in
+                    ConnectionRow(connection: connection, onRemove: {
+                        removeConnection(connection)
+                    })
+                }
+            } else {
+                emptyConnectionsView
+            }
+        }
+    }
+    
+    /// Empty state for connections
+    private var emptyConnectionsView: some View {
+        VStack(spacing: 12) {
+            Text("No connections found")
+                .foregroundColor(.gray)
+                .padding()
+            
+            Button(action: {
+                forceShowEmptyState = false
+                loadConnections(forceReload: true)
+            }) {
+                Label("Refresh", systemImage: "arrow.clockwise")
+            }
+            .buttonStyle(.bordered)
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+        .background(Color.gray.opacity(0.1))
+        .cornerRadius(10)
     }
     
     // MARK: - Helper Methods
@@ -221,19 +237,13 @@ struct UserDetailView: View {
         }
         
         connectionLoadAttempts += 1
-        
-        // Clear any error message before fetching
         coordinator.networkManager.errorMessage = nil
-        
-        // Get connections (async operation)
         coordinator.networkManager.getConnections(userId: user.id)
         
-        // Force the view to check connections after a delay in case something goes wrong
+        // Force view update after a delay in case loading fails
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             if self.localConnections.isEmpty && !self.coordinator.networkManager.isLoading {
                 self.updateLocalConnections()
-                
-                // If still empty and not loading, force show empty state
                 if self.localConnections.isEmpty && !self.coordinator.networkManager.isLoading {
                     self.forceShowEmptyState = true
                 }
@@ -244,25 +254,19 @@ struct UserDetailView: View {
     /// Updates the local connections from the network manager
     private func updateLocalConnections() {
         localConnections = coordinator.networkManager.connections
-        
-        // Force UI update if needed
         if !localConnections.isEmpty {
-            // Reset the force state since we have connections
             forceShowEmptyState = false
         }
     }
     
     /// Sets up timers to retry loading connections if initial attempts fail
     private func setupConnectionLoadTimers() {
-        // Clean up any existing timer
         retryTimer?.invalidate()
         
-        // Set up a retry timer if connections are empty
         retryTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
             if self.localConnections.isEmpty && self.connectionLoadAttempts < 3 && !self.forceShowEmptyState {
                 self.loadConnections()
             } else {
-                // Stop retrying after success or 3 attempts
                 self.retryTimer?.invalidate()
                 self.retryTimer = nil
             }
@@ -272,10 +276,8 @@ struct UserDetailView: View {
     /// Removes a connection between the current user and the specified connection
     /// - Parameter connection: The connection to remove
     private func removeConnection(_ connection: Connection) {
-        // Call API to remove connection
         coordinator.networkManager.removeConnection(userId: user.id, connectionId: connection.id) { success in
             if success {
-                // Reload connections on success
                 self.loadConnections(forceReload: true)
             }
         }
@@ -292,26 +294,7 @@ struct ConnectionRow: View {
     
     var body: some View {
         HStack {
-            let userForAvatar = User(
-                id: connection.id,
-                username: connection.username,
-                firstName: connection.firstName,
-                lastName: connection.lastName,
-                email: connection.email,
-                phoneNumber: connection.phoneNumber,
-                location: connection.location,
-                university: connection.university,
-                fieldOfInterest: connection.fieldOfInterest,
-                highSchool: connection.highSchool,
-                birthday: nil,
-                createdAt: nil,
-                currentCompany: nil,
-                gender: connection.gender,
-                ethnicity: connection.ethnicity,
-                uniMajor: connection.uniMajor,
-                jobTitle: connection.jobTitle
-            )
-            UserAvatar(user: userForAvatar, size: 40)
+            UserAvatar(user: createUserFromConnection(), size: 40)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(connection.fullName)
@@ -326,9 +309,7 @@ struct ConnectionRow: View {
             
             Spacer()
             
-            Button(action: {
-                showingRemoveAlert = true
-            }) {
+            Button(action: { showingRemoveAlert = true }) {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundColor(.red)
             }
@@ -342,6 +323,29 @@ struct ConnectionRow: View {
         } message: { _ in
             Text("Are you sure you want to remove this connection?")
         }
+    }
+    
+    /// Creates a User object from connection data for avatar display
+    private func createUserFromConnection() -> User {
+        User(
+            id: connection.id,
+            username: connection.username,
+            firstName: connection.firstName,
+            lastName: connection.lastName,
+            email: connection.email,
+            phoneNumber: connection.phoneNumber,
+            location: connection.location,
+            university: connection.university,
+            fieldOfInterest: connection.fieldOfInterest,
+            highSchool: connection.highSchool,
+            birthday: nil,
+            createdAt: nil,
+            currentCompany: nil,
+            gender: connection.gender,
+            ethnicity: connection.ethnicity,
+            uniMajor: connection.uniMajor,
+            jobTitle: connection.jobTitle
+        )
     }
 }
 
@@ -387,9 +391,7 @@ struct AddConnectionView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
+                    Button("Cancel") { dismiss() }
                 }
             }
         }
@@ -402,10 +404,6 @@ struct AddConnectionView: View {
         }
         
         return coordinator.networkManager.users.filter { user in
-            // Filter out:
-            // 1. Current user
-            // 2. The user whose detail we're viewing
-            // 3. Filter by search text if any
             let nameMatch = searchText.isEmpty || 
                            user.fullName.lowercased().contains(searchText.lowercased())
             
@@ -448,8 +446,8 @@ struct AddConnectionView: View {
             highSchool: nil,
             birthday: nil,
             createdAt: nil,
-            currentCompany: "Tech Corp",
-            gender: nil,
+            currentCompany: "Acme Inc",
+            gender: "Male",
             ethnicity: nil,
             uniMajor: "Computer Science",
             jobTitle: "Software Engineer"
