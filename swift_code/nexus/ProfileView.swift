@@ -9,12 +9,6 @@ struct ProfileView: View {
     /// Controls visibility of the logout confirmation dialog
     @State private var showLogoutConfirmation = false
     
-    /// Tracks the number of data loading retry attempts
-    @State private var retryAttempts = 0
-    
-    /// Timer for automatic retry of loading user data
-    @State private var retryTimer: Timer?
-    
     // MARK: - View Body
     
     var body: some View {
@@ -37,10 +31,40 @@ struct ProfileView: View {
             // Refresh current user data when view appears
             coordinator.activeScreen = .profile
             loadUserData()
+            
+            // Auto-retry loading profile if it's missing
+            coordinator.autoRetryLoading(
+                check: { self.coordinator.networkManager.currentUser != nil },
+                action: { self.coordinator.networkManager.fetchCurrentUser() }
+            )
         }
-        .onDisappear {
-            // Invalidate timer when view disappears
-            invalidateRetryTimer()
+        .onChange(of: coordinator.activeScreen) { oldValue, newValue in
+            if newValue == .profile {
+                print("ProfileView: Active screen changed to profile")
+                // Only force refresh when returning to profile screen if data is missing
+                if coordinator.networkManager.currentUser == nil {
+                    print("ProfileView: User data missing, refreshing")
+                    loadUserData()
+                    
+                    // Force UI update by creating a dummy change to trigger refresh
+                    // But only if data is still missing after a delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        if self.coordinator.networkManager.currentUser == nil {
+                            print("ProfileView: Still no data after screen change, forcing UI update")
+                            coordinator.objectWillChange.send()
+                        }
+                    }
+                } else {
+                    print("ProfileView: User data already loaded, no refresh needed")
+                }
+            }
+        }
+        .onChange(of: coordinator.networkManager.currentUser) { oldValue, newValue in
+            if newValue != nil && oldValue == nil {
+                print("ProfileView: Current user changed from nil to loaded, forcing UI refresh")
+                // Only trigger UI refresh when user data goes from nil to non-nil
+                coordinator.objectWillChange.send()
+            }
         }
     }
     
@@ -80,7 +104,14 @@ struct ProfileView: View {
             title: Text("Logout"),
             message: Text("Are you sure you want to logout?"),
             primaryButton: .destructive(Text("Logout")) {
+                print("User confirmed logout")
                 coordinator.logout()
+                
+                // Force UI update after logout
+                DispatchQueue.main.async {
+                    // Ensure we navigate to login screen
+                    coordinator.activeScreen = .login
+                }
             },
             secondaryButton: .cancel()
         )
@@ -211,62 +242,42 @@ struct ProfileView: View {
                     .foregroundColor(.gray)
                     .padding()
                 
-                // Manual refresh button if retries have exceeded
-                if retryAttempts >= 5 {
-                    Button(action: {
-                        retryAttempts = 0
-                        loadUserData()
-                    }) {
-                        HStack {
-                            Image(systemName: "arrow.clockwise")
-                            Text("Refresh Profile")
-                        }
+                Button(action: {
+                    loadUserData()
+                }) {
+                    HStack {
+                        Image(systemName: "arrow.clockwise")
+                        Text("Refresh Profile")
                     }
-                    .buttonStyle(SecondaryButtonStyle())
                 }
+                .buttonStyle(SecondaryButtonStyle())
             }
         }
     }
     
     // MARK: - Data Management
     
-    /// Loads user data and sets up retry mechanism if needed
+    /// Loads user data
     private func loadUserData() {
         if coordinator.networkManager.userId != nil {
-            coordinator.networkManager.fetchCurrentUser()
+            print("ProfileView: Loading user data for user ID: \(coordinator.networkManager.userId!)")
             
-            // Set up a retry timer if currentUser is nil
+            // Only fetch if we don't already have data
             if coordinator.networkManager.currentUser == nil {
-                setupRetryTimer()
-            }
-        }
-    }
-    
-    /// Sets up a timer to retry loading user data
-    private func setupRetryTimer() {
-        // Invalidate existing timer if any
-        invalidateRetryTimer()
-        
-        // Create a new timer that retries fetching user data
-        retryTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            if coordinator.networkManager.currentUser == nil && retryAttempts < 5 {
-                retryAttempts += 1
+                coordinator.networkManager.fetchCurrentUser()
                 
-                if coordinator.networkManager.userId != nil {
-                    coordinator.networkManager.fetchCurrentUser()
+                // Force UI refresh after a slight delay, only if data was missing
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    // Trigger an update by publishing a change only if we still don't have data
+                    if self.coordinator.networkManager.currentUser == nil {
+                        print("ProfileView: Still no user data after fetch, forcing UI update")
+                        coordinator.objectWillChange.send()
+                    }
                 }
             } else {
-                // Stop retrying after success or 5 attempts
-                invalidateRetryTimer()
-                retryAttempts = 0
+                print("ProfileView: User data already loaded, skipping fetch")
             }
         }
-    }
-    
-    /// Invalidates and clears the retry timer
-    private func invalidateRetryTimer() {
-        retryTimer?.invalidate()
-        retryTimer = nil
     }
 }
 

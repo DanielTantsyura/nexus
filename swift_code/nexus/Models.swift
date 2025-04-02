@@ -138,8 +138,17 @@ struct Connection: Identifiable, Codable, Hashable {
     /// High school of the connected user
     let highSchool: String?
     
-    /// Description of the relationship with this connection
-    let relationshipDescription: String?
+    /// Type of relationship with this connection
+    let relationshipType: String?
+    
+    /// Notes about the relationship
+    let note: String?
+    
+    /// Tags for the connection
+    let tags: String?
+    
+    /// When the connection was last viewed
+    let lastViewed: String?
     
     /// Gender of the connected user
     let gender: String?
@@ -167,7 +176,10 @@ struct Connection: Identifiable, Codable, Hashable {
         case university
         case fieldOfInterest = "field_of_interest"
         case highSchool = "high_school"
-        case relationshipDescription = "relationship_description"
+        case relationshipType = "relationship_type"
+        case note
+        case tags
+        case lastViewed = "last_viewed"
         case gender
         case ethnicity
         case uniMajor = "uni_major"
@@ -179,6 +191,17 @@ struct Connection: Identifiable, Codable, Hashable {
     /// Returns the full name of the connected user
     var fullName: String {
         return "\(firstName ?? "Unknown") \(lastName ?? "User")"
+    }
+    
+    /// Returns a description of the relationship with additional context
+    var relationshipDescription: String? {
+        if let type = relationshipType, !type.isEmpty {
+            if let note = note, !note.isEmpty {
+                return "\(type) • \(note)"
+            }
+            return type.capitalized
+        }
+        return nil
     }
     
     // MARK: - Hashable Conformance
@@ -196,64 +219,28 @@ struct Connection: Identifiable, Codable, Hashable {
 
 // MARK: - Authentication Models
 
-/// Login request payload
+/// Model for authentication data
 struct Login: Codable {
-    /// Username for authentication
     let username: String
-    
-    /// Password for authentication
     let password: String
-    
-    /// Maps Swift property names to JSON field names
-    enum CodingKeys: String, CodingKey {
-        case username
-        case password
-    }
 }
 
-/// Response from a successful login
+/// Model for authentication response
 struct LoginResponse: Codable {
-    /// ID of the authenticated user
+    let status: String
     let userId: Int
-    
-    /// Authentication token for subsequent requests
-    let token: String
-    
-    /// Last login timestamp (can be nil for first-time login)
-    let lastLogin: String?
-    
-    /// User data returned from login
     let user: User?
     
-    /// Maps Swift property names to JSON field names
     enum CodingKeys: String, CodingKey {
+        case status
         case userId = "user_id"
-        case token = "auth_token"
-        case lastLogin = "last_login"
         case user
     }
 }
 
-/// Errors that can occur during authentication
+/// Error types for authentication
 enum AuthError: Error {
-    /// Invalid username or password
     case invalidCredentials
-    
-    /// Network connectivity issues
     case networkError
-    
-    /// Other unspecified errors
     case unknownError
-    
-    /// Human-readable error message
-    var message: String {
-        switch self {
-        case .invalidCredentials:
-            return "Invalid username or password"
-        case .networkError:
-            return "Network error. Please check your connection"
-        case .unknownError:
-            return "An unknown error occurred"
-        }
-    }
 } 

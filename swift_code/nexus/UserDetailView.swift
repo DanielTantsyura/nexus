@@ -7,9 +7,7 @@ struct UserDetailView: View {
     
     // MARK: - State
     @State private var showingAddConnectionSheet = false
-    @State private var connectionLoadAttempts = 0
     @State private var localConnections: [Connection] = []
-    @State private var retryTimer: Timer?
     @State private var forceShowEmptyState = false
     @State private var showingEditContactSheet = false
     
@@ -36,14 +34,30 @@ struct UserDetailView: View {
         .onAppear {
             coordinator.activeScreen = .userDetail
             loadConnections(forceReload: true)
-            setupConnectionLoadTimers()
+            
+            // Auto-retry loading connections if they're missing
+            coordinator.autoRetryLoading(
+                check: { !self.localConnections.isEmpty },
+                action: { self.loadConnections(forceReload: true) }
+            )
         }
         .onDisappear {
-            retryTimer?.invalidate()
-            retryTimer = nil
+            // Nothing to invalidate since we're using DispatchQueue for retries
         }
-        .onChange(of: user.id) { loadConnections(forceReload: true) }
-        .onChange(of: coordinator.networkManager.connections) { updateLocalConnections() }
+        .onChange(of: user.id) { oldValue, newValue in
+            loadConnections(forceReload: true)
+        }
+        .onChange(of: coordinator.networkManager.connections) { oldValue, newValue in
+            print("Connections updated in NetworkManager: \(newValue.count) connections")
+            updateLocalConnections()
+        }
+        // Listen for active screen changes which may indicate data refreshes
+        .onChange(of: coordinator.activeScreen) { oldValue, newValue in
+            if newValue == .userDetail && localConnections.isEmpty {
+                print("Screen changed to userDetail, updating connections")
+                updateLocalConnections()
+            }
+        }
         .sheet(isPresented: $showingAddConnectionSheet, onDismiss: {
             loadConnections(forceReload: true)
         }) {
@@ -188,7 +202,7 @@ struct UserDetailView: View {
     /// Content for the connections section
     private var connectionsContent: some View {
         VStack {
-            if coordinator.networkManager.isLoading && connectionLoadAttempts < 3 {
+            if coordinator.networkManager.isLoading {
                 Text("Loading connections...")
                     .foregroundColor(.gray)
                     .frame(height: 120)
@@ -232,43 +246,21 @@ struct UserDetailView: View {
     /// - Parameter forceReload: Whether to force a reload of connections
     private func loadConnections(forceReload: Bool = false) {
         if forceReload {
-            connectionLoadAttempts = 0
             forceShowEmptyState = false
         }
         
-        connectionLoadAttempts += 1
         coordinator.networkManager.errorMessage = nil
+        print("Loading connections for user ID: \(user.id)")
         coordinator.networkManager.getConnections(userId: user.id)
-        
-        // Force view update after a delay in case loading fails
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            if self.localConnections.isEmpty && !self.coordinator.networkManager.isLoading {
-                self.updateLocalConnections()
-                if self.localConnections.isEmpty && !self.coordinator.networkManager.isLoading {
-                    self.forceShowEmptyState = true
-                }
-            }
-        }
     }
     
     /// Updates the local connections from the network manager
     private func updateLocalConnections() {
-        localConnections = coordinator.networkManager.connections
-        if !localConnections.isEmpty {
-            forceShowEmptyState = false
-        }
-    }
-    
-    /// Sets up timers to retry loading connections if initial attempts fail
-    private func setupConnectionLoadTimers() {
-        retryTimer?.invalidate()
-        
-        retryTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            if self.localConnections.isEmpty && self.connectionLoadAttempts < 3 && !self.forceShowEmptyState {
-                self.loadConnections()
-            } else {
-                self.retryTimer?.invalidate()
-                self.retryTimer = nil
+        DispatchQueue.main.async {
+            self.localConnections = self.coordinator.networkManager.connections
+            print("Local connections updated: \(self.localConnections.count) connections")
+            if !self.localConnections.isEmpty {
+                self.forceShowEmptyState = false
             }
         }
     }
@@ -300,10 +292,32 @@ struct ConnectionRow: View {
                 Text(connection.fullName)
                     .fontWeight(.semibold)
                 
-                if let description = connection.relationshipDescription {
-                    Text(description)
-                        .font(.caption)
+                // Display relationship info
+                if let relationshipType = connection.relationshipType {
+                    HStack(spacing: 6) {
+                        Text(relationshipType.capitalized)
+                            .font(.caption)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.blue.opacity(0.1))
+                            .foregroundColor(.blue)
+                            .cornerRadius(4)
+                        
+                        if let note = connection.note, !note.isEmpty {
+                            Text("• \(note)")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+                
+                // Display tags if available
+                if let tags = connection.tags, !tags.isEmpty {
+                    Text(tags)
+                        .font(.caption2)
                         .foregroundColor(.gray)
+                        .lineLimit(1)
                 }
             }
             

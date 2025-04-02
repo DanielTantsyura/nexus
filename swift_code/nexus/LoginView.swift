@@ -27,6 +27,9 @@ struct LoginView: View {
         case password
     }
     
+    // Add a state property to track whether to show the retry button
+    @State private var showRetryButton = false
+    
     // MARK: - View Body
     
     var body: some View {
@@ -51,6 +54,12 @@ struct LoginView: View {
         }
         .onTapGesture {
             focusedField = nil  // Dismiss keyboard when tapping outside
+        }
+        .onAppear {
+            // Reset loading state and retry button when view appears
+            coordinator.networkManager.isLoading = false
+            showRetryButton = false
+            print("LoginView appeared: Reset loading state")
         }
     }
     
@@ -120,8 +129,28 @@ struct LoginView: View {
     private var loginButton: some View {
         Group {
             if coordinator.networkManager.isLoading {
-                ProgressView()
-                    .padding()
+                VStack(spacing: 8) {
+                    ProgressView()
+                        .padding(.bottom, 5)
+                    
+                    Text("Signing in...")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    
+                    // Add a retry button that appears after a delay if login seems stuck
+                    if showRetryButton {
+                        Button("Cancel and try again") {
+                            // Force reset loading state
+                            coordinator.networkManager.isLoading = false
+                            coordinator.networkManager.errorMessage = nil
+                            showRetryButton = false
+                        }
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                        .padding(.top, 5)
+                    }
+                }
+                .padding()
             } else {
                 Button(action: loginUser) {
                     Text("Sign In")
@@ -185,7 +214,17 @@ struct LoginView: View {
     /// Attempts to log in the user with provided credentials
     private func loginUser() {
         focusedField = nil  // Dismiss keyboard
+        showRetryButton = false
+        
+        // Set a timer to show the retry button if login takes too long
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8.0) {
+            if self.coordinator.networkManager.isLoading {
+                self.showRetryButton = true
+            }
+        }
+        
         coordinator.login(username: username, password: password) { success in
+            self.showRetryButton = false
             if !success {
                 showingAlert = true
                 alertMessage = coordinator.networkManager.errorMessage ?? "Failed to login"

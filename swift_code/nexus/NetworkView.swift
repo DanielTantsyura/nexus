@@ -12,18 +12,27 @@ struct NetworkView: View {
     
     var body: some View {
         // Only show MainTabView after login, otherwise show LoginView with no tab bar
-        if coordinator.activeScreen == .login {
+        if coordinator.activeScreen == .login || !coordinator.networkManager.isLoggedIn {
             LoginView()
                 .onAppear {
+                    print("Showing LoginView - activeScreen: \(coordinator.activeScreen), isLoggedIn: \(coordinator.networkManager.isLoggedIn)")
                     // Hide tab bar when login screen appears
                     UITabBar.appearance().isHidden = true
+                    
+                    // Ensure loading state is reset to show the login button
+                    coordinator.networkManager.isLoading = false
                 }
+                .transition(.opacity)
+                .animation(.easeInOut, value: coordinator.activeScreen)
         } else {
             MainTabView()
                 .onAppear {
+                    print("Showing MainTabView - activeScreen: \(coordinator.activeScreen)")
                     // Show tab bar when main app appears
                     UITabBar.appearance().isHidden = false
                 }
+                .transition(.opacity)
+                .animation(.easeInOut, value: coordinator.activeScreen)
         }
     }
 }

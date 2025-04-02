@@ -1,70 +1,86 @@
 import SwiftUI
 
-/// View that displays a searchable list of users
+/// View that displays a list of users with search functionality
 struct UserListView: View {
     // MARK: - Properties
     
     @EnvironmentObject private var coordinator: AppCoordinator
-    
-    /// Text currently entered in the search field
     @State private var searchText = ""
     
     // MARK: - View Body
     
     var body: some View {
         VStack(spacing: 0) {
-            // Search bar
-            searchBarView
-            
-            // Content based on state
+            searchBar
             contentView
         }
+        .navigationTitle("Users")
         .onAppear {
             coordinator.activeScreen = .userList
-            coordinator.refreshData()
+            
+            // If users is empty, trigger a refresh
+            if coordinator.networkManager.users.isEmpty {
+                coordinator.refreshData()
+                
+                // Auto-retry loading users if they're missing
+                coordinator.autoRetryLoading(
+                    check: { !self.coordinator.networkManager.users.isEmpty },
+                    action: { self.coordinator.refreshData() }
+                )
+            }
+            
+            print("UserListView appeared, users count: \(coordinator.networkManager.users.count)")
+        }
+        // Listen for active screen changes which may indicate data refreshes
+        .onChange(of: coordinator.activeScreen) { oldValue, newValue in
+            if newValue == .userList && filteredUsers.isEmpty && searchText.isEmpty {
+                print("Screen changed to userList, refreshing user data")
+                coordinator.refreshData()
+            }
         }
     }
     
     // MARK: - UI Components
     
     /// Search bar for filtering users
-    private var searchBarView: some View {
+    private var searchBar: some View {
         HStack {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.gray)
                 
-                TextField("Search users...", text: $searchText, onCommit: {
-                    performSearch()
-                })
-                .autocapitalization(.none)
-                .disableAutocorrection(true)
+                TextField("Search by name or location", text: $searchText)
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
                 
                 if !searchText.isEmpty {
                     Button(action: {
                         searchText = ""
-                        coordinator.refreshData()
+                        // Reset to all users when clearing search
+                        coordinator.networkManager.fetchAllUsers()
                     }) {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.gray)
                     }
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(Color.gray.opacity(0.1))
+            .padding(8)
+            .background(Color(.systemGray6))
             .cornerRadius(10)
             
-            Button(action: {
-                performSearch()
-            }) {
-                Text("Search")
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(Color.blue)
-                    .cornerRadius(10)
+            if !searchText.isEmpty {
+                Button(action: {
+                    // Execute search
+                    performSearch()
+                }) {
+                    Text("Search")
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color.blue)
+                        .cornerRadius(10)
+                }
             }
         }
         .padding(.horizontal)
@@ -86,7 +102,10 @@ struct UserListView: View {
                 title: "No users found",
                 message: !searchText.isEmpty ? "Try a different search term" : "Refresh to find people",
                 buttonTitle: "Refresh",
-                action: { coordinator.refreshData() }
+                action: { 
+                    coordinator.refreshData()
+                    print("Refreshing user list")
+                }
             )
         } else {
             userListView
@@ -116,6 +135,7 @@ struct UserListView: View {
             .padding(.vertical, 8)
         }
         .refreshable {
+            print("Pull-to-refresh triggered")
             coordinator.refreshData()
         }
     }

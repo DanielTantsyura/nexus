@@ -99,6 +99,17 @@ struct MainTabView: View {
             // Create a custom layout using a subclass to adjust tab positioning
             setupTabBarItemPositioning()
         }
+        .onChange(of: coordinator.activeScreen) { oldValue, newValue in
+            // If active screen becomes login, ensure we properly handle logout
+            if newValue == .login {
+                print("MainTabView detected activeScreen change to .login")
+                // Extra check to ensure we're logged out
+                if coordinator.networkManager.isLoggedIn == false {
+                    // This should trigger any parent views to show login screen
+                    coordinator.objectWillChange.send()
+                }
+            }
+        }
         .edgesIgnoringSafeArea(.bottom) // Make tab bar extend to screen edges
     }
     
@@ -120,17 +131,15 @@ struct MainTabView: View {
                 // Ensure we have 3 tab bar items
                 guard let items = tabBar.items, items.count == 3 else { return }
                 
-                // Calculate screen width and determine center points for each half
-                let screenWidth = window.bounds.width
+                // Calculate tab offsets without needing screen width
+                // Using fixed values for simplicity
                 
                 // Adjust the first tab (Network) - position in center of left half
-                // Move it right toward the center of the left half (screenWidth/4)
                 items[0].titlePositionAdjustment = UIOffset(horizontal: 42, vertical: 0)
                 
                 // Skip the middle tab (already hidden)
                 
                 // Adjust the last tab (Profile) - position in center of right half
-                // Move it left toward the center of the right half (-screenWidth/4)
                 items[2].titlePositionAdjustment = UIOffset(horizontal: -42, vertical: 0)
             }
         }

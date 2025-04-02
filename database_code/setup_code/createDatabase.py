@@ -7,13 +7,17 @@ This module contains functions to create the database schema with tables for:
 - relationships: Store bidirectional connections between users
 
 The schema supports both one-way and two-way relationship properties, where:
-- relationship_type is bidirectional (shared in both directions)
-- note, tags, and last_viewed are unidirectional (specific to each direction)
+- relationship_description is bidirectional (shared in both directions)
+- custom_note, tags, and last_viewed are unidirectional (specific to each direction)
 """
 
 import psycopg2
 import os
+import sys
 from dotenv import load_dotenv
+
+# Add parent directory to the path so we can import from the parent directory
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import DATABASE_URL
 
 # Load environment variables
@@ -32,7 +36,7 @@ CREATE TABLE users (
     username VARCHAR(50) UNIQUE,
     first_name VARCHAR(50) NOT NULL,
     last_name VARCHAR(50) NOT NULL,
-    email VARCHAR(100) UNIQUE,
+    email VARCHAR(100),
     phone_number VARCHAR(20),
     location VARCHAR(100),
     university VARCHAR(100),
@@ -60,14 +64,14 @@ CREATE TABLE logins (
 
 -- Create relationships table 
 -- NOTE: 
--- - relationship_type is bidirectional (shared in both directions)
--- - note, tags, and last_viewed are unidirectional (specific to each direction)
+-- - relationship_description is bidirectional (shared in both directions)
+-- - custom_note, tags, and last_viewed are unidirectional (specific to each direction)
 CREATE TABLE relationships (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     contact_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    relationship_type VARCHAR(50) NOT NULL,
-    note TEXT,
+    relationship_description VARCHAR(50) NOT NULL,
+    custom_note TEXT,
     tags TEXT,
     last_viewed TIMESTAMP,
     CONSTRAINT unique_relationship UNIQUE (user_id, contact_id)

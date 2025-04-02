@@ -370,34 +370,32 @@ struct CreateContactView: View {
             return
         }
         
-        coordinator.networkManager.addConnection(
+        coordinator.networkManager.createContact(
             userId: userId,
-            connectionId: nil,  // This will be determined by the server based on the contact text
-            relationshipType: contactText,
-            tags: selectedTags
-        ) { result in
-            isSubmitting = false
-            
-            switch result {
-            case true:
-                withAnimation {
-                    successMessage = "Contact created successfully"
-                    contactText = ""
-                    selectedTags = []
+            contactText: contactText,
+            relationshipType: "contact",
+            completion: { result in
+                self.isSubmitting = false
+                
+                if result {
+                    withAnimation {
+                        self.successMessage = "Contact created successfully"
+                        self.contactText = ""
+                        self.selectedTags = []
+                    }
+                    
+                    // Refresh the contacts list
+                    self.coordinator.refreshData()
+                    
+                    // Navigate back after a short delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        self.coordinator.backFromCreateContact()
+                    }
+                } else {
+                    self.errorMessage = "Failed to create contact"
                 }
-                
-                // Refresh the contacts list
-                coordinator.refreshData()
-                
-                // Navigate back after a short delay
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    coordinator.backFromCreateContact()
-                }
-                
-            case false:
-                errorMessage = "Failed to create contact"
             }
-        }
+        )
     }
     
     /// Clear form data without navigation

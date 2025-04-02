@@ -147,11 +147,28 @@ final class AppCoordinator: ObservableObject {
     
     /// Handle user logout
     func logout() {
-        networkManager.logout()
-        activeScreen = .login
+        print("Logging out - resetting app state and navigating to login screen")
+        
+        // Ensure NetworkManager is not in loading state
+        networkManager.isLoading = false
+        
+        // First clear all navigation paths and state
         navigationPath = NavigationPath()
         networkTabPath = NavigationPath()
         profileTabPath = NavigationPath()
+        
+        // Reset the tab selection to ensure we're not stuck in a specific tab
+        selectedTab = .network
+        
+        // Clear the user data
+        networkManager.logout()
+        
+        // Finally set the active screen to login
+        // This must happen after clearing other state
+        activeScreen = .login
+        
+        // Force UI refresh
+        objectWillChange.send()
     }
     
     // MARK: - Navigation Methods
@@ -167,6 +184,30 @@ final class AppCoordinator: ObservableObject {
         }
         navigationPath = profileTabPath
         activeScreen = .profile
+        
+        // Ensure user data is refreshed when navigating to profile, but only if missing
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            guard let self = self else { return }
+            
+            // Only fetch user data if it's missing
+            if self.networkManager.currentUser == nil {
+                print("AppCoordinator: User data missing, fetching")
+                self.networkManager.fetchCurrentUser()
+                
+                // Force UI update to ensure the view reflects the latest data
+                // But only if data is still missing after the fetch
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    if self.networkManager.currentUser == nil {
+                        print("AppCoordinator: Still no user data, forcing UI refresh")
+                        self.objectWillChange.send()
+                    } else {
+                        print("AppCoordinator: User data loaded successfully, no forced refresh needed")
+                    }
+                }
+            } else {
+                print("AppCoordinator: User data already loaded, no fetch needed")
+            }
+        }
     }
     
     /// Navigate to the user list screen
@@ -221,6 +262,10 @@ final class AppCoordinator: ObservableObject {
         networkTabPath.append(user)
         navigationPath = networkTabPath
         activeScreen = .userDetail
+        
+        // Ensure connections are loaded for this user
+        print("Loading connections for user ID: \(user.id)")
+        networkManager.getConnections(userId: user.id)
     }
     
     /// Navigate back from user detail to user list
@@ -244,6 +289,70 @@ final class AppCoordinator: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             self?.loadData()
         }
+    }
+    
+    /// Automatically retries loading data when a view needs it
+    /// - Parameters:
+    ///   - check: A closure that returns true if data is loaded properly, false if data is missing
+    ///   - action: The refresh action to perform when data is missing
+    ///   - maxAttempts: Maximum number of retry attempts (default: 3)
+    ///   - interval: Seconds between retry attempts (default: 2.0)
+    func autoRetryLoading(check: @escaping () -> Bool, action: @escaping () -> Void, maxAttempts: Int = 3, interval: TimeInterval = 2.0) {
+        // Always perform the action at least once to ensure fresh data
+        action()
+        
+        // If data is already loaded after the first attempt, we're done
+        if check() {
+            print("Data loaded successfully on first attempt")
+            return
+        }
+        
+        print("Initial data load incomplete, setting up auto-retry...")
+        
+        // Create a task that will retry loading the data
+        let task = DispatchWorkItem {
+            var attempts = 0
+            
+            func attemptRefresh() {
+                // If data is loaded or we've reached max attempts, stop retrying
+                if check() || attempts >= maxAttempts {
+                    print("Auto-retry complete after \(attempts) attempts")
+                    
+                    // Force a UI update on the main thread - but only if data is still not loaded
+                    // after max attempts (meaning we're stopping due to max attempts)
+                    if !check() && attempts >= maxAttempts {
+                        print("Auto-retry: Max attempts reached but data still not loaded. Forcing UI update")
+                        DispatchQueue.main.async {
+                            // Trigger an update by publishing a dummy change to activeScreen and back
+                            let currentScreen = self.activeScreen
+                            self.activeScreen = .login
+                            self.activeScreen = currentScreen
+                        }
+                    } else {
+                        print("Auto-retry: Data successfully loaded, no forced UI update needed")
+                    }
+                    return
+                }
+                
+                // Increment attempts and try again
+                attempts += 1
+                print("Auto-retry attempt \(attempts)/\(maxAttempts)...")
+                
+                // Perform the refresh action
+                action()
+                
+                // Schedule next attempt after the interval
+                DispatchQueue.main.asyncAfter(deadline: .now() + interval) {
+                    attemptRefresh()
+                }
+            }
+            
+            // Start the first attempt
+            attemptRefresh()
+        }
+        
+        // Start the task
+        DispatchQueue.main.async(execute: task)
     }
     
     /// Loads all required data from the API
@@ -275,6 +384,12 @@ final class AppCoordinator: ObservableObject {
         
         // Always refresh the current user to ensure latest data
         networkManager.fetchCurrentUser()
+        
+        // If on user detail screen, reload connections for that user
+        if activeScreen == .userDetail, let selectedUser = networkManager.selectedUser {
+            print("Refreshing connections for selected user: \(selectedUser.id)")
+            networkManager.getConnections(userId: selectedUser.id)
+        }
         
         // If we encounter session expiration or persistent errors, handle them
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
