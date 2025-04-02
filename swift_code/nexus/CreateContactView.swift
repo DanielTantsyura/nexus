@@ -33,6 +33,20 @@ struct CreateContactView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
+                // App header
+                AppHeader(
+                    firstName: coordinator.networkManager.currentUser?.firstName,
+                    subtitle: "Your personal network tracker"
+                )
+                .padding(.bottom, 10)
+                
+                // Title
+                Text("Create Contact")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
+                
                 // Error message
                 if let errorMessage = errorMessage {
                     errorBanner(message: errorMessage)
@@ -59,12 +73,15 @@ struct CreateContactView: View {
             }
             .padding()
         }
-        .navigationTitle("Create Contact")
+        .navigationBarHidden(true)
         .onAppear {
             // Auto-focus text field when view appears
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 isContactTextFieldFocused = true
             }
+            
+            // Fetch recent tags when the view appears
+            coordinator.networkManager.fetchRecentTags()
         }
         .disabled(isSubmitting)
         .overlay(
@@ -154,12 +171,17 @@ struct CreateContactView: View {
                     Text("Selected Tags")
                         .font(.headline)
                    
-                    FlowLayout(spacing: 8) {
+                    // Use fixed height container for proper layout
+                    VStack(alignment: .leading) {
                         ForEach(selectedTags, id: \.self) { tag in
-                            tagBadge(tag)
+                            TagBadge(text: tag, showRemoveButton: true) {
+                                removeTag(tag)
+                            }
+                            .padding(.bottom, 4)
                         }
                     }
                 }
+                .padding(.top, 8)
             }
         }
     }
@@ -175,7 +197,13 @@ struct CreateContactView: View {
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                        
-                        FlowLayout(spacing: 8) {
+                        // Use a LazyVGrid for tag layout instead of FlowLayout
+                        LazyVGrid(
+                            columns: [
+                                GridItem(.adaptive(minimum: 100, maximum: 150), spacing: 8)
+                            ],
+                            spacing: 8
+                        ) {
                             ForEach(coordinator.networkManager.recentTags, id: \.self) { tag in
                                 Button(action: {
                                     addTag(tag)
@@ -186,6 +214,7 @@ struct CreateContactView: View {
                                         .background(selectedTags.contains(tag) ? Color.blue.opacity(0.2) : Color.gray.opacity(0.2))
                                         .foregroundColor(selectedTags.contains(tag) ? .blue : .primary)
                                         .cornerRadius(16)
+                                        .frame(maxWidth: .infinity)
                                 }
                                 .buttonStyle(PlainButtonStyle())
                             }
@@ -242,47 +271,6 @@ struct CreateContactView: View {
         }
     }
    
-    /// Creates a tag badge with remove functionality
-    private func tagBadge(_ tag: String) -> some View {
-        HStack(spacing: 4) {
-            Text(tag)
-                .font(.caption)
-                .padding(.leading, 8)
-           
-            Button(action: {
-                removeTag(tag)
-            }) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.caption)
-            }
-            .padding(.trailing, 6)
-        }
-        .padding(.vertical, 6)
-        .background(Color.blue.opacity(0.2))
-        .foregroundColor(.blue)
-        .cornerRadius(16)
-    }
-   
-    // MARK: - Methods
-   
-    /// Adds a custom tag based on the newTagText value
-    private func addCustomTag() {
-        let trimmedText = newTagText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedText.isEmpty else { return }
-       
-        addTag(trimmedText)
-        newTagText = ""
-    }
-   
-    /// Adds a tag to the selected tags array if not already present
-    private func addTag(_ tag: String) {
-        if !selectedTags.contains(tag) {
-            selectedTags.append(tag)
-        } else {
-            removeTag(tag)
-        }
-    }
-   
     /// Removes a tag from the selected tags array
     private func removeTag(_ tag: String) {
         selectedTags.removeAll { $0 == tag }
@@ -328,6 +316,24 @@ struct CreateContactView: View {
                 errorMessage = "Failed to create contact: \(error.localizedDescription)"
             }
         }
+    }
+   
+    /// Adds a tag to the selected tags array if not already present
+    private func addTag(_ tag: String) {
+        if !selectedTags.contains(tag) {
+            selectedTags.append(tag)
+        } else {
+            removeTag(tag)
+        }
+    }
+   
+    /// Adds a custom tag based on the newTagText value
+    private func addCustomTag() {
+        let trimmedText = newTagText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedText.isEmpty else { return }
+       
+        addTag(trimmedText)
+        newTagText = ""
     }
 }
 

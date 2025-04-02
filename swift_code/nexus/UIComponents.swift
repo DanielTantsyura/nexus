@@ -44,6 +44,39 @@ struct SecondaryButtonStyle: ButtonStyle {
 
 // MARK: - UI Components
 
+/// A consistent app header with logo and title
+struct AppHeader: View {
+    /// The first name of the user for personalization
+    let firstName: String?
+    
+    /// Subtitle for the header
+    let subtitle: String
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 12) {
+                // App logo
+                Image("AppLogo")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(height: 40)
+                
+                // App name with user's first name
+                Text("\(firstName?.isEmpty == false ? "\(firstName!)'s " : "")Nexus")
+                    .font(.title)
+                    .fontWeight(.bold)
+            }
+            
+            // App motto/subtitle
+            Text(subtitle)
+                .font(.subheadline)
+                .foregroundColor(.gray)
+                .padding(.bottom, 8)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
 /// A circular avatar view displaying the user's initial
 struct UserAvatar: View {
     /// The user to display the avatar for

@@ -20,12 +20,19 @@ struct ProfileView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // App logo
-                Image("AppLogo")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(height: 60)
-                    .padding(.bottom, 10)
+                // App header
+                AppHeader(
+                    firstName: coordinator.networkManager.currentUser?.firstName,
+                    subtitle: "Your personal network tracker"
+                )
+                .padding(.bottom, 10)
+                
+                // Title
+                Text("Your Profile")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
                 
                 // Current user profile section
                 currentUserSection
@@ -37,6 +44,7 @@ struct ProfileView: View {
             }
             .padding()
         }
+        .navigationBarHidden(true)
         .alert(isPresented: $showLogoutConfirmation) {
             logoutAlert
         }

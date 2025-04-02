@@ -128,13 +128,12 @@ class DatabaseUtils:
             conn = psycopg2.connect(DATABASE_URL)
             cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
             
-            # Get all users who don't have login credentials
+            # Get all users who have non-null recent_tags and don't have login credentials
             query = """
             SELECT u.id, u.first_name, u.last_name
             FROM users u
             LEFT JOIN logins l ON u.id = l.user_id
-            WHERE l.id IS NULL
-            LIMIT 5;  -- Limit to 5 for demo purposes
+            WHERE l.id IS NULL AND u.recent_tags IS NOT NULL;
             """
             
             cur.execute(query)
@@ -153,7 +152,7 @@ class DatabaseUtils:
                 # Add the login
                 insert_query = """
                 INSERT INTO logins (user_id, username, passkey, last_login)
-                VALUES (%s, %s, %s, NOW());
+                VALUES (%s, %s, %s, NULL);
                 """
                 
                 cur.execute(insert_query, (user_id, username, default_password))

@@ -66,8 +66,16 @@ struct User: Identifiable, Codable, Hashable {
     /// LinkedIn profile URL
     let linkedinUrl: String?
     
-    /// Recent tags used by the user
-    let recentTags: [String]?
+    /// Recent tags used by the user - stored as a comma-separated string in the database
+    private let _recentTagsString: String?
+    
+    /// Recent tags used by the user - converted to array
+    var recentTags: [String]? {
+        guard let tagsString = _recentTagsString, !tagsString.isEmpty else {
+            return nil
+        }
+        return tagsString.split(separator: ",").map { String($0) }
+    }
     
     // MARK: - Coding Keys
     
@@ -93,7 +101,34 @@ struct User: Identifiable, Codable, Hashable {
         case lastLogin = "last_login"
         case profileImageUrl = "profile_image_url"
         case linkedinUrl = "linkedin_url"
-        case recentTags = "recent_tags"
+        case _recentTagsString = "recent_tags"
+    }
+    
+    // MARK: - Init
+    
+    /// Custom initializer that allows setting all properties
+    init(id: Int, username: String?, firstName: String?, lastName: String?, email: String?, phoneNumber: String?, location: String?, university: String?, fieldOfInterest: String?, highSchool: String?, birthday: String?, createdAt: String?, currentCompany: String?, gender: String?, ethnicity: String?, uniMajor: String?, jobTitle: String?, lastLogin: String?, profileImageUrl: String?, linkedinUrl: String?, recentTags: [String]?) {
+        self.id = id
+        self.username = username
+        self.firstName = firstName
+        self.lastName = lastName
+        self.email = email
+        self.phoneNumber = phoneNumber
+        self.location = location
+        self.university = university
+        self.fieldOfInterest = fieldOfInterest
+        self.highSchool = highSchool
+        self.birthday = birthday
+        self.createdAt = createdAt
+        self.currentCompany = currentCompany
+        self.gender = gender
+        self.ethnicity = ethnicity
+        self.uniMajor = uniMajor
+        self.jobTitle = jobTitle
+        self.lastLogin = lastLogin
+        self.profileImageUrl = profileImageUrl
+        self.linkedinUrl = linkedinUrl
+        self._recentTagsString = recentTags?.joined(separator: ",")
     }
     
     // MARK: - Computed Properties
@@ -177,11 +212,67 @@ struct Connection: Identifiable, Codable, Hashable {
     /// Notes about the connection
     let notes: String?
     
-    /// Tags associated with the connection
-    let tags: [String]?
+    /// Tags associated with the connection - may be stored as string or array
+    private let _tagsString: String?
+    
+    /// Tags stored as an array after processing
+    var tags: [String] {
+        guard let tagsStr = _tagsString, !tagsStr.isEmpty else {
+            return []
+        }
+        return tagsStr.split(separator: ",").map { String($0) }
+    }
     
     /// When the connection was last viewed
     let lastViewed: String?
+    
+    /// User object created from connection data
+    var user: User {
+        return User(
+            id: id,
+            username: username,
+            firstName: firstName,
+            lastName: lastName,
+            email: email,
+            phoneNumber: phoneNumber,
+            location: location,
+            university: university,
+            fieldOfInterest: fieldOfInterest,
+            highSchool: highSchool,
+            birthday: nil,
+            createdAt: nil,
+            currentCompany: currentCompany,
+            gender: gender,
+            ethnicity: ethnicity,
+            uniMajor: uniMajor,
+            jobTitle: jobTitle,
+            lastLogin: nil,
+            profileImageUrl: profileImageUrl,
+            linkedinUrl: linkedinUrl,
+            recentTags: nil
+        )
+    }
+    
+    /// Formatted last contact date string
+    var lastContactFormat: String {
+        guard let lastViewed = lastViewed else { return "Never" }
+        
+        // Simple date formatting
+        if lastViewed.isEmpty { return "Never" }
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+        
+        guard let date = dateFormatter.date(from: lastViewed) else {
+            return "Unknown"
+        }
+        
+        let displayFormatter = DateFormatter()
+        displayFormatter.dateStyle = .medium
+        displayFormatter.timeStyle = .none
+        
+        return displayFormatter.string(from: date)
+    }
     
     // MARK: - Coding Keys
     
@@ -206,7 +297,7 @@ struct Connection: Identifiable, Codable, Hashable {
         case profileImageUrl = "profile_image_url"
         case linkedinUrl = "linkedin_url"
         case notes
-        case tags
+        case _tagsString = "tags"
         case lastViewed = "last_viewed"
     }
     
@@ -272,14 +363,26 @@ struct LoginResponse: Codable {
     /// Last login timestamp (can be nil for first-time login)
     let lastLogin: String?
     
-    /// User data returned from login
-    let user: User?
+    /// Username returned from login
+    let username: String?
     
     /// Maps Swift property names to JSON field names
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
         case lastLogin = "last_login"
-        case user
+        case username = "username"
+    }
+    
+    // Custom initializer to handle different response formats
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        // userId is required - if it's missing, decoding will fail
+        userId = try container.decode(Int.self, forKey: .userId)
+        
+        // These are optional fields
+        lastLogin = try container.decodeIfPresent(String.self, forKey: .lastLogin)
+        username = try container.decodeIfPresent(String.self, forKey: .username)
     }
 }
 

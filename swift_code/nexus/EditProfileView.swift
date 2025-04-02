@@ -39,39 +39,48 @@ struct EditProfileView: View {
     // MARK: - View Body
     
     var body: some View {
-        Group {
+        VStack(spacing: 0) {
+            // App header
+            if !isInSheet {
+                AppHeader(
+                    firstName: coordinator.networkManager.currentUser?.firstName,
+                    subtitle: "Your personal network tracker"
+                )
+                .padding(.top)
+                .padding(.horizontal)
+                
+                // Title
+                Text("Edit Profile")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+            }
+            
+            profileEditContent
+                .padding(.vertical)
+        }
+        .navigationBarHidden(!isInSheet)
+        .navigationBarBackButtonHidden(!isInSheet)
+        .toolbar {
             if isInSheet {
-                // For contacts, show in a NavigationView
-                NavigationView {
-                    profileEditContent
-                        .navigationTitle("Edit Contact")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarLeading) {
-                                Button("Cancel") {
-                                    dismiss()
-                                }
-                            }
-                            
-                            ToolbarItem(placement: .navigationBarTrailing) {
-                                Button("Save") {
-                                    saveProfile()
-                                }
-                                .disabled(coordinator.networkManager.isLoading)
-                            }
-                        }
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
                 }
-            } else {
-                // For current user, use existing navigation stack
-                profileEditContent
-                    .navigationTitle("Edit Profile")
-                    .navigationBarTitleDisplayMode(.inline)
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        saveProfile()
+                    }
+                    .disabled(coordinator.networkManager.isLoading)
+                }
             }
         }
         .onAppear {
-            if !isInSheet {
-                coordinator.activeScreen = .editProfile
-            }
+            coordinator.activeScreen = .editProfile
             loadUserData()
         }
         .alert(isPresented: $showingSaveAlert) {
@@ -83,8 +92,7 @@ struct EditProfileView: View {
                         if isInSheet {
                             dismiss()
                         } else {
-                            // Navigate back
-                            coordinator.navigationPath.removeLast()
+                            coordinator.backFromEditProfile()
                         }
                     }
                 }

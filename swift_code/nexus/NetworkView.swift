@@ -1,240 +1,208 @@
 import SwiftUI
 
-/// View that displays the user's connections
+/// A view displaying the user's network connections
 struct NetworkView: View {
-    // MARK: - Environment
+    // MARK: - Properties
     
-    /// Reference to the app coordinator
-    @EnvironmentObject var coordinator: AppCoordinator
+    /// App coordinator for navigation and state management
+    @EnvironmentObject private var coordinator: AppCoordinator
     
-    // MARK: - State
+    /// State for controlling the refresh of connections
+    @State private var isRefreshing = false
     
-    /// Search text for filtering connections
-    @State private var searchText = ""
+    /// Error message to display
+    @State private var errorMessage: String? = nil
     
-    // MARK: - View
+    // MARK: - View Body
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Search bar
-                searchBar
+        ScrollView {
+            VStack(spacing: 16) {
+                // App header
+                AppHeader(
+                    firstName: coordinator.networkManager.currentUser?.firstName,
+                    subtitle: "Your professional connections"
+                )
                 
-                // Content based on state
+                // Error message
+                if let errorMessage = errorMessage {
+                    errorBanner(message: errorMessage)
+                }
+                
+                // Main content
+                connectionsList
+            }
+            .padding()
+        }
+        .navigationBarHidden(true)
+        .overlay(
+            Group {
                 if coordinator.networkManager.isLoading {
                     LoadingView(message: "Loading connections...")
-                } else if let errorMessage = coordinator.networkManager.errorMessage {
-                    ErrorView(message: errorMessage) {
-                        coordinator.networkManager.fetchUserConnections()
-                    }
-                } else if filteredConnections.isEmpty {
-                    EmptyStateView(
-                        icon: "person.3",
-                        title: "No connections found",
-                        message: !searchText.isEmpty ? "Try a different search term" : "Add connections to build your network",
-                        buttonTitle: "Add Contact",
-                        action: { coordinator.showCreateContact() }
-                    )
-                } else {
-                    // Connection list
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
-                            ForEach(filteredConnections) { connection in
-                                VStack(spacing: 0) {
-                                    connectionRow(connection)
-                                        .contentShape(Rectangle())
-                                        .onTapGesture {
-                                            selectConnection(connection)
-                                        }
-                                        .padding(.horizontal)
-                                    
-                                    if connection.id != filteredConnections.last?.id {
-                                        Divider()
-                                            .padding(.leading)
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.vertical, 8)
-                    }
-                    .refreshable {
-                        coordinator.networkManager.fetchUserConnections()
-                    }
                 }
             }
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    HStack {
-                        Image("AppLogo")
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(height: 40)
-                        
-                        Text("My Network")
-                            .font(.headline)
-                    }
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        coordinator.showCreateContact()
-                    }) {
-                        Image(systemName: "plus")
-                    }
-                }
-            }
-            .onAppear {
-                coordinator.activeScreen = .userList
-                coordinator.networkManager.fetchUserConnections()
-            }
+        )
+                .onAppear {
+            refreshConnections()
+        }
+        .refreshable {
+            await refreshConnectionsAsync()
         }
     }
     
     // MARK: - UI Components
     
-    /// Search bar for filtering connections
-    private var searchBar: some View {
-        HStack {
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(.gray)
-                
-                TextField("Search connections...", text: $searchText)
-                    .autocapitalization(.none)
-                    .disableAutocorrection(true)
-                
-                if !searchText.isEmpty {
-                    Button(action: {
-                        searchText = ""
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.gray)
-                    }
-                }
+    /// List of connections
+    private var connectionsList: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if coordinator.networkManager.connections.isEmpty && !coordinator.networkManager.isLoading {
+                emptyState
+            } else {
+                connectionListContent
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(Color.gray.opacity(0.1))
-            .cornerRadius(10)
         }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
     }
     
-    /// Row for displaying a single connection
-    private func connectionRow(_ connection: Connection) -> some View {
-        HStack(spacing: 12) {
-            // Avatar
-            UserAvatar(user: createUserFromConnection(connection), size: 50)
+    /// Error banner displayed at the top of the view
+    private func errorBanner(message: String) -> some View {
+        HStack {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.white)
             
-            // User details
-            VStack(alignment: .leading, spacing: 4) {
-                // Name
-                Text(connection.fullName)
-                    .font(.headline)
-                
-                // Relationship description
-                if let description = connection.relationshipDescription {
-                    Text(description)
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                }
-                
-                // Tags (if available)
-                if let tags = connection.tags, !tags.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 4) {
-                            ForEach(tags.prefix(3), id: \.self) { tag in
-                                TagBadge(text: tag, showRemoveButton: false)
-                            }
-                            
-                            if tags.count > 3 {
-                                Text("+\(tags.count - 3)")
-                                    .font(.caption)
-                                    .foregroundColor(.blue)
-                            }
-                        }
-                    }
-                    .frame(height: 24)
-                }
-                
-                // Job title and company
-                if let jobTitle = connection.jobTitle {
-                    Text(jobTitle)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
+            Text(message)
+                .font(.subheadline)
+                .foregroundColor(.white)
             
             Spacer()
             
-            // Navigation indicator
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundColor(.gray)
-        }
-        .padding(.vertical, 8)
-    }
-    
-    // MARK: - Helper Methods
-    
-    /// Returns filtered connections based on search text
-    private var filteredConnections: [Connection] {
-        if searchText.isEmpty {
-            return coordinator.networkManager.connections
-        } else {
-            return coordinator.networkManager.connections.filter { connection in
-                let name = connection.fullName.lowercased()
-                let description = connection.relationshipDescription?.lowercased() ?? ""
-                let company = connection.currentCompany?.lowercased() ?? ""
-                let tags = connection.tags?.joined(separator: " ").lowercased() ?? ""
-                let searchLower = searchText.lowercased()
-                
-                return name.contains(searchLower) ||
-                       description.contains(searchLower) ||
-                       company.contains(searchLower) ||
-                       tags.contains(searchLower)
+            Button(action: {
+                withAnimation {
+                    errorMessage = nil
+                }
+            }) {
+                Image(systemName: "xmark")
+                    .foregroundColor(.white)
             }
         }
+        .padding()
+        .background(Color.red)
+        .cornerRadius(8)
     }
     
-    /// Creates a User object from connection data for avatar display
-    private func createUserFromConnection(_ connection: Connection) -> User {
-        User(
-            id: connection.id,
-            username: connection.username,
-            firstName: connection.firstName,
-            lastName: connection.lastName,
-            email: connection.email,
-            phoneNumber: connection.phoneNumber,
-            location: connection.location,
-            university: connection.university,
-            fieldOfInterest: connection.fieldOfInterest,
-            highSchool: connection.highSchool,
-            birthday: nil,
-            createdAt: nil,
-            currentCompany: connection.currentCompany,
-            gender: connection.gender,
-            ethnicity: connection.ethnicity,
-            uniMajor: connection.uniMajor,
-            jobTitle: connection.jobTitle,
-            lastLogin: nil,
-            profileImageUrl: connection.profileImageUrl,
-            linkedinUrl: connection.linkedinUrl,
-            recentTags: nil
+    /// Empty state view when no connections exist
+    private var emptyState: some View {
+        EmptyStateView(
+            icon: "person.3",
+            title: "No Connections Yet",
+            message: "You haven't added any connections to your network yet. Start building your network by adding your first contact.",
+            buttonTitle: "Refresh",
+            action: refreshConnections
         )
     }
     
-    /// Selects a connection and navigates to user detail
-    private func selectConnection(_ connection: Connection) {
-        coordinator.networkManager.fetchUser(withId: connection.id) { result in
-            switch result {
-            case .success(let user):
-                coordinator.showUserDetail(user)
-            case .failure(let error):
-                coordinator.networkManager.errorMessage = "Failed to load user: \(error.localizedDescription)"
+    /// Content displayed when connections exist
+    private var connectionListContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Your Network")
+                .font(.title2)
+                .fontWeight(.bold)
+                .padding(.top, 8)
+            
+            ForEach(coordinator.networkManager.connections) { connection in
+                connectionCard(for: connection)
             }
         }
+    }
+    
+    /// Card displaying a connection's information
+    private func connectionCard(for connection: Connection) -> some View {
+        SectionCard(title: "") {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 16) {
+                    // Avatar
+                    UserAvatar(user: connection.user, size: 60)
+                    
+                    // User details
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(connection.user.fullName)
+                            .font(.headline)
+                        
+                        if let title = connection.user.jobTitle, !title.isEmpty {
+                            Text(title)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Text("Last Contact: \(connection.lastContactFormat)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.top, 2)
+                    }
+                    
+                    Spacer()
+                    
+                    // View details button
+                    Button(action: {
+                        coordinator.showUserDetail(connection.user)
+                    }) {
+                        Image(systemName: "info.circle")
+                            .font(.title2)
+                            .foregroundColor(.blue)
+                    }
+                }
+                
+                if !connection.tags.isEmpty {
+                    tagsList(tags: connection.tags)
+                }
+            }
+        }
+        .onTapGesture {
+            coordinator.showUserDetail(connection.user)
+        }
+    }
+    
+    /// Horizontal scrolling list of tags
+    private func tagsList(tags: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Tags")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(tags, id: \.self) { tag in
+                        Text(tag)
+                            .font(.caption)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.blue.opacity(0.2))
+                            .foregroundColor(.blue)
+                            .cornerRadius(12)
+                    }
+                }
+            }
+        }
+        .padding(.top, 4)
+    }
+    
+    // MARK: - Methods
+    
+    /// Refreshes the list of connections (non-async version)
+    private func refreshConnections() {
+        errorMessage = nil
+        coordinator.networkManager.fetchConnections(forUserId: coordinator.networkManager.userId ?? 0)
+    }
+    
+    /// Refreshes the list of connections (async version for pull-to-refresh)
+    private func refreshConnectionsAsync() async {
+        isRefreshing = true
+        
+        await withCheckedContinuation { continuation in
+            refreshConnections()
+            continuation.resume()
+        }
+        
+        isRefreshing = false
     }
 }
 

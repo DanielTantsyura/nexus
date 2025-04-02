@@ -23,9 +23,26 @@ struct MainTabView: View {
             }
             .tag(TabSelection.network)
             
+            // Add New Tab (now a rounded rectangle button)
+            NavigationStack {
+                CreateContactView()
+            }
+            .tabItem {
+                Label("Add", systemImage: "plus.rectangle.fill")
+            }
+            .tag(TabSelection.addNew)
+            
             // Profile Tab
             NavigationStack(path: $coordinator.profileTabPath) {
                 ProfileView()
+                    .navigationDestination(for: ActiveScreen.self) { screen in
+                        switch screen {
+                        case .editProfile:
+                            EditProfileView()
+                        default:
+                            EmptyView()
+                        }
+                    }
             }
             .tabItem {
                 Label("Profile", systemImage: "person.circle")
