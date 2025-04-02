@@ -21,7 +21,7 @@ struct NetworkView: View {
                 // App header
                 AppHeader(
                     firstName: coordinator.networkManager.currentUser?.firstName,
-                    subtitle: "Your professional connections"
+                    subtitle: "Your personal network tracker"
                 )
                 
                 // Error message

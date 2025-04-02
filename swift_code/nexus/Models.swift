@@ -328,8 +328,8 @@ struct Login: Codable {
     /// Username for authentication
     let username: String
     
-    /// Password or passkey for authentication
-    let passkey: String
+    /// Password for authentication
+    let password: String
 }
 
 /// Request to create new login credentials

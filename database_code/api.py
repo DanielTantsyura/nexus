@@ -1,355 +1,416 @@
-from flask import Flask, jsonify, request
-from database_operations import DatabaseManager
+"""
+API endpoints for the Nexus application.
+
+This module provides RESTful API endpoints for user and contact management,
+including creating, searching, and updating users and relationships.
+"""
+
+from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
-from config import API_HOST, API_PORT, API_DEBUG, DEFAULT_TAGS
-import newUser  # Import the new contact processing module
-import random
+import json
+import traceback
+from database_operations import DatabaseManager
+from newUser import process_contact_text, create_new_contact
+from config import API_HOST, API_PORT, DATABASE_URL, API_DEBUG, DEFAULT_TAGS
+import argparse
+import os
+import sys
+import uuid
+import time
+from datetime import datetime
 
 app = Flask(__name__)
-CORS(app)  # Enable cross-origin requests
+app.debug = API_DEBUG
+# Enable CORS for all routes
+CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Initialize database connection
-db = DatabaseManager()
+# Create a single database manager instance
+db_manager = DatabaseManager(DATABASE_URL)
+
+@app.route('/', methods=['GET'])
+def root():
+    """API root endpoint returns a status message."""
+    return jsonify({"status": "API is running"})
 
 @app.route('/users', methods=['GET'])
 def get_users():
     """Get all users from the database."""
-    db.connect()
     try:
-        users = db.get_all_users()
+        with db_manager:
+            users = db_manager.get_all_users()
+        
+        # Even if we get an empty list, return it as valid response
+        return jsonify(users if users else [])
+    except Exception as e:
+        error_message = f"Error retrieving users: {str(e)}"
+        print(error_message)
+        # Return empty array instead of error for better client handling
+        return jsonify([])
+
+@app.route('/users/<int:user_id>', methods=['GET'])
+def get_user(user_id):
+    """Get a specific user by ID."""
+    try:
+        with db_manager:
+            user = db_manager.get_user_by_id(user_id)
+        
+        if user:
+            return jsonify(user)
+        else:
+            print(f"User with ID {user_id} not found")
+            # Return empty user object with ID instead of 404 error
+            return jsonify({
+                "id": user_id,
+                "username": "unknown",
+                "first_name": "Unknown",
+                "last_name": "User"
+            })
+    except Exception as e:
+        error_message = f"Error retrieving user: {str(e)}"
+        print(error_message)
+        return jsonify({"error": error_message}), 500
+
+@app.route('/users/search', methods=['GET'])
+def search_users():
+    """Search for users based on query parameters."""
+    search_term = request.args.get('q', '')
+    
+    if not search_term:
+        return jsonify({"error": "Search term is required"}), 400
+    
+    try:
+        with db_manager:
+            users = db_manager.search_users(search_term)
         return jsonify(users)
-    finally:
-        db.disconnect()
+    except Exception as e:
+        error_message = f"Error searching users: {str(e)}"
+        print(error_message)
+        return jsonify({"error": error_message}), 500
 
 @app.route('/users', methods=['POST'])
 def add_user():
     """Add a new user to the database."""
-    user_data = request.json
-    
-    # Validate required fields
-    required_fields = ['first_name', 'last_name']
-    for field in required_fields:
-        if field not in user_data or not user_data[field]:
-            return jsonify({"error": f"Missing required field: {field}"}), 400
-    
-    # Remove recent_tags if it was provided
-    if 'recent_tags' in user_data:
-        del user_data['recent_tags']
-    
-    db.connect()
-    try:
-        user_id = db.add_user(user_data)
-        return jsonify({"id": user_id}), 201
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
-    finally:
-        db.disconnect()
-
-@app.route('/contacts/create', methods=['POST'])
-def create_contact():
-    """Create a new contact from free-form text and establish a relationship."""
     data = request.json
     
     # Validate required fields
-    if 'text' not in data or not data['text']:
-        return jsonify({"error": "No contact text provided"}), 400
+    required_fields = ['username', 'first_name', 'last_name']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({"error": f"Missing required field: {field}"}), 400
     
-    if 'user_id' not in data or not data['user_id']:
-        return jsonify({"error": "User ID is required"}), 400
-    
-    # Extract data
-    text = data['text']
-    user_id = data['user_id']
-    tags = data.get('tags', [])
-    
-    # Process the text and create the contact
-    success, message, new_user_id = newUser.create_new_contact(text, tags, user_id)
-    
-    if success:
-        # Always update the user's recent tags when creating a contact
-        db.connect()
-        try:
-            if tags:
-                db.update_user_recent_tags(user_id, tags)
-            
-            return jsonify({
-                "success": True,
-                "message": message,
-                "user_id": new_user_id
-            }), 201
-        finally:
-            db.disconnect()
-    else:
-        return jsonify({
-            "success": False,
-            "message": message
-        }), 400
-
-@app.route('/users/<int:user_id>', methods=['GET'])
-def get_user_by_id(user_id):
-    """Get a specific user by ID."""
-    # Check if this request is from a current user viewing a contact
-    viewing_user_id = request.args.get('viewing_user_id')
-    
-    db.connect()
     try:
-        user = db.get_user_by_id(user_id)
-        if user:
-            # If a viewing_user_id was provided and it's different from the user being viewed,
-            # update the last_viewed timestamp for the connection
-            if viewing_user_id and int(viewing_user_id) != user_id:
-                db.update_last_viewed(int(viewing_user_id), user_id)
-                
-            return jsonify(user)
-        return jsonify({"error": "User not found"}), 404
-    finally:
-        db.disconnect()
+        with db_manager:
+            # Add the user
+            user_id = db_manager.add_user(data)
+            
+            # Add login if provided
+            if 'password' in data:
+                db_manager.add_user_login(user_id, data['username'], data['password'])
+            
+            # Get the newly created user
+            new_user = db_manager.get_user_by_id(user_id)
+        
+        return jsonify(new_user), 201
+    except Exception as e:
+        error_message = f"Error adding user: {str(e)}"
+        print(error_message)
+        return jsonify({"error": error_message}), 500
 
 @app.route('/users/<int:user_id>', methods=['PUT'])
 def update_user(user_id):
     """Update an existing user in the database."""
-    user_data = request.json
+    data = request.json
     
-    if not user_data:
-        return jsonify({"error": "No data provided"}), 400
-        
-    db.connect()
     try:
-        success = db.update_user(user_id, user_data)
-        if success:
-            return jsonify({"success": True})
-        return jsonify({"error": "Failed to update user"}), 400
-    finally:
-        db.disconnect()
-
-@app.route('/users/search', methods=['GET'])
-def search_users():
-    """Search for users by name, location, or other attributes."""
-    search_term = request.args.get('term', '')
-    db.connect()
-    try:
-        users = db.search_users(search_term)
-        return jsonify(users)
-    finally:
-        db.disconnect()
-
-@app.route('/users/<username>', methods=['GET'])
-def get_user(username):
-    """Get a specific user by username."""
-    # Check if this request is from a current user viewing a contact
-    viewing_user_id = request.args.get('viewing_user_id')
-    
-    db.connect()
-    try:
-        user = db.get_user_by_username(username)
-        if user:
-            # If a viewing_user_id was provided and it's different from the user being viewed,
-            # update the last_viewed timestamp for the connection
-            if viewing_user_id and int(viewing_user_id) != user['id']:
-                db.update_last_viewed(int(viewing_user_id), user['id'])
-                
-            return jsonify(user)
-        return jsonify({"error": "User not found"}), 404
-    finally:
-        db.disconnect()
+        with db_manager:
+            # Check if user exists
+            user = db_manager.get_user_by_id(user_id)
+            if not user:
+                return jsonify({"error": f"User with ID {user_id} not found"}), 404
+            
+            # Update the user
+            success = db_manager.update_user(user_id, data)
+            
+            if success:
+                updated_user = db_manager.get_user_by_id(user_id)
+                return jsonify(updated_user)
+            else:
+                return jsonify({"error": "Failed to update user"}), 500
+    except Exception as e:
+        error_message = f"Error updating user: {str(e)}"
+        print(error_message)
+        return jsonify({"error": error_message}), 500
 
 @app.route('/users/<int:user_id>/connections', methods=['GET'])
-def get_connections(user_id):
+def get_user_connections(user_id):
     """Get all connections for a specific user."""
-    db.connect()
     try:
-        connections = db.get_user_connections(user_id)
-        return jsonify(connections)
-    finally:
-        db.disconnect()
+        with db_manager:
+            # Check if user exists
+            user = db_manager.get_user_by_id(user_id)
+            if not user:
+                print(f"User with ID {user_id} not found when fetching connections")
+                # Return empty array instead of error
+                return jsonify([])
+            
+            connections = db_manager.get_user_connections(user_id)
+        return jsonify(connections if connections else [])
+    except Exception as e:
+        error_message = f"Error retrieving connections: {str(e)}"
+        print(error_message)
+        # Return empty array instead of error
+        return jsonify([])
+
+@app.route('/connections/<int:user_id>', methods=['GET'])
+def get_connections(user_id):
+    """Get all connections for a specific user (legacy endpoint)."""
+    # Redirect to the standard endpoint
+    return get_user_connections(user_id)
 
 @app.route('/connections', methods=['POST'])
 def add_connection():
-    """Add a new connection between users."""
+    """Add a new connection between two users."""
     data = request.json
-    user_id = data.get('user_id')
-    contact_id = data.get('contact_id')
-    description = data.get('description', '')
-    notes = data.get('notes', None)
-    tags = data.get('tags', None)
     
-    if not user_id or not contact_id:
-        return jsonify({"error": "Missing user_id or contact_id"}), 400
+    # Validate required fields
+    required_fields = ['user_id', 'contact_id', 'relationship_type']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({"error": f"Missing required field: {field}"}), 400
     
-    db.connect()
+    user_id = data['user_id']
+    contact_id = data['contact_id']
+    relationship_description = data['relationship_type']
+    custom_note = data.get('note')
+    tags = data.get('tags')
+    
     try:
-        success = db.add_connection(user_id, contact_id, description, notes, tags)
-        if success:
-            return jsonify({"success": True}), 201
-        return jsonify({"error": "Failed to add connection"}), 400
-    finally:
-        db.disconnect()
-
-@app.route('/connections/update', methods=['PUT'])
-def update_connection_details():
-    """Update a connection with notes, tags, or update last viewed timestamp."""
-    data = request.json
-    user_id = data.get('user_id')
-    contact_id = data.get('contact_id')
-    
-    if not user_id or not contact_id:
-        return jsonify({"error": "Missing user_id or contact_id"}), 400
-    
-    # Check if we're just updating the last_viewed timestamp
-    update_timestamp_only = data.get('update_timestamp_only', False)
-    
-    db.connect()
-    try:
-        if update_timestamp_only:
-            success = db.update_last_viewed(user_id, contact_id)
-        else:
-            update_data = {}
-            if 'description' in data:
-                update_data['relationship_description'] = data['description']
-            if 'notes' in data:
-                update_data['notes'] = data['notes']
-            if 'tags' in data:
-                update_data['tags'] = data['tags']
-                
-            success = db.update_connection(user_id, contact_id, update_data)
+        with db_manager:
+            # Check if both users exist
+            user = db_manager.get_user_by_id(user_id)
+            if not user:
+                return jsonify({"error": f"User with ID {user_id} not found"}), 404
             
+            contact = db_manager.get_user_by_id(contact_id)
+            if not contact:
+                return jsonify({"error": f"Contact with ID {contact_id} not found"}), 404
+            
+            # Add the connection
+            success = db_manager.add_connection(user_id, contact_id, relationship_description, custom_note, tags)
+        
         if success:
-            return jsonify({"success": True})
-        return jsonify({"error": "Failed to update connection"}), 400
-    finally:
-        db.disconnect()
+            return jsonify({"message": "Connection added successfully"}), 201
+        else:
+            return jsonify({"error": "Failed to add connection"}), 500
+    except Exception as e:
+        error_message = f"Error adding connection: {str(e)}"
+        print(error_message)
+        return jsonify({"error": error_message}), 500
+
+@app.route('/connections', methods=['PUT'])
+def update_connection():
+    """Update an existing connection between two users."""
+    data = request.json
+    
+    # Validate required fields
+    required_fields = ['user_id', 'contact_id']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({"error": f"Missing required field: {field}"}), 400
+    
+    user_id = data['user_id']
+    contact_id = data['contact_id']
+    
+    # Remove the ID fields from the data
+    update_data = {k: v for k, v in data.items() if k not in ['user_id', 'contact_id']}
+    
+    # Map field names from API to database schema
+    if 'relationship_type' in update_data:
+        update_data['relationship_description'] = update_data.pop('relationship_type')
+    
+    if 'note' in update_data:
+        update_data['custom_note'] = update_data.pop('note')
+    
+    if not update_data:
+        return jsonify({"error": "No fields to update"}), 400
+    
+    try:
+        with db_manager:
+            # Update the connection
+            success = db_manager.update_connection(user_id, contact_id, update_data)
+        
+        if success:
+            return jsonify({"message": "Connection updated successfully"})
+        else:
+            return jsonify({"error": "Failed to update connection"}), 500
+    except Exception as e:
+        error_message = f"Error updating connection: {str(e)}"
+        print(error_message)
+        return jsonify({"error": error_message}), 500
 
 @app.route('/connections', methods=['DELETE'])
 def remove_connection():
-    """Remove a connection between users."""
+    """Remove a connection between two users."""
     data = request.json
-    user_id = data.get('user_id')
-    contact_id = data.get('contact_id')
     
-    if not user_id or not contact_id:
-        return jsonify({"error": "Missing user_id or contact_id"}), 400
+    # Validate required fields
+    required_fields = ['user_id', 'contact_id']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({"error": f"Missing required field: {field}"}), 400
     
-    db.connect()
+    user_id = data['user_id']
+    contact_id = data['contact_id']
+    
     try:
-        success = db.remove_connection(user_id, contact_id)
+        with db_manager:
+            # Check if both users exist
+            user = db_manager.get_user_by_id(user_id)
+            if not user:
+                return jsonify({"error": f"User with ID {user_id} not found"}), 404
+            
+            contact = db_manager.get_user_by_id(contact_id)
+            if not contact:
+                return jsonify({"error": f"Contact with ID {contact_id} not found"}), 404
+            
+            # Remove the connection
+            success = db_manager.remove_connection(user_id, contact_id)
+        
         if success:
-            return jsonify({"success": True})
-        return jsonify({"error": "Failed to remove connection"}), 400
-    finally:
-        db.disconnect()
+            return jsonify({"message": "Connection removed successfully"})
+        else:
+            return jsonify({"error": "Failed to remove connection"}), 500
+    except Exception as e:
+        error_message = f"Error removing connection: {str(e)}"
+        print(error_message)
+        return jsonify({"error": error_message}), 500
+
+@app.route('/contacts/create', methods=['POST'])
+def create_contact():
+    """Create a new contact from text and establish a relationship."""
+    data = request.json
+    
+    # Validate required fields
+    required_fields = ['user_id', 'contact_text']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({"error": f"Missing required field: {field}"}), 400
+    
+    user_id = data['user_id']
+    contact_text = data['contact_text']
+    relationship_type = data.get('relationship_type', 'contact')
+    
+    try:
+        # First check if the user exists
+        with db_manager:
+            user = db_manager.get_user_by_id(user_id)
+            if not user:
+                return jsonify({"error": f"User with ID {user_id} not found"}), 404
+        
+        # Process the contact text
+        try:
+            # Process text into a user profile and create a new contact
+            created_contact = create_new_contact(
+                contact_text=contact_text,
+                user_id=user_id,
+                relationship_type=relationship_type
+            )
+            
+            return jsonify(created_contact), 201
+        except Exception as e:
+            error_message = f"Error processing contact text: {str(e)}"
+            print(error_message)
+            traceback.print_exc()
+            return jsonify({"error": error_message}), 500
+    except Exception as e:
+        error_message = f"Error creating contact: {str(e)}"
+        print(error_message)
+        traceback.print_exc()
+        return jsonify({"error": error_message}), 500
 
 @app.route('/login', methods=['POST'])
-def create_login():
-    """Create login credentials for a user."""
-    data = request.json
-    user_id = data.get('user_id')
-    passkey = data.get('passkey')
+def login():
+    """
+    Login route to authenticate users.
     
-    if not all([user_id, passkey]):
-        return jsonify({"error": "Missing required fields"}), 400
-    
-    db.connect()
+    Request:
+        - username: user's username
+        - password: user's password
+        
+    Response:
+        - JSON with user_id if successful
+        - Error message if login fails
+    """
     try:
-        # Check if user already has login credentials
-        has_login = db.user_has_login(user_id)
-        if has_login:
-            return jsonify({"error": "User already has login credentials"}), 400
+        data = request.get_json()
+        
+        if not data or 'username' not in data or 'password' not in data:
+            return jsonify({
+                'status': 'error',
+                'message': 'Username and password are required'
+            }), 400
+        
+        username = data['username']
+        passkey = data['password']  # Map password to passkey
+        
+        # Connect to database and validate login
+        with db_manager:
+            user_id = db_manager.validate_login(username, passkey)
             
-        # Get the user to generate a username
-        user = db.get_user_by_id(user_id)
-        if not user:
-            return jsonify({"error": "User not found"}), 404
-            
-        # Create username from first_name and last_name (lowercase with no spaces)
-        first_name = user.get('first_name', '')
-        last_name = user.get('last_name', '')
-        
-        if not first_name or not last_name:
-            return jsonify({"error": "User must have first and last name to create login"}), 400
-        
-        # Try to create a unique username
-        attempts = 0
-        max_attempts = 10
-        username_base = (first_name + last_name).lower().replace(' ', '')
-        username = username_base
-        
-        while attempts < max_attempts:
-            # Try to add user login with current username
-            try:
-                success = db.add_user_login(user_id, username, passkey)
-                if success:
-                    return jsonify({
-                        "success": True,
-                        "username": username
-                    }), 201
-            except Exception as e:
-                if "duplicate key value" in str(e) and "logins_username_key" in str(e):
-                    # Username already exists, try adding a random number
-                    username = f"{username_base}{random.randint(1, 100)}"
-                    attempts += 1
-                else:
-                    # Different error
-                    raise e
-        
-        # If we reach here, we couldn't generate a unique username
-        return jsonify({"error": "Could not generate a unique username"}), 400
+            if user_id:
+                # Update last login
+                db_manager.update_last_login(user_id)
+                
+                # Get basic user info
+                user = db_manager.get_user_by_id(user_id)
+                
+                return jsonify({
+                    'status': 'success',
+                    'user_id': user_id,
+                    'user': user
+                })
+            else:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Invalid username or password'
+                }), 401
     except Exception as e:
-        print(f"Error creating login: {e}")
-        return jsonify({"error": "Failed to create login"}), 400
-    finally:
-        db.disconnect()
+        print(f"Login error: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Login service unavailable. Please try again later. Error: {str(e)}'
+        }), 500
 
-@app.route('/login/validate', methods=['POST'])
-def validate_login():
-    """Validate user login credentials."""
-    data = request.json
-    username = data.get('username')
-    passkey = data.get('passkey')
-    
-    if not all([username, passkey]):
-        return jsonify({"error": "Missing username or passkey"}), 400
-    
-    db.connect()
+@app.route('/users/<int:user_id>/update-last-login', methods=['POST'])
+def update_last_login(user_id):
+    """Update the last_login timestamp for a user when the app is opened."""
     try:
-        user_id = db.validate_login(username, passkey)
-        if user_id:
-            return jsonify({"user_id": user_id})
-        return jsonify({"error": "Invalid login credentials"}), 401
-    finally:
-        db.disconnect()
-
-@app.route('/users/<int:user_id>/recent-tags', methods=['GET'])
-def get_user_recent_tags(user_id):
-    """Get a user's recently used tags."""
-    db.connect()
-    try:
-        recent_tags = db.get_user_recent_tags(user_id)
-        return jsonify(recent_tags)
-    finally:
-        db.disconnect()
-
-@app.route('/login/update', methods=['POST'])
-def update_last_login():
-    """Update the last_login timestamp for a logged-in user."""
-    data = request.json
-    user_id = data.get('user_id')
-    
-    if not user_id:
-        return jsonify({"error": "User ID is required"}), 400
-    
-    db.connect()
-    try:
-        # Check if this user has login credentials
-        has_login = db.user_has_login(user_id)
-        if not has_login:
-            return jsonify({"error": "User has no login credentials"}), 404
+        with db_manager:
+            # Check if user exists
+            user = db_manager.get_user_by_id(user_id)
+            if not user:
+                print(f"User with ID {user_id} not found when updating last login")
+                # Return success even if user not found to avoid client errors
+                return jsonify({"message": "User not found but operation recorded"}), 200
             
-        success = db.update_last_login(user_id)
-        if success:
-            return jsonify({"success": True})
-        return jsonify({"error": "Failed to update last login timestamp"}), 400
-    finally:
-        db.disconnect()
+            # Update last login timestamp
+            success = db_manager.update_last_login(user_id)
+            
+            if success:
+                return jsonify({"message": "Last login timestamp updated successfully"})
+            else:
+                return jsonify({"message": "No update needed for last login"}), 200
+    except Exception as e:
+        error_message = f"Error updating last login timestamp: {str(e)}"
+        print(error_message)
+        # Return success to avoid client errors
+        return jsonify({"message": "Error recorded but continuing operation"}), 200
 
 if __name__ == '__main__':
-    app.run(host=API_HOST, port=API_PORT, debug=API_DEBUG) 
+    parser = argparse.ArgumentParser(description='Run the Nexus API server')
+    parser.add_argument('--port', type=int, default=API_PORT, 
+                        help=f'Port to run the server on (default: {API_PORT})')
+    args = parser.parse_args()
+    
+    print(f"Starting API server on port {args.port}")
+    app.run(host=API_HOST, port=args.port, debug=True) 

@@ -84,12 +84,12 @@ class NetworkManager: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        guard let url = URL(string: "\(baseURL)/login/validate") else {
+        guard let url = URL(string: "\(baseURL)/login") else {
             handleError("Invalid URL", error: .unknownError, completion: completion)
             return
         }
         
-        let loginData = Login(username: username, passkey: password)
+        let loginData = Login(username: username, password: password)
         
         guard let jsonData = try? JSONEncoder().encode(loginData) else {
             handleError("Failed to encode login data", error: .unknownError, completion: completion)

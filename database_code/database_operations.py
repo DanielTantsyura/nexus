@@ -1,50 +1,126 @@
+"""
+Database operations for the Nexus application.
+
+This module provides a comprehensive class for interacting with the database,
+including user management, relationship handling, and utility functions.
+"""
+
 import psycopg2
-from psycopg2.extras import RealDictCursor
-from typing import List, Dict, Optional, Any, Tuple
-from config import DATABASE_URL, DEFAULT_TAGS, MAX_RECENT_TAGS
+import psycopg2.extras
+from typing import Dict, List, Any, Optional, Tuple
+from config import DATABASE_URL, MAX_RECENT_TAGS, DEFAULT_TAGS
+import time
 
 class DatabaseManager:
     """
-    A class to manage database operations for the Nexus application.
+    Manages database operations for the Nexus application.
+    Simplified version with basic connection management.
     """
-    
+
     def __init__(self, connection_string: str = DATABASE_URL):
-        """
-        Initialize the DatabaseManager with a connection string.
-        
-        Args:
-            connection_string: PostgreSQL connection string
-        """
+        """Initialize the database manager with a connection string."""
         self.connection_string = connection_string
-        self.connection = None
+        self.conn = None
         self.cursor = None
-    
-    def connect(self) -> None:
+        
+    def connect(self) -> bool:
         """
-        Establish a connection to the database.
+        Establishes a connection to the database.
+        Includes simple retry logic.
+        
+        Returns:
+            bool: True if connection successful, False otherwise
         """
-        try:
-            self.connection = psycopg2.connect(self.connection_string)
-            # Use RealDictCursor to return results as dictionaries
-            self.cursor = self.connection.cursor(cursor_factory=RealDictCursor)
-            print("Connected to the database.")
-        except Exception as e:
-            print(f"Error connecting to the database: {e}")
-            raise
+        max_retries = 2
+        retry_count = 0
+        
+        while retry_count <= max_retries:
+            try:
+                self.conn = psycopg2.connect(self.connection_string)
+                self.cursor = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+                return True
+            except psycopg2.Error as e:
+                retry_count += 1
+                print(f"Connection attempt {retry_count} failed: {e}")
+                time.sleep(0.5)  # Simple delay before retry
+                
+                if retry_count > max_retries:
+                    print(f"Failed to connect to database after {max_retries} attempts")
+                    return False
+        
+        return False
     
     def disconnect(self) -> None:
+        """Close the database connection and cursor."""
+        try:
+            if self.cursor:
+                self.cursor.close()
+            if self.conn:
+                self.conn.close()
+            self.cursor = None
+            self.conn = None
+        except Exception as e:
+            print(f"Error disconnecting from database: {e}")
+    
+    def is_connected(self) -> bool:
+        """Check if the database connection is active."""
+        if not self.conn:
+            return False
+        
+        try:
+            # Simple connection check
+            self.cursor.execute("SELECT 1")
+            return True
+        except Exception:
+            return False
+            
+    def execute_query(self, query: str, params=None, fetch=False, fetch_all=False):
         """
-        Close the database connection.
+        Execute a query with simple retry logic.
+        
+        Args:
+            query: SQL query to execute
+            params: Parameters for the query
+            fetch: Whether to fetch a single result
+            fetch_all: Whether to fetch all results
+            
+        Returns:
+            Query results if fetch is True, otherwise None
         """
-        if self.cursor:
-            self.cursor.close()
-        if self.connection:
-            self.connection.close()
-            print("Disconnected from the database.")
+        max_retries = 2
+        retry_count = 0
+        
+        while retry_count <= max_retries:
+            try:
+                self.cursor.execute(query, params)
+                
+                if fetch_all:
+                    return self.cursor.fetchall()
+                elif fetch:
+                    return self.cursor.fetchone()
+                else:
+                    self.conn.commit()
+                    return True
+            except psycopg2.Error as e:
+                retry_count += 1
+                print(f"Query execution attempt {retry_count} failed: {e}")
+                
+                # If connection was lost, try to reconnect
+                if "connection" in str(e).lower():
+                    self.disconnect()
+                    self.connect()
+                
+                if retry_count > max_retries:
+                    print(f"Failed to execute query after {max_retries} attempts")
+                    return None
+        
+        return None
+    
+    # ========== USER MANAGEMENT ==========
     
     def get_all_users(self) -> List[Dict]:
         """
-        Retrieve all users from the database.
+        Get all users from the database.
         
         Returns:
             List of user dictionaries
@@ -62,36 +138,12 @@ class DatabaseManager:
             print(f"Error retrieving users: {e}")
             return []
     
-    def get_user_by_username(self, username: str) -> Optional[Dict]:
-        """
-        Retrieve a user by looking up their username in the logins table.
-        
-        Args:
-            username: The username to search for
-            
-        Returns:
-            User dictionary or None if not found
-        """
-        query = """
-        SELECT u.* FROM users u
-        JOIN logins l ON u.id = l.user_id
-        WHERE l.username = %s;
-        """
-        
-        try:
-            self.cursor.execute(query, (username,))
-            user = self.cursor.fetchone()
-            return dict(user) if user else None
-        except Exception as e:
-            print(f"Error retrieving user: {e}")
-            return None
-    
     def get_user_by_id(self, user_id: int) -> Optional[Dict]:
         """
-        Retrieve a user by their ID.
+        Get a user by ID.
         
         Args:
-            user_id: The user ID to search for
+            user_id: The ID of the user
             
         Returns:
             User dictionary or None if not found
@@ -107,6 +159,52 @@ class DatabaseManager:
             return dict(user) if user else None
         except Exception as e:
             print(f"Error retrieving user: {e}")
+            return None
+    
+    def get_user_by_username(self, username: str) -> Optional[Dict]:
+        """
+        Get a user by username.
+        
+        Args:
+            username: The username to look up
+            
+        Returns:
+            User dictionary or None if not found
+        """
+        query = """
+        SELECT * FROM users
+        WHERE username = %s;
+        """
+        
+        try:
+            self.cursor.execute(query, (username,))
+            user = self.cursor.fetchone()
+            return dict(user) if user else None
+        except Exception as e:
+            print(f"Error retrieving user by username: {e}")
+            return None
+    
+    def get_user_by_email(self, email: str) -> Optional[Dict]:
+        """
+        Get a user by email.
+        
+        Args:
+            email: The email to look up
+            
+        Returns:
+            User dictionary or None if not found
+        """
+        query = """
+        SELECT * FROM users
+        WHERE email = %s;
+        """
+        
+        try:
+            self.cursor.execute(query, (email,))
+            user = self.cursor.fetchone()
+            return dict(user) if user else None
+        except Exception as e:
+            print(f"Error retrieving user by email: {e}")
             return None
     
     def search_users(self, search_term: str) -> List[Dict]:
@@ -143,38 +241,6 @@ class DatabaseManager:
             print(f"Error searching users: {e}")
             return []
     
-    def get_user_connections(self, user_id: int) -> List[Dict]:
-        """
-        Get all connections for a specific user.
-        
-        Args:
-            user_id: The ID of the user
-            
-        Returns:
-            List of connection dictionaries with user information
-        """
-        query = """
-        SELECT 
-            u.id, u.first_name, u.last_name,
-            u.email, u.phone_number, u.location, u.university,
-            u.field_of_interest, u.high_school, u.gender, u.ethnicity,
-            u.uni_major, u.job_title, u.current_company, u.profile_image_url,
-            u.linkedin_url, r.relationship_description, r.notes,
-            r.tags, r.last_viewed
-        FROM relationships r
-        JOIN users u ON r.contact_id = u.id
-        WHERE r.user_id = %s
-        ORDER BY u.first_name, u.last_name;
-        """
-        
-        try:
-            self.cursor.execute(query, (user_id,))
-            connections = self.cursor.fetchall()
-            return [dict(connection) for connection in connections]
-        except Exception as e:
-            print(f"Error retrieving connections: {e}")
-            return []
-    
     def add_user(self, user_data: Dict[str, Any]) -> int:
         """
         Add a new user to the database.
@@ -187,91 +253,33 @@ class DatabaseManager:
         """
         query = """
         INSERT INTO users (
-            first_name, last_name, email, phone_number,
+            username, first_name, last_name, email, phone_number,
             location, university, field_of_interest, high_school,
             gender, ethnicity, uni_major, job_title, current_company,
             profile_image_url, linkedin_url, recent_tags
         ) VALUES (
-            %(first_name)s, %(last_name)s, %(email)s, %(phone_number)s,
+            %(username)s, %(first_name)s, %(last_name)s, %(email)s, %(phone_number)s,
             %(location)s, %(university)s, %(field_of_interest)s, %(high_school)s,
             %(gender)s, %(ethnicity)s, %(uni_major)s, %(job_title)s, %(current_company)s,
-            %(profile_image_url)s, %(linkedin_url)s, NULL
+            %(profile_image_url)s, %(linkedin_url)s, %(recent_tags)s
         ) RETURNING id;
         """
         
-        # Force recent_tags to be NULL
-        # We're not even using the provided values in the query
+        # Ensure the recent_tags field is present, set to default tags if not provided
+        if 'recent_tags' not in user_data or user_data['recent_tags'] is None:
+            user_data['recent_tags'] = DEFAULT_TAGS
         
         try:
             self.cursor.execute(query, user_data)
             user_id = self.cursor.fetchone()['id']
-            self.connection.commit()
+            self.conn.commit()
             print(f"User created with ID: {user_id}")
             return user_id
         except Exception as e:
-            self.connection.rollback()
+            self.conn.rollback()
             print(f"Error adding user: {e}")
             raise
     
-    def add_connection(self, user_id: int, contact_id: int, description: str, notes: str = None, tags: str = None) -> bool:
-        """
-        Add a connection between two users.
-        
-        Args:
-            user_id: ID of the user initiating the connection
-            contact_id: ID of the user to connect with
-            description: Description of the relationship
-            notes: Optional detailed note about the connection
-            tags: Optional comma-separated list of tags
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        query = """
-        INSERT INTO relationships (user_id, contact_id, relationship_description, notes, tags, last_viewed)
-        VALUES (%s, %s, %s, %s, %s, NOW());
-        """
-        
-        try:
-            # First direction: user_id -> contact_id
-            self.cursor.execute(query, (user_id, contact_id, description, notes, tags))
-            
-            # Second direction: contact_id -> user_id (create the reciprocal connection)
-            self.cursor.execute(query, (contact_id, user_id, description, notes, tags))
-            
-            self.connection.commit()
-            return True
-        except Exception as e:
-            self.connection.rollback()
-            print(f"Error adding connection: {e}")
-            return False
-    
-    def remove_connection(self, user_id: int, contact_id: int) -> bool:
-        """
-        Remove a connection between two users in both directions.
-        
-        Args:
-            user_id: ID of the first user
-            contact_id: ID of the second user
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        query = """
-        DELETE FROM relationships
-        WHERE (user_id = %s AND contact_id = %s) OR (user_id = %s AND contact_id = %s);
-        """
-        
-        try:
-            # Remove connections in both directions
-            self.cursor.execute(query, (user_id, contact_id, contact_id, user_id))
-            self.connection.commit()
-            return True
-        except Exception as e:
-            self.connection.rollback()
-            print(f"Error removing connection: {e}")
-            return False
-
     def update_user(self, user_id: int, user_data: Dict[str, Any]) -> bool:
         """
         Update an existing user in the database.
@@ -289,6 +297,7 @@ class DatabaseManager:
         
         # Map of user_data keys to database columns
         field_mapping = {
+            'username': 'username',
             'first_name': 'first_name',
             'last_name': 'last_name',
             'email': 'email',
@@ -325,7 +334,7 @@ class DatabaseManager:
         try:
             self.cursor.execute(query, params)
             rows_affected = self.cursor.rowcount
-            self.connection.commit()
+            self.conn.commit()
             
             if rows_affected > 0:
                 print(f"User {user_id} updated successfully")
@@ -334,122 +343,174 @@ class DatabaseManager:
                 print(f"No user found with ID {user_id}")
                 return False
         except Exception as e:
-            self.connection.rollback()
+            self.conn.rollback()
             print(f"Error updating user: {e}")
             return False
-
-    def add_user_login(self, user_id: int, username: str, passkey: str) -> bool:
+    
+    # ========== RELATIONSHIP MANAGEMENT ==========
+    
+    def get_user_connections(self, user_id: int) -> List[Dict]:
         """
-        Add login credentials for a user.
+        Get all connections for a specific user.
         
         Args:
-            user_id: ID of the user
-            username: Login username
-            passkey: Password/key for authentication
+            user_id: The ID of the user
+            
+        Returns:
+            List of connection dictionaries with user information
+        """
+        query = """
+        SELECT 
+            u.id, l.username, u.first_name, u.last_name,
+            u.email, u.phone_number, u.location, u.university,
+            u.field_of_interest, u.high_school, u.gender, u.ethnicity,
+            u.uni_major, u.job_title, u.current_company, u.profile_image_url,
+            u.linkedin_url, r.relationship_description, r.notes as custom_note,
+            r.tags, r.last_viewed
+        FROM relationships r
+        JOIN users u ON r.contact_id = u.id
+        LEFT JOIN logins l ON u.id = l.user_id
+        WHERE r.user_id = %s
+        ORDER BY u.first_name, u.last_name;
+        """
+        
+        try:
+            self.cursor.execute(query, (user_id,))
+            connections = self.cursor.fetchall()
+            return [dict(connection) for connection in connections]
+        except Exception as e:
+            print(f"Error retrieving connections: {e}")
+            return []
+    
+    def add_connection(self, user_id: int, contact_id: int, relationship_description: str, 
+                       custom_note: str = None, tags: str = None) -> bool:
+        """
+        Add a new connection between two users.
+        relationship_description is bidirectional (shared in both directions)
+        custom_note, tags, and last_viewed are unidirectional (specific to each direction)
+        
+        Args:
+            user_id: ID of the first user
+            contact_id: ID of the second user
+            relationship_description: Type of the relationship
+            custom_note: Optional detailed note about the connection (one-way)
+            tags: Optional comma-separated tags for the connection (one-way)
             
         Returns:
             True if successful, False otherwise
-            
-        Raises:
-            Exception: If there's an error, especially for duplicate username
         """
         query = """
-        INSERT INTO logins (user_id, username, passkey, last_login)
-        VALUES (%s, %s, %s, NOW())
+        INSERT INTO relationships (user_id, contact_id, relationship_description, custom_note, tags, last_viewed)
+        VALUES (%s, %s, %s, %s, %s, NOW());
         """
         
         try:
-            self.cursor.execute(query, (user_id, username, passkey))
-            self.connection.commit()
+            # First direction: user_id -> contact_id (with full data)
+            self.cursor.execute(query, (user_id, contact_id, relationship_description, custom_note, tags))
+            
+            # Second direction: contact_id -> user_id (with shared relationship_description only)
+            self.cursor.execute(query, (contact_id, user_id, relationship_description, None, None))
+            
+            self.conn.commit()
             return True
         except Exception as e:
-            self.connection.rollback()
-            print(f"Error adding user login: {e}")
-            # Re-raise the exception so the caller can handle duplicate usernames
-            raise
+            self.conn.rollback()
+            print(f"Error adding connection: {e}")
+            return False
     
-    def validate_login(self, username: str, passkey: str) -> Optional[int]:
+    def remove_connection(self, user_id: int, contact_id: int) -> bool:
         """
-        Validate user login credentials.
+        Remove a connection between two users in both directions.
         
         Args:
-            username: Login username
-            passkey: Password/key for authentication
+            user_id: ID of the first user
+            contact_id: ID of the second user
             
         Returns:
-            User ID if login successful, None otherwise
+            True if successful, False otherwise
         """
         query = """
-        SELECT user_id
-        FROM logins
-        WHERE username = %s AND passkey = %s
-        """
-        
-        update_last_login_query = """
-        UPDATE logins
-        SET last_login = NOW()
-        WHERE username = %s AND passkey = %s
+        DELETE FROM relationships
+        WHERE (user_id = %s AND contact_id = %s) OR (user_id = %s AND contact_id = %s);
         """
         
         try:
-            self.cursor.execute(query, (username, passkey))
-            result = self.cursor.fetchone()
-            
-            if result:
-                # Update last login timestamp
-                self.cursor.execute(update_last_login_query, (username, passkey))
-                self.connection.commit()
-                
-            return result['user_id'] if result else None
+            # Remove connections in both directions
+            self.cursor.execute(query, (user_id, contact_id, contact_id, user_id))
+            self.conn.commit()
+            return True
         except Exception as e:
-            print(f"Error validating login: {e}")
-            return None
-
+            self.conn.rollback()
+            print(f"Error removing connection: {e}")
+            return False
+    
     def update_connection(self, user_id: int, contact_id: int, data: Dict[str, Any]) -> bool:
         """
-        Update a connection with custom notes, tags, or other metadata.
+        Update a connection with custom_note, tags, or other metadata.
+        Only updates the one-way relationship (from user_id to contact_id).
+        If relationship_description is updated, it updates both directions.
         
         Args:
             user_id: ID of the user
             contact_id: ID of the contact
-            data: Dictionary of fields to update (description, custom_note, tags)
+            data: Dictionary of fields to update (relationship_description, custom_note, tags)
             
         Returns:
             True if successful, False otherwise
         """
         # Build the SET clause dynamically based on provided fields
-        set_clauses = []
-        params = []
+        one_way_fields = []
+        one_way_params = []
         
+        # Handle one-way fields (custom_note, tags)
         for key, value in data.items():
-            if key in ['relationship_description', 'notes', 'tags']:
-                set_clauses.append(f"{key} = %s")
-                params.append(value)
+            if key in ['custom_note', 'tags']:
+                one_way_fields.append(f"{key} = %s")
+                one_way_params.append(value)
         
         # Always update the last_viewed timestamp
-        set_clauses.append("last_viewed = NOW()")
+        one_way_fields.append("last_viewed = NOW()")
         
-        # Add user_id and contact_id for the WHERE clause
-        params.extend([user_id, contact_id])
+        # Create the one-way update query
+        one_way_query = None
+        if one_way_fields:
+            one_way_params.extend([user_id, contact_id])
+            one_way_query = f"""
+            UPDATE relationships
+            SET {', '.join(one_way_fields)}
+            WHERE user_id = %s AND contact_id = %s;
+            """
         
-        query = f"""
-        UPDATE relationships
-        SET {', '.join(set_clauses)}
-        WHERE user_id = %s AND contact_id = %s;
-        """
+        # Check if relationship_description needs to be updated (two-way)
+        two_way_query = None
+        if 'relationship_description' in data:
+            two_way_query = """
+            UPDATE relationships
+            SET relationship_description = %s
+            WHERE (user_id = %s AND contact_id = %s) OR (user_id = %s AND contact_id = %s);
+            """
         
         try:
-            self.cursor.execute(query, params)
-            self.connection.commit()
+            # Execute one-way update if needed
+            if one_way_query:
+                self.cursor.execute(one_way_query, one_way_params)
+            
+            # Execute two-way update if needed
+            if two_way_query:
+                self.cursor.execute(two_way_query, 
+                    (data['relationship_description'], user_id, contact_id, contact_id, user_id))
+            
+            self.conn.commit()
             return True
         except Exception as e:
-            self.connection.rollback()
+            self.conn.rollback()
             print(f"Error updating connection: {e}")
             return False
-            
+    
     def update_last_viewed(self, user_id: int, contact_id: int) -> bool:
         """
         Update the last_viewed timestamp for a connection.
+        This is a one-way update (only from user_id to contact_id).
         
         Args:
             user_id: ID of the user viewing the connection
@@ -466,14 +527,16 @@ class DatabaseManager:
         
         try:
             self.cursor.execute(query, (user_id, contact_id))
-            self.connection.commit()
+            self.conn.commit()
             return True
         except Exception as e:
-            self.connection.rollback()
+            self.conn.rollback()
             print(f"Error updating last viewed timestamp: {e}")
             return False
 
-    def get_user_recent_tags(self, user_id: int) -> Optional[List[str]]:
+    # ========== USER TAGS ==========
+    
+    def get_user_recent_tags(self, user_id: int) -> List[str]:
         """
         Get a user's recently used tags.
         
@@ -481,7 +544,7 @@ class DatabaseManager:
             user_id: The ID of the user
             
         Returns:
-            List of recent tags or None if not found
+            List of recent tags or empty list if none found
         """
         query = """
         SELECT recent_tags FROM users
@@ -543,7 +606,7 @@ class DatabaseManager:
         
         try:
             self.cursor.execute(query, (tags_string, user_id))
-            self.connection.commit()
+            self.conn.commit()
             
             if self.cursor.rowcount > 0:
                 print(f"Recent tags updated for user {user_id}")
@@ -552,86 +615,231 @@ class DatabaseManager:
                 print(f"No user found with ID {user_id}")
                 return False
         except Exception as e:
-            self.connection.rollback()
-            print(f"Error updating recent tags: {e}")
+            self.conn.rollback()
+            print(f"Error updating user recent tags: {e}")
             return False
 
-    def get_connection_details(self, user_id: int, contact_id: int) -> Dict:
+    # ========== LOGIN & AUTHENTICATION ==========
+    
+    def add_user_login(self, user_id: int, username: str, passkey: str) -> bool:
         """
-        Get detailed information about a specific connection.
+        Add login credentials for a user.
         
         Args:
             user_id: ID of the user
-            contact_id: ID of the connection (contact)
-        
-        Returns:
-            Dictionary containing connection details
-        """
-        query = """
-        SELECT u.first_name, u.last_name, u.email, u.phone_number, 
-        u.location, u.university, u.field_of_interest, u.job_title, 
-        u.current_company, u.profile_image_url, u.linkedin_url, 
-        r.relationship_description, r.notes, r.tags, r.last_viewed
-        FROM users u
-        JOIN relationships r ON u.id = r.contact_id
-        WHERE r.user_id = %s AND r.contact_id = %s
-        """
-        
-        try:
-            self.cursor.execute(query, (user_id, contact_id))
-            result = self.cursor.fetchone()
-            return dict(result)
-        except Exception as e:
-            print(f"Error retrieving connection details: {e}")
-            return {}
-
-    def user_has_login(self, user_id: int) -> bool:
-        """
-        Check if a user has login credentials.
-        
-        Args:
-            user_id: The ID of the user to check
-            
-        Returns:
-            True if the user has login credentials, False otherwise
-        """
-        query = """
-        SELECT COUNT(*) as count
-        FROM logins
-        WHERE user_id = %s
-        """
-        
-        try:
-            self.cursor.execute(query, (user_id,))
-            result = self.cursor.fetchone()
-            return result['count'] > 0
-        except Exception as e:
-            print(f"Error checking user login: {e}")
-            return False
-
-    def update_last_login(self, user_id: int) -> bool:
-        """
-        Update the last_login timestamp for a user.
-        
-        Args:
-            user_id: ID of the user
+            username: Login username
+            passkey: Password/key for authentication
             
         Returns:
             True if successful, False otherwise
         """
         query = """
-        UPDATE logins
-        SET last_login = NOW()
-        WHERE user_id = %s;
+        INSERT INTO logins (user_id, username, passkey, last_login)
+        VALUES (%s, %s, %s, NOW())
         """
         
         try:
-            self.cursor.execute(query, (user_id,))
-            self.connection.commit()
-            return self.cursor.rowcount > 0
+            self.cursor.execute(query, (user_id, username, passkey))
+            self.conn.commit()
+            return True
         except Exception as e:
-            self.connection.rollback()
-            print(f"Error updating last login timestamp: {e}")
+            self.conn.rollback()
+            print(f"Error adding user login: {e}")
+            return False
+    
+    def validate_login(self, username: str, passkey: str) -> Optional[int]:
+        """
+        Validate user login credentials.
+        
+        Args:
+            username: Login username
+            passkey: Password/key for authentication
+            
+        Returns:
+            User ID if login successful, None otherwise
+        """
+        query = """
+        SELECT user_id
+        FROM logins
+        WHERE username = %s AND passkey = %s
+        """
+        
+        update_last_login_query = """
+        UPDATE logins
+        SET last_login = NOW()
+        WHERE username = %s AND passkey = %s
+        """
+        
+        try:
+            self.cursor.execute(query, (username, passkey))
+            result = self.cursor.fetchone()
+            
+            if result:
+                # Update last login timestamp
+                self.cursor.execute(update_last_login_query, (username, passkey))
+                self.conn.commit()
+                
+            return result['user_id'] if result else None
+        except Exception as e:
+            print(f"Error validating login: {e}")
+            return None
+
+    def update_passwords(self, new_password: str = "password") -> bool:
+        """
+        Update all user passwords to a standard value.
+        
+        Args:
+            new_password: The password to set for all users
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Get all users with usernames
+            self.cursor.execute("SELECT id, username, first_name, last_name FROM users WHERE username IS NOT NULL;")
+            users = self.cursor.fetchall()
+            print(f"Found {len(users)} users with usernames")
+            
+            # Update passwords for users
+            password_updates = 0
+            for user in users:
+                user_id = user['id']
+                username = user['username']
+                first_name = user['first_name']
+                last_name = user['last_name']
+                
+                # Check if login exists
+                self.cursor.execute("SELECT id FROM logins WHERE user_id = %s;", (user_id,))
+                login = self.cursor.fetchone()
+                
+                if login:
+                    # Update existing login
+                    self.cursor.execute(
+                        "UPDATE logins SET passkey = %s WHERE user_id = %s;", 
+                        (new_password, user_id)
+                    )
+                    print(f"Updated password for {first_name} {last_name} (ID: {user_id})")
+                else:
+                    # Create new login
+                    self.cursor.execute(
+                        "INSERT INTO logins (user_id, username, passkey) VALUES (%s, %s, %s);",
+                        (user_id, username, new_password)
+                    )
+                    print(f"Created login for {first_name} {last_name} (ID: {user_id})")
+                
+                password_updates += 1
+            
+            self.conn.commit()
+            print(f"Updated {password_updates} user passwords to '{new_password}'")
+            
+            return True
+        except Exception as e:
+            self.conn.rollback()
+            print(f"Error updating passwords: {e}")
+            return False
+    
+    # ========== DATABASE UTILITIES ==========
+    
+    def check_database(self) -> bool:
+        """
+        Check the current state of the database, printing table summaries.
+        
+        Returns:
+            True if check completed successfully
+        """
+        try:
+            # Get users
+            self.cursor.execute("SELECT id, username, first_name, last_name FROM users ORDER BY id;")
+            users = self.cursor.fetchall()
+            print(f"=== Users ({len(users)}) ===")
+            for user in users:
+                print(f"{user['id']}: {user['first_name']} {user['last_name']} (username: {user['username']})")
+            
+            # Get logins
+            self.cursor.execute("SELECT user_id, username, passkey FROM logins ORDER BY user_id;")
+            logins = self.cursor.fetchall()
+            print(f"\n=== Logins ({len(logins)}) ===")
+            for login in logins:
+                print(f"User ID: {login['user_id']}, Username: {login['username']}, Password: {login['passkey']}")
+            
+            # Get relationships
+            self.cursor.execute("""
+                SELECT r.user_id, u1.first_name, r.contact_id, u2.first_name, r.relationship_description 
+                FROM relationships r
+                JOIN users u1 ON r.user_id = u1.id
+                JOIN users u2 ON r.contact_id = u2.id
+                ORDER BY r.user_id, r.contact_id;
+            """)
+            relationships = self.cursor.fetchall()
+            print(f"\n=== Relationships ({len(relationships)}) ===")
+            for rel in relationships:
+                print(f"{rel['user_id']} ({rel[1]}) -> {rel['contact_id']} ({rel[3]}): {rel['relationship_description']}")
+            
+            return True
+        except Exception as e:
+            print(f"Error checking database: {e}")
+            return False
+    
+    def clean_test_data(self, real_user_id_threshold: int = 5) -> bool:
+        """
+        Remove test data from the database.
+        
+        Args:
+            real_user_id_threshold: IDs above this threshold are considered test users
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Delete test users and their connections
+            self.cursor.execute(f"DELETE FROM relationships WHERE user_id > {real_user_id_threshold} OR contact_id > {real_user_id_threshold};")
+            deleted_connections = self.cursor.rowcount
+            print(f"Deleted {deleted_connections} test connections")
+            
+            self.cursor.execute(f"DELETE FROM logins WHERE user_id > {real_user_id_threshold};")
+            deleted_logins = self.cursor.rowcount
+            print(f"Deleted {deleted_logins} test logins")
+            
+            self.cursor.execute(f"DELETE FROM users WHERE id > {real_user_id_threshold};")
+            deleted_users = self.cursor.rowcount
+            print(f"Deleted {deleted_users} test users")
+            
+            # Commit the changes
+            self.conn.commit()
+            return True
+        except Exception as e:
+            self.conn.rollback()
+            print(f"Error cleaning test data: {e}")
+            return False
+            
+    def __enter__(self):
+        """Context manager entry point."""
+        self.connect()
+        return self
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit point."""
+        self.disconnect()
+    
+    def update_last_login(self, user_id: int) -> bool:
+        """
+        Update the last_login timestamp for a user.
+        
+        Args:
+            user_id: The ID of the user to update
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            query = """
+                UPDATE logins 
+                SET last_login = NOW() 
+                WHERE user_id = %s
+            """
+            return self.execute_query(query, (user_id,))
+        except Exception as e:
+            print(f"Error updating last login: {e}")
             return False
 
 
