@@ -28,14 +28,21 @@ enum ActiveScreen: Equatable {
     /// Create new contact screen
     case createContact
     
+    /// Add new contact tab
+    case addNew
+    
     /// Home screen
     case home
-    
-    /// Add new screen
-    case addNew
 }
 
-/// Centralized application coordinator that manages state and navigation
+/// Tab selection options for main tab view
+enum TabSelection: Int {
+    case network = 0
+    case addNew = 1
+    case profile = 2
+}
+
+/// Coordinator handling the app's navigation and state
 final class AppCoordinator: ObservableObject {
     // MARK: - Published Properties
     
@@ -45,48 +52,82 @@ final class AppCoordinator: ObservableObject {
     /// Currently active screen
     @Published var activeScreen: ActiveScreen = .login
     
-    /// Current navigation path
-    @Published var navigationPath = NavigationPath()
-    
-    /// Track if initial loading has completed
-    @Published var initialLoadComplete = false
-    
     /// Currently selected tab
     @Published var selectedTab: TabSelection = .network
     
-    /// Network tab navigation path
+    /// Navigation path for the current navigation stack
+    @Published var navigationPath = NavigationPath()
+    
+    /// Navigation path for the network tab
     @Published var networkTabPath = NavigationPath()
     
-    /// Profile tab navigation path
+    /// Navigation path for the profile tab
     @Published var profileTabPath = NavigationPath()
+    
+    /// Current login state
+    @Published var isLoggedIn: Bool = false
+    
+    /// ID of the logged-in user
+    @Published var userId: Int? = nil
+    
+    /// Track if initial loading has completed
+    @Published var initialLoadComplete = false
     
     // MARK: - Private Properties
     
     /// Timer to retry loading data if needed
     private var loadTimer: Timer?
     
+    /// Subscriptions for the coordinator
+    private var cancellables = Set<AnyCancellable>()
+    
     // MARK: - Initialization
     
     /// Initialize the coordinator
     init() {
         setupInitialState()
+        
+        // Set up listeners for login state changes
+        self.networkManager.$isLoggedIn
+            .receive(on: RunLoop.main)
+            .sink { [weak self] isLoggedIn in
+                self?.isLoggedIn = isLoggedIn
+                
+                // Update screen based on login state
+                if isLoggedIn {
+                    self?.activeScreen = .profile
+                } else {
+                    self?.userId = nil
+                    self?.activeScreen = .login
+                }
+            }
+            .store(in: &cancellables)
+        
+        // Listen for user ID changes from the network manager
+        self.networkManager.$userId
+            .receive(on: RunLoop.main)
+            .sink { [weak self] userId in
+                self?.userId = userId
+            }
+            .store(in: &cancellables)
     }
     
     /// Clean up resources when deallocated
     deinit {
         loadTimer?.invalidate()
+        cancellables.forEach { $0.cancel() }
     }
     
     // MARK: - Setup
     
     /// Set up the initial state of the coordinator
     private func setupInitialState() {
-        // Check if user is already logged in
+        // Check if a session can be restored
         if networkManager.isLoggedIn {
             activeScreen = .profile
-            refreshData()
-            // Update last login when the app is opened
-            networkManager.updateLastLogin()
+            selectedTab = .profile
+        } else {
+            activeScreen = .login
         }
         
         // Set up a timer to check if data loaded successfully
@@ -101,7 +142,7 @@ final class AppCoordinator: ObservableObject {
         }
     }
     
-    // MARK: - Tab Navigation
+    // MARK: - Navigation
     
     /// Set the active tab
     /// - Parameter tab: The tab to select
@@ -110,13 +151,13 @@ final class AppCoordinator: ObservableObject {
         
         switch tab {
         case .network:
-            navigationPath = networkTabPath
             activeScreen = .userList
+            navigationPath = networkTabPath
         case .profile:
-            navigationPath = profileTabPath
             activeScreen = .profile
+            navigationPath = profileTabPath
         case .addNew:
-            // Simply set the active screen to createContact 
+            // Simply set the active screen to createContact
             // without adding to navigation stack
             activeScreen = .createContact
             // Use a fresh navigation path for this tab
@@ -124,54 +165,36 @@ final class AppCoordinator: ObservableObject {
         }
     }
     
-    // MARK: - Authentication Methods
-    
-    /// Handle user login
-    /// - Parameters:
-    ///   - username: The username to log in with
-    ///   - password: The password to authenticate with
-    ///   - completion: Closure called with success flag
-    func login(username: String, password: String, completion: @escaping (Bool) -> Void) {
-        networkManager.login(username: username, password: password) { [weak self] result in
-            switch result {
-            case .success(_):
-                self?.activeScreen = .userList
-                self?.selectedTab = .network
-                self?.refresh()
-                completion(true)
-            case .failure(_):
-                completion(false)
-            }
+    /// Navigate to the user list screen
+    func showUserListScreen() {
+        if selectedTab == .network {
+            networkTabPath = NavigationPath()
+        } else {
+            selectedTab = .network
+            networkTabPath = NavigationPath()
         }
+        navigationPath = networkTabPath
+        activeScreen = .userList
     }
     
-    /// Handle user logout
-    func logout() {
-        print("Logging out - resetting app state and navigating to login screen")
-        
-        // Ensure NetworkManager is not in loading state
-        networkManager.isLoading = false
-        
-        // First clear all navigation paths and state
-        navigationPath = NavigationPath()
-        networkTabPath = NavigationPath()
-        profileTabPath = NavigationPath()
-        
-        // Reset the tab selection to ensure we're not stuck in a specific tab
-        selectedTab = .network
-        
-        // Clear the user data
-        networkManager.logout()
-        
-        // Finally set the active screen to login
-        // This must happen after clearing other state
-        activeScreen = .login
-        
-        // Force UI refresh
-        objectWillChange.send()
+    /// Navigate to the user detail screen for the specified user
+    /// - Parameter user: The user to display details for
+    func showUserDetail(_ user: User) {
+        networkManager.selectedUser = user
+        networkTabPath.append(user)
+        navigationPath = networkTabPath
+        activeScreen = .userDetail
     }
     
-    // MARK: - Navigation Methods
+    /// Navigate back from user detail to user list
+    func navigateBackFromUserDetail() {
+        // If we're showing user detail, go back to user list
+        if activeScreen == .userDetail {
+            networkTabPath.removeLast()
+            navigationPath = networkTabPath
+        }
+        activeScreen = .userList
+    }
     
     /// Navigate to the profile screen
     func showProfileScreen() {
@@ -184,42 +207,6 @@ final class AppCoordinator: ObservableObject {
         }
         navigationPath = profileTabPath
         activeScreen = .profile
-        
-        // Ensure user data is refreshed when navigating to profile, but only if missing
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            guard let self = self else { return }
-            
-            // Only fetch user data if it's missing
-            if self.networkManager.currentUser == nil {
-                print("AppCoordinator: User data missing, fetching")
-                self.networkManager.fetchCurrentUser()
-                
-                // Force UI update to ensure the view reflects the latest data
-                // But only if data is still missing after the fetch
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    if self.networkManager.currentUser == nil {
-                        print("AppCoordinator: Still no user data, forcing UI refresh")
-                        self.objectWillChange.send()
-                    } else {
-                        print("AppCoordinator: User data loaded successfully, no forced refresh needed")
-                    }
-                }
-            } else {
-                print("AppCoordinator: User data already loaded, no fetch needed")
-            }
-        }
-    }
-    
-    /// Navigate to the user list screen
-    func showUserList() {
-        if selectedTab == .network {
-            networkTabPath = NavigationPath()
-        } else {
-            selectedTab = .network
-            networkTabPath = NavigationPath()
-        }
-        navigationPath = networkTabPath
-        activeScreen = .userList
     }
     
     /// Navigate to the edit profile screen
@@ -231,7 +218,7 @@ final class AppCoordinator: ObservableObject {
     
     /// Navigate to the create contact screen
     func showCreateContact() {
-        // Simply switch to the addNew tab
+        // Simply call selectTab(.addNew) instead of manipulating the navigation path
         selectTab(.addNew)
     }
     
@@ -255,104 +242,29 @@ final class AppCoordinator: ObservableObject {
         }
     }
     
-    /// Navigate to a user's detail view
-    /// - Parameter user: The user to display details for
-    func showUserDetail(user: User) {
-        networkManager.selectedUser = user
-        networkTabPath.append(user)
-        navigationPath = networkTabPath
-        activeScreen = .userDetail
-        
-        // Ensure connections are loaded for this user
-        print("Loading connections for user ID: \(user.id)")
-        networkManager.getConnections(userId: user.id)
-    }
+    // MARK: - Authentication Methods
     
-    /// Navigate back from user detail to user list
-    func backFromUserDetail() {
-        if !networkTabPath.isEmpty {
-            networkTabPath.removeLast()
-        }
-        navigationPath = networkTabPath
-        activeScreen = .userList
+    /// Log out the current user and return to the login screen
+    func logout() {
+        networkManager.logout()
+        activeScreen = .login
+        navigationPath = NavigationPath()
+        networkTabPath = NavigationPath()
+        profileTabPath = NavigationPath()
     }
     
     // MARK: - Data Management
     
     /// Refreshes all data from the API
     func refresh() {
-        loadData()
+        networkManager.refreshAll()
     }
     
     /// Refreshes all data with a custom delay
     func refreshWithDelay() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            self?.loadData()
+            self?.refresh()
         }
-    }
-    
-    /// Automatically retries loading data when a view needs it
-    /// - Parameters:
-    ///   - check: A closure that returns true if data is loaded properly, false if data is missing
-    ///   - action: The refresh action to perform when data is missing
-    ///   - maxAttempts: Maximum number of retry attempts (default: 3)
-    ///   - interval: Seconds between retry attempts (default: 2.0)
-    func autoRetryLoading(check: @escaping () -> Bool, action: @escaping () -> Void, maxAttempts: Int = 3, interval: TimeInterval = 2.0) {
-        // Always perform the action at least once to ensure fresh data
-        action()
-        
-        // If data is already loaded after the first attempt, we're done
-        if check() {
-            print("Data loaded successfully on first attempt")
-            return
-        }
-        
-        print("Initial data load incomplete, setting up auto-retry...")
-        
-        // Create a task that will retry loading the data
-        let task = DispatchWorkItem {
-            var attempts = 0
-            
-            func attemptRefresh() {
-                // If data is loaded or we've reached max attempts, stop retrying
-                if check() || attempts >= maxAttempts {
-                    print("Auto-retry complete after \(attempts) attempts")
-                    
-                    // Force a UI update on the main thread - but only if data is still not loaded
-                    // after max attempts (meaning we're stopping due to max attempts)
-                    if !check() && attempts >= maxAttempts {
-                        print("Auto-retry: Max attempts reached but data still not loaded. Forcing UI update")
-                        DispatchQueue.main.async {
-                            // Trigger an update by publishing a dummy change to activeScreen and back
-                            let currentScreen = self.activeScreen
-                            self.activeScreen = .login
-                            self.activeScreen = currentScreen
-                        }
-                    } else {
-                        print("Auto-retry: Data successfully loaded, no forced UI update needed")
-                    }
-                    return
-                }
-                
-                // Increment attempts and try again
-                attempts += 1
-                print("Auto-retry attempt \(attempts)/\(maxAttempts)...")
-                
-                // Perform the refresh action
-                action()
-                
-                // Schedule next attempt after the interval
-                DispatchQueue.main.asyncAfter(deadline: .now() + interval) {
-                    attemptRefresh()
-                }
-            }
-            
-            // Start the first attempt
-            attemptRefresh()
-        }
-        
-        // Start the task
-        DispatchQueue.main.async(execute: task)
     }
     
     /// Loads all required data from the API
@@ -384,28 +296,6 @@ final class AppCoordinator: ObservableObject {
         
         // Always refresh the current user to ensure latest data
         networkManager.fetchCurrentUser()
-        
-        // If on user detail screen, reload connections for that user
-        if activeScreen == .userDetail, let selectedUser = networkManager.selectedUser {
-            print("Refreshing connections for selected user: \(selectedUser.id)")
-            networkManager.getConnections(userId: selectedUser.id)
-        }
-        
-        // If we encounter session expiration or persistent errors, handle them
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-            guard let self = self else { return }
-            
-            if let errorMessage = self.networkManager.errorMessage {
-                if errorMessage.contains("session has expired") || 
-                   errorMessage.contains("User not found") ||
-                   (errorMessage.contains("404") && self.activeScreen == .profile) {
-                    // Session expired, log out and show login
-                    self.logout()
-                }
-                
-                // Print debug info
-                print("NetworkManager error: \(errorMessage)")
-            }
-        }
     }
-} 
+}
+

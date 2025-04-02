@@ -1,39 +1,208 @@
 import SwiftUI
 
-// MARK: - Main Network View
-
-/// The main content view for the Nexus application
-/// 
-/// This view serves as the entry point and orchestrates navigation between different screens,
-/// handling the transition from login to the main application interface.
+/// A view displaying the user's network connections
 struct NetworkView: View {
-    /// App coordinator that manages navigation and application state
-    @EnvironmentObject var coordinator: AppCoordinator
+    // MARK: - Properties
+    
+    /// App coordinator for navigation and state management
+    @EnvironmentObject private var coordinator: AppCoordinator
+    
+    /// State for controlling the refresh of connections
+    @State private var isRefreshing = false
+    
+    /// Error message to display
+    @State private var errorMessage: String? = nil
+    
+    // MARK: - View Body
     
     var body: some View {
-        // Only show MainTabView after login, otherwise show LoginView with no tab bar
-        if coordinator.activeScreen == .login || !coordinator.networkManager.isLoggedIn {
-            LoginView()
-                .onAppear {
-                    print("Showing LoginView - activeScreen: \(coordinator.activeScreen), isLoggedIn: \(coordinator.networkManager.isLoggedIn)")
-                    // Hide tab bar when login screen appears
-                    UITabBar.appearance().isHidden = true
-                    
-                    // Ensure loading state is reset to show the login button
-                    coordinator.networkManager.isLoading = false
+        ScrollView {
+            VStack(spacing: 16) {
+                // App header
+                AppHeader(
+                    firstName: coordinator.networkManager.currentUser?.firstName,
+                    subtitle: "Your personal network tracker"
+                )
+                
+                // Error message
+                if let errorMessage = errorMessage {
+                    errorBanner(message: errorMessage)
                 }
-                .transition(.opacity)
-                .animation(.easeInOut, value: coordinator.activeScreen)
-        } else {
-            MainTabView()
-                .onAppear {
-                    print("Showing MainTabView - activeScreen: \(coordinator.activeScreen)")
-                    // Show tab bar when main app appears
-                    UITabBar.appearance().isHidden = false
-                }
-                .transition(.opacity)
-                .animation(.easeInOut, value: coordinator.activeScreen)
+                
+                // Main content
+                connectionsList
+            }
+            .padding()
         }
+        .navigationBarHidden(true)
+        .overlay(
+            Group {
+                if coordinator.networkManager.isLoading {
+                    LoadingView(message: "Loading connections...")
+                }
+            }
+        )
+                .onAppear {
+            refreshConnections()
+        }
+        .refreshable {
+            await refreshConnectionsAsync()
+        }
+    }
+    
+    // MARK: - UI Components
+    
+    /// List of connections
+    private var connectionsList: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if coordinator.networkManager.connections.isEmpty && !coordinator.networkManager.isLoading {
+                emptyState
+            } else {
+                connectionListContent
+            }
+        }
+    }
+    
+    /// Error banner displayed at the top of the view
+    private func errorBanner(message: String) -> some View {
+        HStack {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.white)
+            
+            Text(message)
+                .font(.subheadline)
+                .foregroundColor(.white)
+            
+            Spacer()
+            
+            Button(action: {
+                withAnimation {
+                    errorMessage = nil
+                }
+            }) {
+                Image(systemName: "xmark")
+                    .foregroundColor(.white)
+            }
+        }
+        .padding()
+        .background(Color.red)
+        .cornerRadius(8)
+    }
+    
+    /// Empty state view when no connections exist
+    private var emptyState: some View {
+        EmptyStateView(
+            icon: "person.3",
+            title: "No Connections Yet",
+            message: "You haven't added any connections to your network yet. Start building your network by adding your first contact.",
+            buttonTitle: "Refresh",
+            action: refreshConnections
+        )
+    }
+    
+    /// Content displayed when connections exist
+    private var connectionListContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Your Network")
+                .font(.title2)
+                .fontWeight(.bold)
+                .padding(.top, 8)
+            
+            ForEach(coordinator.networkManager.connections) { connection in
+                connectionCard(for: connection)
+            }
+        }
+    }
+    
+    /// Card displaying a connection's information
+    private func connectionCard(for connection: Connection) -> some View {
+        SectionCard(title: "") {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 16) {
+                    // Avatar
+                    UserAvatar(user: connection.user, size: 60)
+                    
+                    // User details
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(connection.user.fullName)
+                            .font(.headline)
+                        
+                        if let title = connection.user.jobTitle, !title.isEmpty {
+                            Text(title)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Text("Last Contact: \(connection.lastContactFormat)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.top, 2)
+                    }
+                    
+                    Spacer()
+                    
+                    // View details button
+                    Button(action: {
+                        coordinator.showUserDetail(connection.user)
+                    }) {
+                        Image(systemName: "info.circle")
+                            .font(.title2)
+                            .foregroundColor(.blue)
+                    }
+                }
+                
+                if !connection.tags.isEmpty {
+                    tagsList(tags: connection.tags)
+                }
+            }
+        }
+        .onTapGesture {
+            coordinator.showUserDetail(connection.user)
+        }
+    }
+    
+    /// Horizontal scrolling list of tags
+    private func tagsList(tags: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Tags")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(tags, id: \.self) { tag in
+                        Text(tag)
+                            .font(.caption)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.blue.opacity(0.2))
+                            .foregroundColor(.blue)
+                            .cornerRadius(12)
+                    }
+                }
+            }
+        }
+        .padding(.top, 4)
+    }
+    
+    // MARK: - Methods
+    
+    /// Refreshes the list of connections (non-async version)
+    private func refreshConnections() {
+        errorMessage = nil
+        coordinator.networkManager.fetchConnections(forUserId: coordinator.networkManager.userId ?? 0)
+    }
+    
+    /// Refreshes the list of connections (async version for pull-to-refresh)
+    private func refreshConnectionsAsync() async {
+        isRefreshing = true
+        
+        await withCheckedContinuation { continuation in
+            refreshConnections()
+            continuation.resume()
+        }
+        
+        isRefreshing = false
     }
 }
 

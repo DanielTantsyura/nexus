@@ -1,69 +1,87 @@
-# Nexus Database Code
+# Nexus Database and API
 
-This directory contains the database backend code for the Nexus application, a relationship management platform that allows users to create, track, and manage connections.
+This directory contains the backend components of the Nexus application, including the database schema, API endpoints, and natural language processing for contact creation.
 
-## Overview
+## Core Components
 
-The Nexus database uses PostgreSQL and consists of the following core components:
+### Database Structure
 
-- Database schema for users, relationships, and authentication
-- RESTful API endpoints for interacting with the database
-- Utilities for database operations and management
-- Test and setup scripts
+The system uses PostgreSQL with three main tables:
 
-## Components
+- **users**: Stores comprehensive user/contact profiles
+- **logins**: Manages authentication credentials
+- **relationships**: Tracks connections between users with custom metadata
 
-### Core Files
+Key updates:
+- Email addresses are no longer required to be unique, allowing multiple users with the same email
+- Simplified login credential generation using first and last names
 
-- `config.py` - Configuration settings for the database, API, and other components
-- `createDatabase.py` - Creates the database schema with tables for users, logins, and relationships
-- `database_operations.py` - Core database interaction class with all database operations
-- `api.py` - Flask-based RESTful API for accessing the database
-- `newUser.py` - Utilities for processing natural language input into structured user data
-- `setup.py` - Script to set up the database with schema and optional sample data
+### API Server
 
-### Setup and Sample Data
+The Flask-based API (`api.py`) provides endpoints for:
 
-- `insertSampleUsers.py` - Inserts sample user profiles into the database
-- `insertSampleRelationships.py` - Creates sample relationships between users
+- User management (create, read, update)
+- Connection management
+- Contact creation from natural language
+- Authentication
+- Database utilities
 
-## Database Schema
+### Natural Language Processing
 
-The database uses three primary tables:
+The `newUser.py` module uses OpenAI's GPT-4o-mini to extract structured information from free-form text descriptions of contacts, enabling users to easily add new contacts by simply describing them.
 
-1. **users** - Stores user profiles with personal information
-2. **logins** - Manages authentication credentials and tracks last login timestamps
-3. **relationships** - Manages connections between users with the following structure:
-   - `relationship_type` is bidirectional (shared in both directions)
-   - `note`, `tags`, and `last_viewed` are unidirectional (specific to each direction)
+## Directory Structure
 
-## Getting Started
+- **api.py**: Flask server with REST endpoints
+- **database_operations.py**: Core database access layer with CRUD operations
+- **database_utils.py**: Helper functions for database access
+- **config.py**: Configuration settings and environment variables
+- **newUser.py**: OpenAI integration for text processing
+- **setupFiles/**: Database setup and initialization scripts
+  - **createDatabase.py**: Schema creation script
+  - **insertSampleUsers.py**: Sample user data script
+  - **insertSampleRelationships.py**: Sample relationships script
+  - **setup.py**: Unified setup script
+- **testFiles/**: Test suite for various components
+  - **test_api.py**: API endpoint tests
+  - **test_newUser.py**: NLP processing tests
+  - **test_newUser_samples.py**: Sample-based NLP tests
+  - **test_samples.json**: Test data for NLP tests
+
+## Data Flow
+
+1. API request arrives at a Flask endpoint
+2. API layer validates input and prepares parameters
+3. Database operations layer executes SQL against PostgreSQL
+4. Results are processed and returned as JSON
+
+For contact creation via natural language:
+1. Text is sent to the `/contacts/create` endpoint
+2. `newUser.py` processes text using OpenAI's API
+3. Structured data is extracted and validated
+4. User record is created using database operations
+5. Relationship is established between the creator and new contact
+
+## Login Generation
+
+The system now features a simplified login credential creation process:
+1. Usernames are automatically generated from a user's first and last name (lowercase, no spaces)
+2. If a username already exists, a random number (1-100) is appended to create a unique username
+3. This process repeats until a unique username is found or maximum attempts are reached
+4. The `/login` endpoint handles this process transparently, returning the generated username
+
+## Setup Instructions
 
 ### Prerequisites
 
-- PostgreSQL database
-- Python 3.8+
-- Required Python packages (see `requirements.txt`)
+- Python 3.9+
+- PostgreSQL 13+
+- OpenAI API key (for natural language processing)
+- Flask and other dependencies (`pip install -r requirements.txt`)
 
-### PostgreSQL Setup
+### Configuration
 
-1. Install PostgreSQL on your system if not already installed
-   - Mac: `brew install postgresql` and `brew services start postgresql`
-   - Ubuntu: `sudo apt install postgresql postgresql-contrib`
-   - Windows: Download and install from the [PostgreSQL website](https://www.postgresql.org/download/windows/)
-
-2. Create a database for the application:
-   ```bash
-   sudo -u postgres psql
-   CREATE DATABASE nexus;
-   CREATE USER nexus_user WITH ENCRYPTED PASSWORD 'your_password';
-   GRANT ALL PRIVILEGES ON DATABASE nexus TO nexus_user;
-   \q
-   ```
-
-### Environment Setup
-
-Create a `.env` file with the following variables:
+Create a `.env` file with:
 
 ```
 DATABASE_URL=postgresql://username:password@localhost:5432/nexus
@@ -71,109 +89,87 @@ API_PORT=8080
 OPENAI_API_KEY=your_openai_api_key
 ```
 
-Ensure your DATABASE_URL points to a valid PostgreSQL instance you have access to.
+### Database Initialization
 
-### Database Setup
-
-To set up the database with schema and sample data:
+To initialize the database with schema and sample data:
 
 ```bash
-python setup.py
+python -m setupFiles.setup
 ```
 
-To set up without sample data:
-
-```bash
-python setup.py --no-samples
-```
-
-To customize the default password:
-
-```bash
-python setup.py --password custompassword
-```
+This script will:
+1. Create tables (dropping existing ones)
+2. Insert sample users
+3. Insert sample relationships
+4. Configure default passwords
 
 ### Running the API
-
-To start the API server:
 
 ```bash
 python api.py
 ```
 
-By default, the API runs on port 8080, which can be changed in the config.py file or via the API_PORT environment variable.
+By default, the API runs on localhost:8080.
 
-To run the API on a different port:
+## API Endpoints
 
-```bash
-python api.py --port 9000
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/users` | GET | List all users |
+| `/users` | POST | Create a new user |
+| `/users/<int:user_id>` | GET | Get user by ID |
+| `/users/<int:user_id>` | PUT | Update a user |
+| `/users/search` | GET | Search for users |
+| `/users/<int:user_id>/connections` | GET | Get user connections |
+| `/connections` | POST | Create a new connection |
+| `/connections/update` | PUT | Update a connection |
+| `/contacts/create` | POST | Create a contact from text |
+| `/login` | POST | Create login credentials with auto-generated username |
+| `/login/validate` | POST | Validate login credentials |
+| `/login/update` | POST | Update last login timestamp |
+
+## Natural Language Contact Creation
+
+The system can process text descriptions like:
+
+```
+"Daniel Tantsyura from Carnegie Mellon University, interested in real estate and entrepreneurship"
 ```
 
-## Using the API
+And extract structured data including:
+- First and last name
+- University
+- Fields of interest
+- Other inferred information
 
-The API provides the following endpoints:
+This makes it easy for users to add contacts in a natural way without filling out forms.
 
-- `/users` - Create and retrieve users
-- `/users/<id>` - Get or update a specific user
-- `/users/search` - Search for users by name, location, etc.
-- `/connections/<user_id>` - Get connections for a specific user
-- `/connections` - Create, update, or remove connections between users
-- `/contacts/create` - Create a new contact from text
-- `/login` - Validate user login credentials and update last login timestamp
-- `/users/<id>/update-last-login` - Update last login timestamp when app is opened
+## Error Handling
 
-## Relationship Management
+The API implements standardized error responses:
+- 400: Bad Request (validation errors)
+- 404: Not Found (resource doesn't exist)
+- 500: Server Error (unexpected failures)
 
-The relationship system supports both one-way and two-way properties:
+Each error response includes an error message and appropriate HTTP status code.
 
-- **Two-way properties**: `relationship_type` is shared in both directions
-- **One-way properties**: `note`, `tags`, and `last_viewed` are specific to each direction
+## Testing
 
-This design allows users to maintain their own perspective on the relationship while sharing a common relationship type.
+Run the test suite with:
 
-## Login Tracking
-
-The system tracks when users log in or open the application:
-
-- The `last_login` field in the `logins` table is automatically updated when:
-  - A user successfully logs in through the `/login` endpoint
-  - The app is opened and calls the `/users/<id>/update-last-login` endpoint
-
-This tracking enables features like:
-- Showing "last seen" information for users
-- Detecting inactive accounts
-- Providing activity analytics
-
-## Additional Features
-
-- **Natural Language Processing**: The system can extract structured user data from free-form text using OpenAI's API
-- **Tag Management**: Users can tag connections and maintain a list of recent tags
-- **Password Management**: Utilities for setting and validating login credentials
-
-## Troubleshooting
-
-### PostgreSQL Connection Issues
-
-If you encounter errors connecting to PostgreSQL:
-
-1. **Check PostgreSQL service status**:
-   - Mac: `brew services list` to check if PostgreSQL is running
-   - Ubuntu: `sudo service postgresql status`
-   - Windows: Check Services application
-
-2. **Verify PostgreSQL connection settings**:
-   - Ensure the DATABASE_URL in your `.env` file is correct
-   - Verify you can connect manually: `psql -U username -d nexus`
-
-3. **PostgreSQL Authentication**:
-   - Check if pg_hba.conf is configured to allow local connections
-   - Ensure the user has appropriate permissions
-
-4. **Port Conflicts**:
-   - Verify PostgreSQL is listening on the expected port (default 5432)
-   - Check if another service is using the same port
-
-For more detailed diagnostics, run:
 ```bash
-python -c "import psycopg2; conn = psycopg2.connect('your_connection_string'); print('Connection successful!')"
-``` 
+python -m unittest discover -s testFiles
+```
+
+To run specific test modules:
+
+```bash
+python -m unittest testFiles.test_api
+python -m unittest testFiles.test_newUser
+```
+
+These tests cover all major API functionality including:
+- User operations
+- Connection management
+- Authentication
+- Natural language processing 

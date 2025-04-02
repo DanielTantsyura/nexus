@@ -44,5 +44,33 @@ venv/
 ehthumbs.db
 Thumbs.db
 
-# Keep necessary setup files
-!setup.py 
+# Swift/Xcode
+## User settings
+xcuserdata/
+
+## Obj-C/Swift specific
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+## Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+## Swift Package Manager
+.build/
+
+## App packaging
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log

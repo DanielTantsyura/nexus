@@ -16,9 +16,10 @@ import time
 from typing import Dict, Any, List, Tuple, Optional
 from openai import OpenAI
 from dotenv import load_dotenv
-from config import DATABASE_URL, API_PORT, DEFAULT_TAGS, OPENAI_API_KEY, OPENAI_MODEL
+import openai
+from config import DEFAULT_TAGS, OPENAI_MODEL
 
-# Load environment variables
+# Only load API key from environment variables
 load_dotenv()
 
 # Initialize OpenAI client
@@ -29,39 +30,35 @@ API_BASE_URL = f"http://localhost:{API_PORT}"
 
 def get_user_fields_from_schema() -> List[str]:
     """
-    Get user fields dynamically from the database schema.
+    Dynamically extract user fields from the database schema in setupFiles/createDatabase.py.
+    This ensures that the fields used in the API call always match the actual database schema.
     
     Returns:
         List of user field names
     """
     try:
-        # Look for the createDatabase.py file in the current directory or setup_code directory
-        file_paths = ["createDatabase.py", "setup_code/createDatabase.py"]
+        # Read the createDatabase.py file from setupFiles directory
+        with open(os.path.join(os.path.dirname(__file__), 'setupFiles', 'createDatabase.py'), 'r') as file:
+            schema_content = file.read()
         
-        for file_path in file_paths:
-            if os.path.exists(file_path):
-                with open(file_path, "r") as f:
-                    content = f.read()
-                
-                # Find the CREATE TABLE statement for users
-                match = re.search(r"CREATE TABLE users\s*\((.*?)\);", content, re.DOTALL)
-                if match:
-                    create_table = match.group(1)
-                    
-                    # Extract field names
-                    fields = []
-                    for line in create_table.split("\n"):
-                        line = line.strip()
-                        if line and not line.startswith(("PRIMARY KEY", "CONSTRAINT", "--")):
-                            field_name = line.split()[0].strip()
-                            if field_name != "id":  # Skip ID field
-                                fields.append(field_name)
-                    
-                    print(f"Extracted {len(fields)} fields from database schema")
-                    return fields
+        # Extract the CREATE TABLE users section
+        users_table_match = re.search(r'CREATE TABLE users \(\s*(.*?)\s*\);', schema_content, re.DOTALL)
+        if not users_table_match:
+            raise ValueError("Could not find users table definition in createDatabase.py")
         
-        print("Could not find CREATE TABLE statement for users in any expected location")
-        raise ValueError("Failed to extract user fields from schema")
+        users_table_def = users_table_match.group(1)
+        
+        # Extract field names using regex, excluding system fields like id and created_at
+        field_matches = re.findall(r'^\s*(\w+)\s+', users_table_def, re.MULTILINE)
+        
+        # Filter out system fields that should not be exposed for user input
+        excluded_fields = ['id', 'created_at']
+        fields = [field for field in field_matches if field not in excluded_fields]
+        
+        if not fields:
+            raise ValueError("No fields found in users table definition")
+        
+        return fields
     except Exception as e:
         print(f"Error extracting user fields from schema: {e}")
         # Fallback to a hardcoded list of fields
@@ -83,32 +80,46 @@ def process_contact_text(text: str) -> Tuple[Dict[str, Any], str]:
         text: Free-form text containing user information
         
     Returns:
-        Tuple of (user_data, additional_notes)
+        Tuple containing:
+        - Success flag (bool)
+        - User data dictionary (Dict) or None if processing failed
+        - Message string (success or error message)
     """
-    # Define the system message to instruct the model
-    system_message = f"""
-    You are an assistant that extracts structured information about a person.
-    Your task is to parse the free-form text about a person and extract:
+    # Basic validation - check if there's content
+    if not text or len(text.strip()) < 5:
+        return False, None, "Not enough information provided. Please provide more details."
     
-    1. The standard fields about this person
-    2. Any additional information that should be saved as notes
+    # Create a filtered list of fields that excludes username and recent_tags
+    filtered_fields = [field for field in USER_FIELDS if field not in ['username', 'recent_tags']]
     
-    The standard fields you should extract are: {", ".join(USER_FIELDS)}
-    
-    For any field where information is not available, use null.
-    For the "username" field, create a username from the person's name if not explicitly provided.
-    For the "recent_tags" field, leave as null (this will be handled separately).
-    
-    Return JSON with two keys:
-    1. "user_data": An object containing all the standard fields
-    2. "additional_notes": A string with any additional information that doesn't fit into the standard fields
-    
-    Ensure all standard fields are included, even if null.
-    """
-
     try:
-        # Make the request to OpenAI API using the new client format
-        response = client.chat.completions.create(
+        # Create a system prompt that explains what we want the model to do
+        system_prompt = f"""
+        Extract structured information from the provided text input.
+        The text contains details about a person, and you need to extract specific fields to populate a user database.
+        
+        The database has the following fields:
+        {', '.join(filtered_fields)}
+        
+        IMPORTANT GUIDELINES:
+        1. The input might be a formal paragraph or a shorthand note with brief biographical information.
+        2. For shorthand notes like "Daniel Tantsyura CMU interested in real estate and entrepreneurship white male":
+           - Extract university names (e.g., "CMU" → "Carnegie Mellon University" or just "CMU")
+           - Extract interests even if they're not explicitly labeled (e.g., "interested in X and Y" → field_of_interest: "X and Y")
+           - Identify demographic information like gender and ethnicity
+        3. When multiple educational institutions are mentioned (e.g., "Stanford undergrad MIT PhD"):
+           - Combine them in the university field as a comma-separated list (e.g., "Stanford, MIT")
+        4. Parse dates in various formats and standardize to YYYY-MM-DD for the birthday field
+        5. For each field, extract the relevant information from the input text if present
+        6. If the information for a field is not provided, return null for that field
+        7. Only extract first_name and last_name if they're clearly identifiable
+        8. Don't guess or make up information that isn't in the text
+        
+        Format your response as a valid JSON object with these fields.
+        """
+        
+        # Send the request to the OpenAI API using the older format (0.28.0)
+        response = openai.ChatCompletion.create(
             model=OPENAI_MODEL,
             messages=[
                 {"role": "system", "content": system_message},
@@ -118,34 +129,43 @@ def process_contact_text(text: str) -> Tuple[Dict[str, Any], str]:
             max_tokens=800
         )
         
-        # Extract the response content
-        result = response.choices[0].message.content
+        # Extract the generated JSON from the response
+        response_content = response.choices[0].message.content
+        extracted_data = json.loads(response_content)
         
-        # Parse the JSON response
-        try:
-            parsed_result = json.loads(result)
-            user_data = parsed_result.get("user_data", {})
-            additional_notes = parsed_result.get("additional_notes", "")
+        # Verify that we have at least first_name and last_name (required fields)
+        if not extracted_data.get("first_name") or not extracted_data.get("last_name"):
+            return False, None, "Could not extract first and last name from the text. Please provide clearer information."
+        
+        # Make sure username and recent_tags are not present
+        if "username" in extracted_data:
+            del extracted_data["username"]
             
-            # Ensure all fields are present
-            for field in USER_FIELDS:
-                if field not in user_data:
-                    user_data[field] = None
-            
-            return user_data, additional_notes
-            
-        except json.JSONDecodeError as e:
-            print(f"Error parsing response as JSON: {e}")
-            print(f"Raw response: {result}")
-            # Create a minimal user data structure with available text
-            minimal_user_data = {"first_name": "Unknown", "last_name": "User"}
-            return minimal_user_data, f"Error processing text. Original text: {text}"
-            
+        if "recent_tags" in extracted_data:
+            del extracted_data["recent_tags"]
+        
+        return True, extracted_data, "Successfully extracted user information."
+    
     except Exception as e:
-        print(f"Error processing contact text: {e}")
-        # Create a minimal user data structure
-        minimal_user_data = {"first_name": "Unknown", "last_name": "User"}
-        return minimal_user_data, f"Error processing text. Original text: {text}"
+        print(f"Error processing text with OpenAI: {str(e)}")
+        
+        # Fallback to basic processing if API fails
+        words = text.strip().split()
+        if len(words) < 2:
+            return False, None, "At least first and last name are required."
+        
+        # Create a basic user object with just the required fields
+        user_data = {
+            "first_name": words[0],
+            "last_name": words[1]
+        }
+        
+        # Add all other fields as None for filtered fields only
+        for field in filtered_fields:
+            if field not in user_data:
+                user_data[field] = None
+        
+        return True, user_data, "API processing failed. Used basic extraction instead."
 
 def create_new_contact(contact_text: str, user_id: int, relationship_type: str = "contact") -> Dict[str, Any]:
     """
@@ -167,12 +187,12 @@ def create_new_contact(contact_text: str, user_id: int, relationship_type: str =
         user_data["recent_tags"] = DEFAULT_TAGS
     
     try:
-        # Create the user via API
-        print(f"Creating user with data: {json.dumps(user_data, indent=2)}")
-        user_response = requests.post(
-            f"{API_BASE_URL}/users", 
-            json=user_data
-        )
+        # Import here to avoid circular imports
+        from config import IOS_SIMULATOR_URL
+        
+        # Call the API to create the user
+        api_url = f"{IOS_SIMULATOR_URL}/users"
+        response = requests.post(api_url, json=user_data)
         
         if user_response.status_code != 201:
             error_msg = f"Failed to create user: {user_response.json().get('error', 'Unknown error')}"
@@ -186,15 +206,14 @@ def create_new_contact(contact_text: str, user_id: int, relationship_type: str =
         connection_data = {
             "user_id": user_id,
             "contact_id": new_user_id,
-            "relationship_type": relationship_type,
-            "note": additional_notes if additional_notes else None,
-            "tags": user_data.get("recent_tags")
+            "description": "Added via contact form",
+            "notes": text,  # Store the original text as a note
+            "tags": tags_str
         }
         
-        connection_response = requests.post(
-            f"{API_BASE_URL}/connections", 
-            json=connection_data
-        )
+        # Call the API to create the relationship
+        relationship_url = f"{IOS_SIMULATOR_URL}/connections"
+        rel_response = requests.post(relationship_url, json=relationship_data)
         
         if connection_response.status_code != 201:
             error_msg = f"User created but failed to establish connection: {connection_response.json().get('error', 'Unknown error')}"

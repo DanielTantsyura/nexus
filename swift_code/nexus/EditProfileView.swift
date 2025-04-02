@@ -39,21 +39,48 @@ struct EditProfileView: View {
     // MARK: - View Body
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Avatar display
-                avatarSection
-                
-                // Form fields
-                formFieldsSection
-            }
-            .padding()
-        }
-        .ignoresSafeArea(.keyboard, edges: .bottom)
-        .onAppear {
+        VStack(spacing: 0) {
+            // App header
             if !isInSheet {
-                coordinator.activeScreen = .editProfile
+                AppHeader(
+                    firstName: coordinator.networkManager.currentUser?.firstName,
+                    subtitle: "Your personal network tracker"
+                )
+                .padding(.top)
+                .padding(.horizontal)
+                
+                // Title
+                Text("Edit Profile")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
+                    .padding(.top, 8)
             }
+            
+            profileEditContent
+                .padding(.vertical)
+        }
+        .navigationBarHidden(!isInSheet)
+        .navigationBarBackButtonHidden(!isInSheet)
+        .toolbar {
+            if isInSheet {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        saveProfile()
+                    }
+                    .disabled(coordinator.networkManager.isLoading)
+                }
+            }
+        }
+        .onAppear {
+            coordinator.activeScreen = .editProfile
             loadUserData()
         }
         .alert(isPresented: $showingSaveAlert) {
@@ -65,8 +92,7 @@ struct EditProfileView: View {
                         if isInSheet {
                             dismiss()
                         } else {
-                            // Navigate back
-                            coordinator.navigationPath.removeLast()
+                            coordinator.backFromEditProfile()
                         }
                     }
                 }
@@ -247,12 +273,15 @@ struct EditProfileView: View {
             ethnicity: ethnicity,
             uniMajor: uniMajor,
             jobTitle: jobTitle,
-            lastLogin: user?.lastLogin
+            lastLogin: nil,
+            profileImageUrl: nil,
+            linkedinUrl: nil,
+            recentTags: nil
         )
         
         coordinator.networkManager.updateUser(updatedUser) { success in
             saveSuccess = success
-            saveAlertMessage = success 
+            saveAlertMessage = success
                 ? isInSheet ? "Contact information has been updated successfully." : "Your profile has been updated successfully."
                 : coordinator.networkManager.errorMessage ?? (isInSheet ? "Failed to update contact." : "Failed to update profile.")
             showingSaveAlert = true
@@ -288,7 +317,10 @@ struct EditProfileView: View {
         ethnicity: nil,
         uniMajor: "Computer Science",
         jobTitle: "Software Engineer",
-        lastLogin: "2024-04-01T13:34:22Z"
+        lastLogin: nil,
+        profileImageUrl: nil,
+        linkedinUrl: nil,
+        recentTags: nil
     ))
     .environmentObject(AppCoordinator())
-} 
+}

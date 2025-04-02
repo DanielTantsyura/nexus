@@ -1,235 +1,138 @@
 import SwiftUI
 
-/// View that handles user authentication
+/// The login view for the app
 struct LoginView: View {
-    // MARK: - Properties
+    // MARK: - Environment
     
-    @EnvironmentObject private var coordinator: AppCoordinator
+    /// Reference to the app coordinator
+    @EnvironmentObject var coordinator: AppCoordinator
     
-    /// Username input field value
-    @State private var username: String = ""
+    // MARK: - State
     
-    /// Password input field value
-    @State private var password: String = ""
+    /// The username entered by the user
+    @State private var username = ""
     
-    /// Controls visibility of alert messages
-    @State private var showingAlert = false
+    /// The password entered by the user
+    @State private var password = ""
     
-    /// Content of the alert message
-    @State private var alertMessage = ""
+    /// Whether the login is currently in progress
+    @State private var isLoggingIn = false
     
-    /// Focus state for text fields
-    @FocusState private var focusedField: Field?
+    /// Whether an error message should be shown
+    @State private var showError = false
     
-    /// Represents the input fields that can have focus
-    private enum Field: Hashable {
-        case username
-        case password
-    }
+    /// The current error message to display
+    @State private var errorMessage = "Invalid credentials. Please try again."
     
-    // Add a state property to track whether to show the retry button
-    @State private var showRetryButton = false
-    
-    // MARK: - View Body
+    // MARK: - View
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 30) {
-                logoSection
-                loginFormSection
-                errorMessageView
-                helpSection
-                Spacer(minLength: 50)
-            }
-            .padding(.vertical, 50)
-        }
-        .scrollDismissesKeyboard(.immediately)
-        .ignoresSafeArea(.keyboard, edges: .bottom)
-        .alert(isPresented: $showingAlert) {
-            Alert(
-                title: Text("Information"),
-                message: Text(alertMessage),
-                dismissButton: .default(Text("OK"))
-            )
-        }
-        .onTapGesture {
-            focusedField = nil  // Dismiss keyboard when tapping outside
-        }
-        .onAppear {
-            // Reset loading state and retry button when view appears
-            coordinator.networkManager.isLoading = false
-            showRetryButton = false
-            print("LoginView appeared: Reset loading state")
-        }
-    }
-    
-    // MARK: - UI Components
-    
-    /// Logo and app header section
-    private var logoSection: some View {
         VStack(spacing: 20) {
-            Circle()
-                .fill(Color.blue.opacity(0.1))
-                .frame(width: 100, height: 100)
-                .overlay(
-                    Image(systemName: "person.3.fill")
-                        .font(.system(size: 40))
-                        .foregroundColor(.blue)
-                )
+            // App logo
+            Image("AppLogo")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 120, height: 120)
+                .padding(.bottom, 20)
             
-            Text("Nexus Network")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-            
-            Text("Connect your network")
-                .font(.subheadline)
-                .foregroundColor(.gray)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-        }
-    }
-    
-    /// Login form with username, password inputs and sign in button
-    private var loginFormSection: some View {
-        VStack(spacing: 16) {
-            credentialFields
-            loginButton
-        }
-        .padding(.horizontal, 40)
-    }
-    
-    /// Username and password input fields
-    private var credentialFields: some View {
-        Group {
-            TextField("Username", text: $username)
-                .textContentType(.username)
-                .textInputAutocapitalization(.never)
-                .disableAutocorrection(true)
-                .focused($focusedField, equals: .username)
-                .submitLabel(.next)
-                .onSubmit {
-                    focusedField = .password
-                }
-                .padding()
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(10)
-            
-            SecureField("Password", text: $password)
-                .textContentType(.password)
-                .focused($focusedField, equals: .password)
-                .submitLabel(.go)
-                .onSubmit(loginUser)
-                .padding()
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(10)
-        }
-    }
-    
-    /// Login button or progress indicator
-    private var loginButton: some View {
-        Group {
-            if coordinator.networkManager.isLoading {
-                VStack(spacing: 8) {
-                    ProgressView()
-                        .padding(.bottom, 5)
-                    
-                    Text("Signing in...")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                    
-                    // Add a retry button that appears after a delay if login seems stuck
-                    if showRetryButton {
-                        Button("Cancel and try again") {
-                            // Force reset loading state
-                            coordinator.networkManager.isLoading = false
-                            coordinator.networkManager.errorMessage = nil
-                            showRetryButton = false
-                        }
-                        .font(.caption)
-                        .foregroundColor(.blue)
-                        .padding(.top, 5)
-                    }
-                }
-                .padding()
-            } else {
-                Button(action: loginUser) {
-                    Text("Sign In")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .cornerRadius(10)
-                }
-                .buttonStyle(PrimaryButtonStyle())
-                .disabled(isLoginDisabled)
-                .opacity(isLoginDisabled ? 0.6 : 1)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Username")
+                    .font(.headline)
+                
+                TextField("Enter your username", text: $username)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .textContentType(.username)
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
+                    .padding(.bottom, 10)
+                    .disabled(isLoggingIn)
+                
+                // Adding helper text to clarify username is used
+                Text("Use your username, not email")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .padding(.bottom, 5)
             }
-        }
-    }
-    
-    /// Whether the login button should be disabled
-    private var isLoginDisabled: Bool {
-        username.isEmpty || password.isEmpty || coordinator.networkManager.isLoading
-    }
-    
-    /// Displays error messages from the network manager
-    private var errorMessageView: some View {
-        Group {
-            if let errorMessage = coordinator.networkManager.errorMessage {
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Password")
+                    .font(.headline)
+                
+                SecureField("Enter your password", text: $password)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .textContentType(.password)
+                    .disabled(isLoggingIn)
+            }
+            
+            if showError {
                 Text(errorMessage)
                     .foregroundColor(.red)
                     .font(.caption)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
+                    .padding(.top, 5)
             }
-        }
-    }
-    
-    /// Help text and password hint section
-    private var helpSection: some View {
-        VStack(spacing: 8) {
-            Text("Forgot your password?")
-                .font(.caption)
-                .foregroundColor(.gray)
             
-            Button(action: showPasswordHint) {
-                Text("Need help signing in?")
-                    .font(.caption)
-                    .foregroundColor(.blue)
+            Button(action: loginAction) {
+                Group {
+                    if isLoggingIn {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    } else {
+                        Text("Log In")
+                            .fontWeight(.semibold)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.blue)
+                .foregroundColor(.white)
+                .cornerRadius(10)
             }
+            .disabled(username.isEmpty || password.isEmpty || isLoggingIn)
+            .padding(.top, 20)
+            
+            Button("Create Account") {
+                showCreateAccount()
+            }
+            .foregroundColor(.blue)
+            .padding(.top, 5)
+            
+            Spacer()
         }
-        .padding(.top, 20)
+        .padding()
+        .frame(maxWidth: 400)
+        .padding(.top, 50)
     }
     
     // MARK: - Actions
     
-    /// Shows password hint in an alert
-    private func showPasswordHint() {
-        focusedField = nil  // Dismiss keyboard
-        showingAlert = true
-        alertMessage = "All accounts have password: 'password'"
+    /// Attempt to log in with the provided credentials
+    private func loginAction() {
+        isLoggingIn = true
+        showError = false
+        
+        coordinator.networkManager.login(username: username, password: password) { result in
+            isLoggingIn = false
+            
+            switch result {
+            case .success:
+                // Login successful, coordinator will handle navigation
+                break
+            case .failure(let error):
+                // Show error message
+                errorMessage = error.localizedDescription
+                showError = true
+            }
+        }
     }
     
-    /// Attempts to log in the user with provided credentials
-    private func loginUser() {
-        focusedField = nil  // Dismiss keyboard
-        showRetryButton = false
-        
-        // Set a timer to show the retry button if login takes too long
-        DispatchQueue.main.asyncAfter(deadline: .now() + 8.0) {
-            if self.coordinator.networkManager.isLoading {
-                self.showRetryButton = true
-            }
-        }
-        
-        coordinator.login(username: username, password: password) { success in
-            self.showRetryButton = false
-            if !success {
-                showingAlert = true
-                alertMessage = coordinator.networkManager.errorMessage ?? "Failed to login"
-            }
-        }
+    /// Navigate to the create account screen
+    private func showCreateAccount() {
+        // Implementation for navigating to account creation
+    }
+    
+    /// Navigate to the create account screen
+    private func showCreateAccount() {
+        // Implementation for navigating to account creation
     }
 }
 

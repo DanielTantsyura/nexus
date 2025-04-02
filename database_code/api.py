@@ -11,7 +11,7 @@ import json
 import traceback
 from database_operations import DatabaseManager
 from newUser import process_contact_text, create_new_contact
-from config import API_HOST, API_PORT, DATABASE_URL, API_DEBUG, DEFAULT_TAGS, CONNECTION_TYPES
+from config import API_HOST, API_PORT, DATABASE_URL, API_DEBUG, DEFAULT_TAGS
 import argparse
 import os
 import sys
@@ -351,11 +351,11 @@ def login():
             }), 400
         
         username = data['username']
-        password = data['password']
+        passkey = data['password']  # Map password to passkey
         
         # Connect to database and validate login
         with db_manager:
-            user_id = db_manager.validate_login(username, password)
+            user_id = db_manager.validate_login(username, passkey)
             
             if user_id:
                 # Update last login

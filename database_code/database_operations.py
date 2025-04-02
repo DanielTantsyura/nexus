@@ -361,14 +361,15 @@ class DatabaseManager:
         """
         query = """
         SELECT 
-            u.id, u.username, u.first_name, u.last_name,
+            u.id, l.username, u.first_name, u.last_name,
             u.email, u.phone_number, u.location, u.university,
             u.field_of_interest, u.high_school, u.gender, u.ethnicity,
             u.uni_major, u.job_title, u.current_company, u.profile_image_url,
-            u.linkedin_url, r.relationship_description, r.custom_note,
+            u.linkedin_url, r.relationship_description, r.notes as custom_note,
             r.tags, r.last_viewed
         FROM relationships r
         JOIN users u ON r.contact_id = u.id
+        LEFT JOIN logins l ON u.id = l.user_id
         WHERE r.user_id = %s
         ORDER BY u.first_name, u.last_name;
         """

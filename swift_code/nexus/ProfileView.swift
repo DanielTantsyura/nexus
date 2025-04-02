@@ -14,6 +14,20 @@ struct ProfileView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
+                // App header
+                AppHeader(
+                    firstName: coordinator.networkManager.currentUser?.firstName,
+                    subtitle: "Your personal network tracker"
+                )
+                .padding(.bottom, 10)
+                
+                // Title
+                Text("Your Profile")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
+                
                 // Current user profile section
                 currentUserSection
                 
@@ -24,6 +38,7 @@ struct ProfileView: View {
             }
             .padding()
         }
+        .navigationBarHidden(true)
         .alert(isPresented: $showLogoutConfirmation) {
             logoutAlert
         }
@@ -234,56 +249,74 @@ struct ProfileView: View {
         }
     }
     
-    /// Card displayed when profile is unavailable
+    /// Card to display when user profile is unavailable
     private var userProfileUnavailableCard: some View {
-        SectionCard(title: "Profile") {
+        SectionCard(title: "My Profile") {
             VStack(spacing: 16) {
-                Text("User profile not available")
+                Image(systemName: "person.fill.questionmark")
+                    .font(.system(size: 50))
                     .foregroundColor(.gray)
+                    .padding()
+                
+                Text("Profile unavailable")
+                    .font(.headline)
+                
+                Text("We couldn't load your profile information. Please try again.")
+                    .multilineTextAlignment(.center)
                     .padding()
                 
                 Button(action: {
                     loadUserData()
                 }) {
-                    HStack {
-                        Image(systemName: "arrow.clockwise")
-                        Text("Refresh Profile")
-                    }
+                    Text("Retry")
                 }
-                .buttonStyle(SecondaryButtonStyle())
+                .buttonStyle(PrimaryButtonStyle())
+            }
+            .padding()
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Loads the current user's data
+    private func loadUserData() {
+        coordinator.networkManager.fetchCurrentUser()
+        
+        // Set up a timer to retry if needed
+        setupRetryTimer()
+    }
+    
+    /// Sets up a timer to retry loading user data if initial attempt fails
+    private func setupRetryTimer() {
+        retryTimer?.invalidate()
+        retryAttempts = 0
+        
+        retryTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { timer in
+            if self.coordinator.networkManager.currentUser == nil && !self.coordinator.networkManager.isLoading {
+                if self.retryAttempts < 2 {
+                    self.retryAttempts += 1
+                    self.coordinator.networkManager.fetchCurrentUser()
+                } else {
+                    self.invalidateRetryTimer()
+                }
+            } else {
+                self.invalidateRetryTimer()
             }
         }
     }
     
-    // MARK: - Data Management
-    
-    /// Loads user data
-    private func loadUserData() {
-        if coordinator.networkManager.userId != nil {
-            print("ProfileView: Loading user data for user ID: \(coordinator.networkManager.userId!)")
-            
-            // Only fetch if we don't already have data
-            if coordinator.networkManager.currentUser == nil {
-                coordinator.networkManager.fetchCurrentUser()
-                
-                // Force UI refresh after a slight delay, only if data was missing
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    // Trigger an update by publishing a change only if we still don't have data
-                    if self.coordinator.networkManager.currentUser == nil {
-                        print("ProfileView: Still no user data after fetch, forcing UI update")
-                        coordinator.objectWillChange.send()
-                    }
-                }
-            } else {
-                print("ProfileView: User data already loaded, skipping fetch")
-            }
-        }
+    /// Invalidates and clears the retry timer
+    private func invalidateRetryTimer() {
+        retryTimer?.invalidate()
+        retryTimer = nil
     }
 }
 
-// MARK: - Previews
+// MARK: - Preview
 
 #Preview {
-    ProfileView()
-        .environmentObject(AppCoordinator())
-} 
+    NavigationView {
+        ProfileView()
+            .environmentObject(AppCoordinator())
+    }
+}
