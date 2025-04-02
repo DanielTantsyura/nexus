@@ -22,7 +22,15 @@ struct NetworkView: View {
                 AppHeader(
                     firstName: coordinator.networkManager.currentUser?.firstName,
                     subtitle: "Your personal network tracker"
-                )
+                ) {
+                    Button(action: {
+                        coordinator.selectedTab = .addNew
+                    }) {
+                        Image(systemName: "plus")
+                            .foregroundColor(.blue)
+                            .font(.system(size: 18))
+                    }
+                }
                 
                 // Error message
                 if let errorMessage = errorMessage {
@@ -42,7 +50,7 @@ struct NetworkView: View {
                 }
             }
         )
-                .onAppear {
+        .onAppear {
             refreshConnections()
         }
         .refreshable {

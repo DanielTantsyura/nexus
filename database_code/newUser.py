@@ -17,13 +17,13 @@ from typing import Dict, Any, List, Tuple, Optional
 from openai import OpenAI
 from dotenv import load_dotenv
 import openai
-from config import DEFAULT_TAGS, OPENAI_MODEL
+from config import DEFAULT_TAGS, OPENAI_MODEL, API_PORT
 
 # Only load API key from environment variables
 load_dotenv()
 
-# Initialize OpenAI client
-client = OpenAI(api_key=OPENAI_API_KEY or os.getenv("OPENAI_API_KEY"))
+# Initialize OpenAI client with API key from environment
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # API endpoints
 API_BASE_URL = f"http://localhost:{API_PORT}"
@@ -122,7 +122,7 @@ def process_contact_text(text: str) -> Tuple[Dict[str, Any], str]:
         response = openai.ChatCompletion.create(
             model=OPENAI_MODEL,
             messages=[
-                {"role": "system", "content": system_message},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": text}
             ],
             temperature=0.1,

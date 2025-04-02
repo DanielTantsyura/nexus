@@ -91,7 +91,6 @@ struct CreateContactView: View {
                 }
             }
         )
-        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
    
     // MARK: - UI Components
@@ -152,7 +151,7 @@ struct CreateContactView: View {
     private var contactTextArea: some View {
         SectionCard(title: "Contact Information") {
             TextEditor(text: $contactText)
-                .frame(minHeight: 150, maxHeight: .infinity)
+                .frame(minHeight: 150)
                 .padding(4)
                 .background(Color(.systemGray6))
                 .cornerRadius(8)
@@ -161,7 +160,6 @@ struct CreateContactView: View {
                     RoundedRectangle(cornerRadius: 8)
                         .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                 )
-                .ignoresSafeArea(.keyboard, edges: .bottom)
         }
     }
    

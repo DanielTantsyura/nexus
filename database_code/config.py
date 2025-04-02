@@ -1,3 +1,4 @@
+import os
 """
 Configuration settings for the Nexus application.
 This module provides hardcoded configuration values for the application.

@@ -101,27 +101,7 @@ class NetworkManager: ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = jsonData
         
-        print("Sending login request with data: \(String(data: jsonData, encoding: .utf8) ?? "")")  // Debug print
-        
-        // Set a timeout to prevent UI being stuck in loading state
-        let timeoutTask = DispatchWorkItem {
-            print("Login request timed out")
-            DispatchQueue.main.async {
-                if self.isLoading {
-                    self.isLoading = false
-                    self.errorMessage = "Request timed out. Please try again."
-                    completion(.failure(.networkError))
-                }
-            }
-        }
-        
-        // Schedule the timeout task
-        DispatchQueue.main.asyncAfter(deadline: .now() + 15.0, execute: timeoutTask)
-        
         URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
-            // Cancel the timeout task since we got a response
-            timeoutTask.cancel()
-            
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 self.isLoading = false
@@ -132,17 +112,12 @@ class NetworkManager: ObservableObject {
                 }
                 
                 if let httpResponse = response as? HTTPURLResponse {
-                    print("Login response status code: \(httpResponse.statusCode)")  // Debug print
-                    
                     if httpResponse.statusCode == 401 {
                         self.handleError("Invalid username or password", error: .invalidCredentials, completion: completion)
                         return
                     }
                     
                     if !(200...299).contains(httpResponse.statusCode) {
-                        if let data = data, let errorString = String(data: data, encoding: .utf8) {
-                            print("Server error response: \(errorString)")  // Debug print
-                        }
                         self.handleError("Server error: \(httpResponse.statusCode)", error: .unknownError, completion: completion)
                         return
                     }
@@ -172,10 +147,6 @@ class NetworkManager: ObservableObject {
                     
                     completion(.success(loginResponse.userId))
                 } catch {
-                    print("Login response decode error: \(error)")  // Debug print
-                    if let dataString = String(data: data, encoding: .utf8) {
-                        print("Raw response data: \(dataString)")  // Debug print
-                    }
                     self.handleError("Failed to decode login response: \(error.localizedDescription)", 
                                     error: .unknownError, 
                                     completion: completion)
@@ -277,7 +248,6 @@ class NetworkManager: ObservableObject {
         URLSession.shared.dataTask(with: request) { _, response, error in
             if let error = error {
                 print("Error updating last login: \(error.localizedDescription)")
-                // Continue app operation, don't log out for this error
                 return
             }
             
@@ -291,7 +261,6 @@ class NetworkManager: ObservableObject {
                 
                 if !(200...299).contains(httpResponse.statusCode) {
                 print("Server error updating last login: \(httpResponse.statusCode)")
-                // Continue app operation, don't log out for this error
                 return
                 }
             }
@@ -300,22 +269,10 @@ class NetworkManager: ObservableObject {
     
     /// Logs out the current user by clearing session data
     func logout() {
-        // Make sure to reset loading state to false so login screen shows login button
-        isLoading = false 
-        
-        // Clear error message as well to ensure a clean login screen
-        errorMessage = nil
-        
-        // Reset user data
         userId = nil
         currentUser = nil
         isLoggedIn = false
-        
-        // Clear stored credentials
         UserDefaults.standard.removeObject(forKey: "userId")
-        
-        // Force UI update
-        objectWillChange.send()
     }
     
     // MARK: - User API Methods
@@ -441,25 +398,12 @@ class NetworkManager: ObservableObject {
             return
         }
         
-        let request = URLRequest(url: url)
-        
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
-            guard let self = self else { return }
-            
-            DispatchQueue.main.async {
         URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                     self.isLoading = false
                 
                 if let error = error {
-                    print("Error fetching user: \(error.localizedDescription)")
-                    self.retryFetchUserIfNeeded(id: id, retryCount: retryCount, error: error, completion: completion)
-                    return
-                }
-                
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    completion(.failure(NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])))
                     self.errorMessage = "Network error: \(error.localizedDescription)"
                         return
                     }
@@ -664,7 +608,7 @@ class NetworkManager: ObservableObject {
         URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
             DispatchQueue.main.async {
                 guard let self = self else { return }
-                    self.isLoading = false
+                self.isLoading = false
                 
                 if let error = error {
                     self.errorMessage = "Network error: \(error.localizedDescription)"
@@ -722,28 +666,9 @@ class NetworkManager: ObservableObject {
         URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
             DispatchQueue.main.async {
                 guard let self = self else { return }
-                
-                // Always set loading to false after fetch completes
-                defer {
-                    if currentRetry >= maxRetries {
-                        self.isLoading = false
-                    }
-                }
                     self.isLoading = false
                 
                 if let error = error {
-                    // Network error with retry
-                    print("Network error fetching users: \(error.localizedDescription)")
-                    if currentRetry < maxRetries {
-                        self.retryFetchAllUsers(currentRetry: currentRetry, maxRetries: maxRetries)
-                        return
-                    }
-                    
-                    // Don't show error message to user to avoid disrupting the experience
-                    // Keep using existing users array if not empty
-                    if self.users.isEmpty {
-                        print("Using empty users array after network error")
-                    }
                     print("Network error fetching connections: \(error.localizedDescription)")
                     // Initialize with empty connections instead of showing error
                     self.connections = []
@@ -751,12 +676,6 @@ class NetworkManager: ObservableObject {
                 }
                 
                 if let httpResponse = response as? HTTPURLResponse {
-                    print("Fetch users response: \(httpResponse.statusCode)")
-                    
-                    if httpResponse.statusCode == 500 || httpResponse.statusCode == 503 {
-                        // Server error with retry
-                        if currentRetry < maxRetries {
-                            self.retryFetchAllUsers(currentRetry: currentRetry, maxRetries: maxRetries)
                     if httpResponse.statusCode == 404 {
                         print("No connections found for user ID: \(userId) - this is not critical")
                         // Initialize with empty array instead of failing
@@ -764,11 +683,6 @@ class NetworkManager: ObservableObject {
                             return
                         }
                         
-                        // Don't show error message to user
-                        return
-                    } else if httpResponse.statusCode != 200 {
-                        // Other HTTP error - log but don't disrupt user experience
-                        print("Server error \(httpResponse.statusCode): Unable to fetch users")
                     if !(200...299).contains(httpResponse.statusCode) {
                         print("Server error fetching connections: \(httpResponse.statusCode)")
                         // Initialize with empty array instead of failing
@@ -867,7 +781,7 @@ class NetworkManager: ObservableObject {
         guard let url = URL(string: "\(baseURL)/connections") else {
             isLoading = false
             errorMessage = "Invalid URL"
-            completion?(false)
+            completion(false)
             return
         }
         
@@ -899,11 +813,7 @@ class NetworkManager: ObservableObject {
         
         URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             DispatchQueue.main.async {
-                guard let self = self else { 
-                    completion?(false)
-                    return 
-                }
-                
+                guard let self = self else { return }
                 self.isLoading = false
                 
                 if let error = error {
@@ -948,8 +858,6 @@ class NetworkManager: ObservableObject {
         
         isLoading = true
         errorMessage = nil
-        
-        print("Fetching connections for user ID: \(userId)")
         
         guard let url = URL(string: "\(baseURL)/connections/update") else {
             isLoading = false
@@ -1175,48 +1083,6 @@ class NetworkManager: ObservableObject {
             let error = NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Failed to encode contact data"])
             errorMessage = "Failed to encode contact data"
             completion(.failure(error))
-            return
-        }
-        
-<<<<<<< HEAD
-        // Create request data
-        let requestData: [String: Any] = [
-            "user_id": userId,
-            "contact_id": connectionId
-        ]
-        
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: requestData) else {
-            isLoading = false
-            errorMessage = "Failed to encode request data"
-=======
-        var requestDict: [String: Any] = [
-            "user_id": userId,
-            "contact_id": contactId
-        ]
-        
-        if updateTimestampOnly {
-            // API supports update_timestamp_only parameter to only update the last_viewed timestamp
-            requestDict["update_timestamp_only"] = true
-        } else {
-            // Only include these fields if we're doing a full update
-            if let description = description {
-                requestDict["description"] = description
-            }
-            
-            if let notes = notes {
-                requestDict["notes"] = notes
-            }
-            
-            if let tags = tags {
-                requestDict["tags"] = tags
-            }
-        }
-        
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: requestDict) else {
-            isLoading = false
-            errorMessage = "Failed to encode connection data"
->>>>>>> unfucking-everything-for-alpha
-            completion(false)
             return
         }
         

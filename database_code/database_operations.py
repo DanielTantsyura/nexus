@@ -366,18 +366,38 @@ class DatabaseManager:
             u.field_of_interest, u.high_school, u.gender, u.ethnicity,
             u.uni_major, u.job_title, u.current_company, u.profile_image_url,
             u.linkedin_url, r.relationship_description, r.notes as custom_note,
-            r.tags, r.last_viewed
-        FROM relationships r
-        JOIN users u ON r.contact_id = u.id
+            r.tags, r.last_viewed, r.created_at
+        FROM users u
+        JOIN relationships r ON u.id = r.contact_id
         LEFT JOIN logins l ON u.id = l.user_id
         WHERE r.user_id = %s
-        ORDER BY u.first_name, u.last_name;
+        ORDER BY r.last_viewed DESC NULLS LAST, u.first_name, u.last_name;
         """
         
         try:
+            print(f"Fetching connections for user {user_id}")  # Debug log
             self.cursor.execute(query, (user_id,))
             connections = self.cursor.fetchall()
-            return [dict(connection) for connection in connections]
+            
+            # Convert to list of dicts and process any special fields
+            result = []
+            for conn in connections:
+                conn_dict = dict(conn)
+                
+                # Convert tags string to list if present
+                if conn_dict.get('tags'):
+                    try:
+                        if isinstance(conn_dict['tags'], str):
+                            conn_dict['tags'] = [tag.strip() for tag in conn_dict['tags'].split(',') if tag.strip()]
+                    except Exception as e:
+                        print(f"Error processing tags for connection: {e}")
+                        conn_dict['tags'] = []
+                
+                result.append(conn_dict)
+            
+            print(f"Found {len(result)} connections")  # Debug log
+            return result
+            
         except Exception as e:
             print(f"Error retrieving connections: {e}")
             return []

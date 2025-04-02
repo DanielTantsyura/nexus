@@ -130,10 +130,6 @@ struct LoginView: View {
         // Implementation for navigating to account creation
     }
     
-    /// Navigate to the create account screen
-    private func showCreateAccount() {
-        // Implementation for navigating to account creation
-    }
 }
 
 // MARK: - Previews

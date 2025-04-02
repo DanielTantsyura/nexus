@@ -45,12 +45,29 @@ struct SecondaryButtonStyle: ButtonStyle {
 // MARK: - UI Components
 
 /// A consistent app header with logo and title
-struct AppHeader: View {
+struct AppHeader<TrailingContent: View>: View {
     /// The first name of the user for personalization
     let firstName: String?
     
     /// Subtitle for the header
     let subtitle: String
+    
+    /// Optional trailing content
+    let trailingContent: TrailingContent?
+    
+    /// Initialize with required fields and optional trailing content
+    init(firstName: String?, subtitle: String, @ViewBuilder trailingContent: () -> TrailingContent) {
+        self.firstName = firstName
+        self.subtitle = subtitle
+        self.trailingContent = trailingContent()
+    }
+    
+    /// Initialize without trailing content
+    init(firstName: String?, subtitle: String) where TrailingContent == EmptyView {
+        self.firstName = firstName
+        self.subtitle = subtitle
+        self.trailingContent = nil
+    }
     
     var body: some View {
         VStack(spacing: 4) {
@@ -65,6 +82,13 @@ struct AppHeader: View {
                 Text("\(firstName?.isEmpty == false ? "\(firstName!)'s " : "")Nexus")
                     .font(.title)
                     .fontWeight(.bold)
+                
+                Spacer()
+                
+                // Trailing content if provided
+                if let trailingContent = trailingContent {
+                    trailingContent
+                }
             }
             
             // App motto/subtitle

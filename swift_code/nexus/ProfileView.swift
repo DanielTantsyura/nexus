@@ -9,30 +9,34 @@ struct ProfileView: View {
     /// Controls visibility of the logout confirmation dialog
     @State private var showLogoutConfirmation = false
     
+    /// Tracks the number of data loading retry attempts
+    @State private var retryAttempts = 0
+    
+    /// Timer for automatic retry of loading user data
+    @State private var retryTimer: Timer?
+    
     // MARK: - View Body
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
-                // App header
+            VStack(spacing: 12) {
+                // App header with integrated logout button
                 AppHeader(
                     firstName: coordinator.networkManager.currentUser?.firstName,
                     subtitle: "Your personal network tracker"
-                )
-                .padding(.bottom, 10)
-                
-                // Title
-                Text("Your Profile")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal)
+                ) {
+                    Button(action: {
+                        showLogoutConfirmation = true
+                    }) {
+                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                            .foregroundColor(.red)
+                            .font(.system(size: 18))
+                    }
+                }
+                .padding(.bottom, 5)
                 
                 // Current user profile section
                 currentUserSection
-                
-                // Settings section with logout
-                settingsSection
                 
                 Spacer(minLength: 50)
             }
@@ -46,72 +50,14 @@ struct ProfileView: View {
             // Refresh current user data when view appears
             coordinator.activeScreen = .profile
             loadUserData()
-            
-            // Auto-retry loading profile if it's missing
-            coordinator.autoRetryLoading(
-                check: { self.coordinator.networkManager.currentUser != nil },
-                action: { self.coordinator.networkManager.fetchCurrentUser() }
-            )
         }
-        .onChange(of: coordinator.activeScreen) { oldValue, newValue in
-            if newValue == .profile {
-                print("ProfileView: Active screen changed to profile")
-                // Only force refresh when returning to profile screen if data is missing
-                if coordinator.networkManager.currentUser == nil {
-                    print("ProfileView: User data missing, refreshing")
-                    loadUserData()
-                    
-                    // Force UI update by creating a dummy change to trigger refresh
-                    // But only if data is still missing after a delay
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        if self.coordinator.networkManager.currentUser == nil {
-                            print("ProfileView: Still no data after screen change, forcing UI update")
-                            coordinator.objectWillChange.send()
-                        }
-                    }
-                } else {
-                    print("ProfileView: User data already loaded, no refresh needed")
-                }
-            }
-        }
-        .onChange(of: coordinator.networkManager.currentUser) { oldValue, newValue in
-            if newValue != nil && oldValue == nil {
-                print("ProfileView: Current user changed from nil to loaded, forcing UI refresh")
-                // Only trigger UI refresh when user data goes from nil to non-nil
-                coordinator.objectWillChange.send()
-            }
+        .onDisappear {
+            // Invalidate timer when view disappears
+            invalidateRetryTimer()
         }
     }
     
     // MARK: - UI Components
-    
-    /// Settings section with logout option
-    private var settingsSection: some View {
-        SectionCard(title: "Settings") {
-            Button(action: {
-                showLogoutConfirmation = true
-            }) {
-                HStack {
-                    Image(systemName: "rectangle.portrait.and.arrow.right")
-                        .font(.title3)
-                        .foregroundColor(.white)
-                        .frame(width: 36, height: 36)
-                        .background(Color.red)
-                        .cornerRadius(10)
-                    
-                    Text("Logout")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    Spacer()
-                }
-                .padding()
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(10)
-            }
-            .buttonStyle(.plain)
-        }
-    }
     
     /// Logout confirmation alert
     private var logoutAlert: Alert {
@@ -119,14 +65,7 @@ struct ProfileView: View {
             title: Text("Logout"),
             message: Text("Are you sure you want to logout?"),
             primaryButton: .destructive(Text("Logout")) {
-                print("User confirmed logout")
                 coordinator.logout()
-                
-                // Force UI update after logout
-                DispatchQueue.main.async {
-                    // Ensure we navigate to login screen
-                    coordinator.activeScreen = .login
-                }
             },
             secondaryButton: .cancel()
         )
