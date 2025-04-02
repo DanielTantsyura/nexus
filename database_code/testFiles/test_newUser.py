@@ -14,9 +14,12 @@ python -m unittest test_newUser.py
 import unittest
 import json
 import os
+import sys
 from unittest.mock import patch, MagicMock
 from typing import Dict, List
 
+# Add parent directory to path to access required modules
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from newUser import process_contact_text, create_new_contact, get_user_fields_from_schema, USER_FIELDS
 from config import DEFAULT_TAGS
 

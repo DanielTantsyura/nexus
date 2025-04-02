@@ -1,6 +1,7 @@
 import psycopg2
 from config import DATABASE_URL
 from typing import Dict, List, Any, Tuple, Optional
+import psycopg2.extras
 
 class DatabaseUtils:
     """
@@ -110,61 +111,67 @@ class DatabaseUtils:
             return False
     
     @classmethod
-    def update_passwords(cls, new_password: str = "password") -> bool:
+    def update_passwords(cls, default_password="password"):
         """
-        Update all user passwords to a standard value.
+        Set a default password for all users and update the login table.
         
         Args:
-            new_password: The password to set for all users
+            default_password: The default password to set for all users
             
         Returns:
-            True if successful, False otherwise
+            Number of users updated
         """
+        conn = None
+        cur = None
         try:
-            # Connect to the database
+            # Connect to database
             conn = psycopg2.connect(DATABASE_URL)
-            cursor = conn.cursor()
+            cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
             
-            # Get all users with usernames
-            cursor.execute("SELECT id, username, first_name, last_name FROM users WHERE username IS NOT NULL;")
-            users = cursor.fetchall()
-            print(f"Found {len(users)} users with usernames")
+            # Get all users who don't have login credentials
+            query = """
+            SELECT u.id, u.first_name, u.last_name
+            FROM users u
+            LEFT JOIN logins l ON u.id = l.user_id
+            WHERE l.id IS NULL
+            LIMIT 5;  -- Limit to 5 for demo purposes
+            """
             
-            # Update passwords for users
-            password_updates = 0
-            for user_id, username, first_name, last_name in users:
-                # Check if login exists
-                cursor.execute("SELECT id FROM logins WHERE user_id = %s;", (user_id,))
-                login = cursor.fetchone()
+            cur.execute(query)
+            users = cur.fetchall()
+            
+            # Add default login credentials for these users
+            count = 0
+            for user in users:
+                user_id = user['id']
+                first_name = user['first_name']
+                last_name = user['last_name']
                 
-                if login:
-                    # Update existing login
-                    cursor.execute(
-                        "UPDATE logins SET passkey = %s WHERE user_id = %s;", 
-                        (new_password, user_id)
-                    )
-                    print(f"Updated password for {first_name} {last_name} (ID: {user_id})")
-                else:
-                    # Create new login
-                    cursor.execute(
-                        "INSERT INTO logins (user_id, username, passkey) VALUES (%s, %s, %s);",
-                        (user_id, username, new_password)
-                    )
-                    print(f"Created login for {first_name} {last_name} (ID: {user_id})")
+                # Create a username from the first and last name (lowercase, no spaces)
+                username = (first_name + last_name).lower().replace(' ', '')
                 
-                password_updates += 1
+                # Add the login
+                insert_query = """
+                INSERT INTO logins (user_id, username, passkey, last_login)
+                VALUES (%s, %s, %s, NOW());
+                """
+                
+                cur.execute(insert_query, (user_id, username, default_password))
+                count += 1
             
             conn.commit()
-            print(f"Updated {password_updates} user passwords to '{new_password}'")
+            print(f"Added login credentials for {count} users with password '{default_password}'")
             
-            cursor.close()
-            conn.close()
-            return True
+            return count
         except Exception as e:
-            print("An error occurred:", e)
             if conn:
                 conn.rollback()
-            return False
+            raise e
+        finally:
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
     
     @classmethod
     def clean_test_data(cls, real_user_id_threshold: int = 5) -> bool:

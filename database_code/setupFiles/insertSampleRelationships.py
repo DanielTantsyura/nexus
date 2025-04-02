@@ -1,6 +1,11 @@
 import psycopg2
 import datetime
 import random
+import os
+import sys
+
+# Add parent directory to path to access config
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import DATABASE_URL
 
 def insert_sample_relationships():
@@ -36,9 +41,9 @@ def insert_sample_relationships():
                     'user_id': daniel_id,
                     'contact_id': soren_id,
                     'description': "College friends",
-                    'custom_note': "Met at CMU during freshman orientation. Works on math research projects. Good contact for academic collaborations.",
+                    'notes': "Met at CMU during freshman orientation. Works on math research projects. Good contact for academic collaborations.",
                     'tags': "college,math,research,academic",
-                    'last_viewed': datetime.datetime.now()
+                    'last_viewed': None
                 })
             
             # Connection to Max
@@ -48,9 +53,9 @@ def insert_sample_relationships():
                     'user_id': daniel_id,
                     'contact_id': max_id,
                     'description': "College roommate",
-                    'custom_note': "Shared apartment during sophomore year. Has good business connections in New Jersey.",
+                    'notes': "Shared apartment during sophomore year. Has good business connections in New Jersey.",
                     'tags': "college,roommate,business,new jersey",
-                    'last_viewed': datetime.datetime.now() - datetime.timedelta(days=2)
+                    'last_viewed': None
                 })
             
             # Connection to Stan
@@ -60,9 +65,9 @@ def insert_sample_relationships():
                     'user_id': daniel_id,
                     'contact_id': stan_id,
                     'description': "CS study group",
-                    'custom_note': "Great programmer with expertise in algorithms. Now works in London, good international contact.",
+                    'notes': "Great programmer with expertise in algorithms. Now works in London, good international contact.",
                     'tags': "CS,algorithms,international,london",
-                    'last_viewed': datetime.datetime.now() - datetime.timedelta(days=5)
+                    'last_viewed': None
                 })
             
             # Connection to Corwin
@@ -72,9 +77,9 @@ def insert_sample_relationships():
                     'user_id': daniel_id,
                     'contact_id': corwin_id,
                     'description': "High school friend",
-                    'custom_note': "Entrepreneur with multiple startups. Good contact for investment opportunities.",
+                    'notes': "Entrepreneur with multiple startups. Good contact for investment opportunities.",
                     'tags': "high school,entrepreneur,investing,startups",
-                    'last_viewed': datetime.datetime.now() - datetime.timedelta(days=1)
+                    'last_viewed': None
                 })
                 
             # Connection to Elon Musk
@@ -84,9 +89,9 @@ def insert_sample_relationships():
                     'user_id': daniel_id,
                     'contact_id': elon_id,
                     'description': "Met at tech conference",
-                    'custom_note': "Briefly chatted at the AI Summit 2023. Expressed interest in my startup idea.",
+                    'notes': "Briefly chatted at the AI Summit 2023. Expressed interest in my startup idea.",
                     'tags': "tech,AI,entrepreneurship,VIP",
-                    'last_viewed': datetime.datetime.now() - datetime.timedelta(days=15)
+                    'last_viewed': None
                 })
                 
             # Connection to Steve Jobs
@@ -96,9 +101,9 @@ def insert_sample_relationships():
                     'user_id': daniel_id,
                     'contact_id': steve_id,
                     'description': "Mentor",
-                    'custom_note': "Read his biography and attended a talk he gave at Stanford. Major inspiration for my work.",
+                    'notes': "Read his biography and attended a talk he gave at Stanford. Major inspiration for my work.",
                     'tags': "inspiration,design,leadership,tech",
-                    'last_viewed': datetime.datetime.now() - datetime.timedelta(days=60)
+                    'last_viewed': None
                 })
         else:
             print("Warning: Daniel not found in the database")
@@ -113,9 +118,9 @@ def insert_sample_relationships():
                     'user_id': max_id,
                     'contact_id': soren_id,
                     'description': "College friends",
-                    'custom_note': "Met through Daniel at a campus event. Good at explaining complex economics concepts.",
+                    'notes': "Met through Daniel at a campus event. Good at explaining complex economics concepts.",
                     'tags': "college,economics,academic",
-                    'last_viewed': datetime.datetime.now() - datetime.timedelta(days=7)
+                    'last_viewed': None
                 })
                 
             # Connection to Sheryl Sandberg
@@ -125,9 +130,9 @@ def insert_sample_relationships():
                     'user_id': max_id,
                     'contact_id': sheryl_id,
                     'description': "Professional contact",
-                    'custom_note': "Met at a leadership conference in 2022. Discussed potential business collaborations.",
+                    'notes': "Met at a leadership conference in 2022. Discussed potential business collaborations.",
                     'tags': "business,leadership,networking,tech",
-                    'last_viewed': datetime.datetime.now() - datetime.timedelta(days=20)
+                    'last_viewed': None
                 })
         
         # Add Corwin's connections
@@ -140,9 +145,9 @@ def insert_sample_relationships():
                     'user_id': corwin_id,
                     'contact_id': mark_id,
                     'description': "Tech investor connection",
-                    'custom_note': "Met at Harvard alumni event. Discussed potential investment in my startup.",
+                    'notes': "Met at Harvard alumni event. Discussed potential investment in my startup.",
                     'tags': "investor,tech,harvard,networking",
-                    'last_viewed': datetime.datetime.now() - datetime.timedelta(days=12)
+                    'last_viewed': None
                 })
                 
             # Connection to Satya Nadella
@@ -152,9 +157,9 @@ def insert_sample_relationships():
                     'user_id': corwin_id,
                     'contact_id': satya_id,
                     'description': "Professional mentor",
-                    'custom_note': "Attended his talk on cloud computing. Had a brief conversation afterwards about my business ideas.",
+                    'notes': "Attended his talk on cloud computing. Had a brief conversation afterwards about my business ideas.",
                     'tags': "mentor,cloud,business,technology",
-                    'last_viewed': datetime.datetime.now() - datetime.timedelta(days=45)
+                    'last_viewed': None
                 })
         
         # Add Steve Jobs connections
@@ -167,9 +172,9 @@ def insert_sample_relationships():
                     'user_id': steve_id,
                     'contact_id': elon_id,
                     'description': "Fellow innovator",
-                    'custom_note': "Met at several tech conferences. Admire his work in electric vehicles and space exploration.",
+                    'notes': "Met at several tech conferences. Admire his work in electric vehicles and space exploration.",
                     'tags': "innovation,tech,entrepreneurship,visionary",
-                    'last_viewed': datetime.datetime.now() - datetime.timedelta(days=180)
+                    'last_viewed': None
                 })
                 
             # Connection to Mark Zuckerberg
@@ -179,9 +184,9 @@ def insert_sample_relationships():
                     'user_id': steve_id,
                     'contact_id': mark_id,
                     'description': "Silicon Valley connection",
-                    'custom_note': "Provided early mentorship on product design and company vision.",
+                    'notes': "Provided early mentorship on product design and company vision.",
                     'tags': "mentor,design,tech,leadership",
-                    'last_viewed': datetime.datetime.now() - datetime.timedelta(days=365)
+                    'last_viewed': None
                 })
         
         # Add tech titans connections
@@ -194,9 +199,9 @@ def insert_sample_relationships():
                     'user_id': elon_id,
                     'contact_id': satya_id,
                     'description': "Industry peer",
-                    'custom_note': "Collaborated on AI safety initiatives. Potential partnership between Tesla and Microsoft on cloud computing.",
+                    'notes': "Collaborated on AI safety initiatives. Potential partnership between Tesla and Microsoft on cloud computing.",
                     'tags': "AI,tech,business,cloud",
-                    'last_viewed': datetime.datetime.now() - datetime.timedelta(days=30)
+                    'last_viewed': None
                 })
         
         # Add Sheryl to Mark connection
@@ -207,20 +212,20 @@ def insert_sample_relationships():
                 'user_id': sheryl_id,
                 'contact_id': mark_id,
                 'description': "Colleague and friend",
-                'custom_note': "Worked together at Meta for many years. Close professional relationship and friendship.",
+                'notes': "Worked together at Meta for many years. Close professional relationship and friendship.",
                 'tags': "work,leadership,meta,business",
-                'last_viewed': datetime.datetime.now() - datetime.timedelta(days=5)
+                'last_viewed': None
             })
         
         # Insert the relationships
         relationship_sql = """
         INSERT INTO relationships (
             user_id, contact_id, relationship_description, 
-            custom_note, tags, last_viewed
+            notes, tags, last_viewed
         )
         VALUES (
             %(user_id)s, %(contact_id)s, %(description)s,
-            %(custom_note)s, %(tags)s, %(last_viewed)s
+            %(notes)s, %(tags)s, %(last_viewed)s
         );
         """
         
@@ -237,9 +242,9 @@ def insert_sample_relationships():
                 'user_id': rel['contact_id'],
                 'contact_id': rel['user_id'],
                 'description': rel['description'],
-                'custom_note': rel['custom_note'],
+                'notes': rel['notes'],
                 'tags': rel['tags'],
-                'last_viewed': rel['last_viewed'] - datetime.timedelta(days=random.randint(1, 3))
+                'last_viewed': None
             }
             cursor.execute(relationship_sql, reverse_rel)
         

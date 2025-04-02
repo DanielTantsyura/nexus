@@ -1,18 +1,20 @@
 """
-Test script for running the newUser module against sample data from test_samples.json.
-This script tests how well the OpenAI model extracts information from different text inputs.
+Test suite for the newUser module processing capabilities with real-world samples.
 
-Run this script with:
-python test_newUser_samples.py
+This module tests the AI processing capabilities of the newUser module by using
+a collection of realistic sample inputs and verifying the outputs.
 """
 
 import os
 import json
 import time
+import sys
 from typing import Dict, List, Optional
 from unittest.mock import patch
 import unittest
 
+# Add parent directory to path to access required modules
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Import the necessary functions from newUser
 from newUser import process_contact_text, USER_FIELDS
 from config import DEFAULT_TAGS

@@ -13,12 +13,17 @@ Only use this script when setting up the database for the first time or when you
 willing to lose all existing data.
 """
 
-from createDatabase import create_database
-from insertSampleUsers import insert_sample_users
-from insertSampleRelationships import insert_sample_relationships
-from database_utils import DatabaseUtils
+# Update imports to use the correct paths
+from setupFiles.createDatabase import create_database
+from setupFiles.insertSampleUsers import insert_sample_users
+from setupFiles.insertSampleRelationships import insert_sample_relationships
 import sys
 import time
+import os
+
+# Add parent directory to path to access database_utils
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from database_utils import DatabaseUtils
 
 def setup_database():
     """Set up the database with schema and sample data."""

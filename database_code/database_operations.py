@@ -64,7 +64,7 @@ class DatabaseManager:
     
     def get_user_by_username(self, username: str) -> Optional[Dict]:
         """
-        Retrieve a user by their username.
+        Retrieve a user by looking up their username in the logins table.
         
         Args:
             username: The username to search for
@@ -73,8 +73,9 @@ class DatabaseManager:
             User dictionary or None if not found
         """
         query = """
-        SELECT * FROM users
-        WHERE username = %s;
+        SELECT u.* FROM users u
+        JOIN logins l ON u.id = l.user_id
+        WHERE l.username = %s;
         """
         
         try:
@@ -154,11 +155,11 @@ class DatabaseManager:
         """
         query = """
         SELECT 
-            u.id, u.username, u.first_name, u.last_name,
+            u.id, u.first_name, u.last_name,
             u.email, u.phone_number, u.location, u.university,
             u.field_of_interest, u.high_school, u.gender, u.ethnicity,
             u.uni_major, u.job_title, u.current_company, u.profile_image_url,
-            u.linkedin_url, r.relationship_description, r.custom_note,
+            u.linkedin_url, r.relationship_description, r.notes,
             r.tags, r.last_viewed
         FROM relationships r
         JOIN users u ON r.contact_id = u.id
@@ -186,21 +187,20 @@ class DatabaseManager:
         """
         query = """
         INSERT INTO users (
-            username, first_name, last_name, email, phone_number,
+            first_name, last_name, email, phone_number,
             location, university, field_of_interest, high_school,
             gender, ethnicity, uni_major, job_title, current_company,
             profile_image_url, linkedin_url, recent_tags
         ) VALUES (
-            %(username)s, %(first_name)s, %(last_name)s, %(email)s, %(phone_number)s,
+            %(first_name)s, %(last_name)s, %(email)s, %(phone_number)s,
             %(location)s, %(university)s, %(field_of_interest)s, %(high_school)s,
             %(gender)s, %(ethnicity)s, %(uni_major)s, %(job_title)s, %(current_company)s,
-            %(profile_image_url)s, %(linkedin_url)s, %(recent_tags)s
+            %(profile_image_url)s, %(linkedin_url)s, NULL
         ) RETURNING id;
         """
         
-        # Ensure the recent_tags field is present, set to default tags if not provided
-        if 'recent_tags' not in user_data or user_data['recent_tags'] is None:
-            user_data['recent_tags'] = DEFAULT_TAGS
+        # Force recent_tags to be NULL
+        # We're not even using the provided values in the query
         
         try:
             self.cursor.execute(query, user_data)
@@ -213,31 +213,31 @@ class DatabaseManager:
             print(f"Error adding user: {e}")
             raise
     
-    def add_connection(self, user_id: int, contact_id: int, description: str, custom_note: str = None, tags: str = None) -> bool:
+    def add_connection(self, user_id: int, contact_id: int, description: str, notes: str = None, tags: str = None) -> bool:
         """
-        Add a new connection between two users in both directions.
+        Add a connection between two users.
         
         Args:
-            user_id: ID of the first user
-            contact_id: ID of the second user
+            user_id: ID of the user initiating the connection
+            contact_id: ID of the user to connect with
             description: Description of the relationship
-            custom_note: Optional detailed note about the connection
-            tags: Optional comma-separated tags for the connection
+            notes: Optional detailed note about the connection
+            tags: Optional comma-separated list of tags
             
         Returns:
             True if successful, False otherwise
         """
         query = """
-        INSERT INTO relationships (user_id, contact_id, relationship_description, custom_note, tags, last_viewed)
+        INSERT INTO relationships (user_id, contact_id, relationship_description, notes, tags, last_viewed)
         VALUES (%s, %s, %s, %s, %s, NOW());
         """
         
         try:
             # First direction: user_id -> contact_id
-            self.cursor.execute(query, (user_id, contact_id, description, custom_note, tags))
+            self.cursor.execute(query, (user_id, contact_id, description, notes, tags))
             
             # Second direction: contact_id -> user_id (create the reciprocal connection)
-            self.cursor.execute(query, (contact_id, user_id, description, custom_note, tags))
+            self.cursor.execute(query, (contact_id, user_id, description, notes, tags))
             
             self.connection.commit()
             return True
@@ -289,7 +289,6 @@ class DatabaseManager:
         
         # Map of user_data keys to database columns
         field_mapping = {
-            'username': 'username',
             'first_name': 'first_name',
             'last_name': 'last_name',
             'email': 'email',
@@ -350,6 +349,9 @@ class DatabaseManager:
             
         Returns:
             True if successful, False otherwise
+            
+        Raises:
+            Exception: If there's an error, especially for duplicate username
         """
         query = """
         INSERT INTO logins (user_id, username, passkey, last_login)
@@ -363,7 +365,8 @@ class DatabaseManager:
         except Exception as e:
             self.connection.rollback()
             print(f"Error adding user login: {e}")
-            return False
+            # Re-raise the exception so the caller can handle duplicate usernames
+            raise
     
     def validate_login(self, username: str, passkey: str) -> Optional[int]:
         """
@@ -419,7 +422,7 @@ class DatabaseManager:
         params = []
         
         for key, value in data.items():
-            if key in ['relationship_description', 'custom_note', 'tags']:
+            if key in ['relationship_description', 'notes', 'tags']:
                 set_clauses.append(f"{key} = %s")
                 params.append(value)
         
@@ -551,6 +554,84 @@ class DatabaseManager:
         except Exception as e:
             self.connection.rollback()
             print(f"Error updating recent tags: {e}")
+            return False
+
+    def get_connection_details(self, user_id: int, contact_id: int) -> Dict:
+        """
+        Get detailed information about a specific connection.
+        
+        Args:
+            user_id: ID of the user
+            contact_id: ID of the connection (contact)
+        
+        Returns:
+            Dictionary containing connection details
+        """
+        query = """
+        SELECT u.first_name, u.last_name, u.email, u.phone_number, 
+        u.location, u.university, u.field_of_interest, u.job_title, 
+        u.current_company, u.profile_image_url, u.linkedin_url, 
+        r.relationship_description, r.notes, r.tags, r.last_viewed
+        FROM users u
+        JOIN relationships r ON u.id = r.contact_id
+        WHERE r.user_id = %s AND r.contact_id = %s
+        """
+        
+        try:
+            self.cursor.execute(query, (user_id, contact_id))
+            result = self.cursor.fetchone()
+            return dict(result)
+        except Exception as e:
+            print(f"Error retrieving connection details: {e}")
+            return {}
+
+    def user_has_login(self, user_id: int) -> bool:
+        """
+        Check if a user has login credentials.
+        
+        Args:
+            user_id: The ID of the user to check
+            
+        Returns:
+            True if the user has login credentials, False otherwise
+        """
+        query = """
+        SELECT COUNT(*) as count
+        FROM logins
+        WHERE user_id = %s
+        """
+        
+        try:
+            self.cursor.execute(query, (user_id,))
+            result = self.cursor.fetchone()
+            return result['count'] > 0
+        except Exception as e:
+            print(f"Error checking user login: {e}")
+            return False
+
+    def update_last_login(self, user_id: int) -> bool:
+        """
+        Update the last_login timestamp for a user.
+        
+        Args:
+            user_id: ID of the user
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        query = """
+        UPDATE logins
+        SET last_login = NOW()
+        WHERE user_id = %s;
+        """
+        
+        try:
+            self.cursor.execute(query, (user_id,))
+            self.connection.commit()
+            return self.cursor.rowcount > 0
+        except Exception as e:
+            self.connection.rollback()
+            print(f"Error updating last login timestamp: {e}")
             return False
 
 

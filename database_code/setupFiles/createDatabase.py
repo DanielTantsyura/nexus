@@ -1,4 +1,9 @@
 import psycopg2
+import os
+import sys
+
+# Add parent directory to path to access config
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import DATABASE_URL
 
 # Define your SQL commands
@@ -11,33 +16,54 @@ DROP TABLE IF EXISTS users;
 -- Create the expanded users table
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
-    username VARCHAR(50) UNIQUE,
+    
+    -- Identity information
     first_name VARCHAR(50) NOT NULL,
     last_name VARCHAR(50) NOT NULL,
-    email VARCHAR(100) UNIQUE,
+    
+    -- Contact information
+    email VARCHAR(100),
     phone_number VARCHAR(20),
-    birthday DATE,
-    location VARCHAR(100),
-    high_school VARCHAR(100),
-    university VARCHAR(100),
-    field_of_interest VARCHAR(100),
-    current_company VARCHAR(100),
+    
+    -- Personal information
     gender VARCHAR(50),
     ethnicity VARCHAR(100),
+    birthday DATE,
+    location VARCHAR(100),
+    
+    -- Educational information
+    high_school VARCHAR(100),
+    university VARCHAR(100),
     uni_major VARCHAR(100),
+    
+    -- Professional information
     job_title VARCHAR(100),
+    current_company VARCHAR(100),
+    field_of_interest VARCHAR(100),
+    
+    -- External links
     profile_image_url VARCHAR(255),
     linkedin_url VARCHAR(255),
+    
+    -- Tags
     recent_tags TEXT,
+    
+    -- Metadata
     created_at TIMESTAMP DEFAULT NOW()
 );
 
 -- Create the login table
 CREATE TABLE logins (
     id SERIAL PRIMARY KEY,
+    
+    -- User relationship
     user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Authentication information
     username VARCHAR(50) NOT NULL UNIQUE,
     passkey VARCHAR(100) NOT NULL,
+    
+    -- Metadata
     last_login TIMESTAMP,
     created_at TIMESTAMP DEFAULT NOW()
 );
@@ -45,13 +71,21 @@ CREATE TABLE logins (
 -- Create the relationships table
 CREATE TABLE relationships (
     id SERIAL PRIMARY KEY,
+    
+    -- User relationships
     user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     contact_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Relationship description
     relationship_description VARCHAR(255),
-    custom_note TEXT,
+    notes TEXT,
     tags TEXT,
-    last_viewed TIMESTAMP,
+    
+    -- Metadata
+    last_viewed TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT NOW(),
+    
+    -- Constraints
     UNIQUE (user_id, contact_id)
 );
 """

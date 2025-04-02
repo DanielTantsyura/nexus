@@ -1,11 +1,15 @@
 import psycopg2
-from config import DATABASE_URL, DEFAULT_TAGS
+import os
+import sys
 from datetime import datetime
+
+# Add parent directory to path to access config
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config import DATABASE_URL, DEFAULT_TAGS
 
 # Sample data as a list of dictionaries
 sample_data = [
     {
-        "username": "danieltantsyura",
         "first_name": "Daniel",
         "last_name": "Tantsyura",
         "email": "dan.tantsyura@gmail.com",
@@ -25,7 +29,6 @@ sample_data = [
         "recent_tags": DEFAULT_TAGS
     },
     {
-        "username": "sorendupont",
         "first_name": "Soren",
         "last_name": "Dupont",
         "email": None,
@@ -45,7 +48,6 @@ sample_data = [
         "recent_tags": DEFAULT_TAGS
     },
     {
-        "username": None,
         "first_name": "Max",
         "last_name": "Battaglia",
         "email": None,
@@ -65,7 +67,6 @@ sample_data = [
         "recent_tags": DEFAULT_TAGS
     },
     {
-        "username": "stanosipenko",
         "first_name": "Stan",
         "last_name": "Osipenko",
         "email": "osipenko@cmu.edu",
@@ -85,7 +86,6 @@ sample_data = [
         "recent_tags": DEFAULT_TAGS
     },
     {
-        "username": "corwincheung",
         "first_name": "Corwin",
         "last_name": "Cheung",
         "email": "corwintcheung@gmail.com",
@@ -105,7 +105,6 @@ sample_data = [
         "recent_tags": DEFAULT_TAGS
     },
     {
-        "username": "stevejobs",
         "first_name": "Steve",
         "last_name": "Jobs",
         "email": "steve@apple.com",
@@ -122,10 +121,9 @@ sample_data = [
         "current_company": "Apple Inc.",
         "profile_image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dc/Steve_Jobs_Headshot_2010-CROP_%28cropped_2%29.jpg/800px-Steve_Jobs_Headshot_2010-CROP_%28cropped_2%29.jpg",
         "linkedin_url": None,
-        "recent_tags": DEFAULT_TAGS
+        "recent_tags": None
     },
     {
-        "username": "elonmusk",
         "first_name": "Elon",
         "last_name": "Musk",
         "email": "elon@tesla.com",
@@ -142,10 +140,9 @@ sample_data = [
         "current_company": "Tesla, SpaceX, X",
         "profile_image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Elon_Musk_Royal_Society_%28crop2%29.jpg/800px-Elon_Musk_Royal_Society_%28crop2%29.jpg",
         "linkedin_url": None,
-        "recent_tags": DEFAULT_TAGS
+        "recent_tags": None
     },
     {
-        "username": "sherylsandberg",
         "first_name": "Sheryl",
         "last_name": "Sandberg",
         "email": "sheryl@meta.com",
@@ -162,10 +159,9 @@ sample_data = [
         "current_company": "Meta Platforms",
         "profile_image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Sheryl_Sandberg_2013.jpg/800px-Sheryl_Sandberg_2013.jpg",
         "linkedin_url": "https://linkedin.com/in/sherylsandberg",
-        "recent_tags": DEFAULT_TAGS
+        "recent_tags": None
     },
     {
-        "username": "markzuckerberg",
         "first_name": "Mark",
         "last_name": "Zuckerberg",
         "email": None,
@@ -182,10 +178,9 @@ sample_data = [
         "current_company": "Meta Platforms",
         "profile_image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Mark_Zuckerberg_F8_2019_Keynote_%2832830578717%29_%28cropped%29.jpg/800px-Mark_Zuckerberg_F8_2019_Keynote_%2832830578717%29_%28cropped%29.jpg",
         "linkedin_url": None,
-        "recent_tags": DEFAULT_TAGS
+        "recent_tags": None
     },
     {
-        "username": "satyandella",
         "first_name": "Satya",
         "last_name": "Nadella",
         "email": "satya@microsoft.com",
@@ -202,7 +197,7 @@ sample_data = [
         "current_company": "Microsoft",
         "profile_image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Satya_Nadella.jpg/800px-Satya_Nadella.jpg",
         "linkedin_url": "https://linkedin.com/in/satyanadella",
-        "recent_tags": DEFAULT_TAGS
+        "recent_tags": None
     }
 ]
 
@@ -211,13 +206,13 @@ def insert_sample_users():
     # SQL INSERT command template - adjusted to match our table schema
     insert_sql = """
     INSERT INTO users (
-        username, first_name, last_name, email, phone_number, birthday,
+        first_name, last_name, email, phone_number, birthday,
         location, university, field_of_interest, high_school,
         gender, ethnicity, uni_major, job_title, current_company,
         profile_image_url, linkedin_url, recent_tags
     )
     VALUES (
-        %(username)s, %(first_name)s, %(last_name)s, %(email)s, %(phone_number)s, %(birthday)s,
+        %(first_name)s, %(last_name)s, %(email)s, %(phone_number)s, %(birthday)s,
         %(location)s, %(university)s, %(field_of_interest)s, %(high_school)s,
         %(gender)s, %(ethnicity)s, %(uni_major)s, %(job_title)s, %(current_company)s,
         %(profile_image_url)s, %(linkedin_url)s, %(recent_tags)s

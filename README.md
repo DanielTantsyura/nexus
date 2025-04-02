@@ -23,6 +23,7 @@ The system allows users to:
    - Comprehensive user profiles with personal and professional details
    - Relationship tracking with custom notes and tags
    - Last login timestamp tracking
+   - Non-unique email addresses, allowing multiple users with the same email
 
 2. **Natural Language Contact Creation**
    - OpenAI GPT integration via `newUser.py` module
@@ -35,6 +36,7 @@ The system allows users to:
    - User CRUD operations (Create, Read, Update, Delete)
    - Connection management with bidirectional relationship support
    - Search functionality across multiple user fields
+   - Simplified login credential creation with auto-generated usernames
 
 ### iOS Client Features
 
@@ -105,6 +107,8 @@ The `users` table stores comprehensive information about each contact:
 - Personal details: gender, ethnicity, birthday
 - Recent tags for quick access to frequently used categories
 
+Email addresses are not required to be unique, allowing the system to store multiple contacts with the same email address.
+
 ### Relationship Management
 
 The `relationships` table manages connections between users:
@@ -113,6 +117,14 @@ The `relationships` table manages connections between users:
 - Tag-based categorization with comma-separated tags
 - Last viewed timestamp for tracking recent interactions
 - One-to-many relationship model that allows each user to have their own perspective
+
+### Authentication System
+
+The login system features a streamlined credential creation process:
+- Usernames are automatically generated from the user's first and last names
+- If a username already exists, a random number (1-100) is appended
+- This process repeats until a unique username is found
+- Simple API endpoint that handles credential creation transparently
 
 ### Natural Language Processing
 
@@ -181,7 +193,9 @@ The system leverages OpenAI's API to extract structured data from natural langua
    | `/connections` | POST | Create a new connection |
    | `/connections/update` | PUT | Update a connection |
    | `/contacts/create` | POST | Create a contact from text |
-   | `/login` | POST | Authenticate user |
+   | `/login` | POST | Create login credentials |
+   | `/login/validate` | POST | Validate login credentials |
+   | `/login/update` | POST | Update last login timestamp |
 
 ### iOS Client Setup
 

@@ -10,9 +10,9 @@ import re
 from typing import Dict, List, Tuple, Optional
 from dotenv import load_dotenv
 import openai
-from config import DEFAULT_TAGS
+from config import DEFAULT_TAGS, OPENAI_MODEL
 
-# Load environment variables
+# Only load API key from environment variables
 load_dotenv()
 
 # Initialize OpenAI API key (using older API version 0.28.0)
@@ -22,15 +22,15 @@ if not openai.api_key:
 
 def get_user_fields_from_schema():
     """
-    Dynamically extract user fields from the database schema in createDatabase.py.
+    Dynamically extract user fields from the database schema in setupFiles/createDatabase.py.
     This ensures that the fields used in the API call always match the actual database schema.
     
     Returns:
         List of user field names
     """
     try:
-        # Read the createDatabase.py file
-        with open(os.path.join(os.path.dirname(__file__), 'createDatabase.py'), 'r') as file:
+        # Read the createDatabase.py file from setupFiles directory
+        with open(os.path.join(os.path.dirname(__file__), 'setupFiles', 'createDatabase.py'), 'r') as file:
             schema_content = file.read()
         
         # Extract the CREATE TABLE users section
@@ -83,6 +83,9 @@ def process_contact_text(text: str, tags: List[str], current_user_id: int) -> Tu
     if not text or len(text.strip()) < 5:
         return False, None, "Not enough information provided. Please provide more details."
     
+    # Create a filtered list of fields that excludes username and recent_tags
+    filtered_fields = [field for field in USER_FIELDS if field not in ['username', 'recent_tags']]
+    
     try:
         # Create a system prompt that explains what we want the model to do
         system_prompt = f"""
@@ -90,7 +93,7 @@ def process_contact_text(text: str, tags: List[str], current_user_id: int) -> Tu
         The text contains details about a person, and you need to extract specific fields to populate a user database.
         
         The database has the following fields:
-        {', '.join(USER_FIELDS)}
+        {', '.join(filtered_fields)}
         
         IMPORTANT GUIDELINES:
         1. The input might be a formal paragraph or a shorthand note with brief biographical information.
@@ -111,7 +114,7 @@ def process_contact_text(text: str, tags: List[str], current_user_id: int) -> Tu
         
         # Send the request to the OpenAI API using the older format (0.28.0)
         response = openai.ChatCompletion.create(
-            model="gpt-4o-mini",
+            model=OPENAI_MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": text}
@@ -127,9 +130,12 @@ def process_contact_text(text: str, tags: List[str], current_user_id: int) -> Tu
         if not extracted_data.get("first_name") or not extracted_data.get("last_name"):
             return False, None, "Could not extract first and last name from the text. Please provide clearer information."
         
-        # Add default tags if not already present
-        if "recent_tags" not in extracted_data or not extracted_data["recent_tags"]:
-            extracted_data["recent_tags"] = DEFAULT_TAGS
+        # Make sure username and recent_tags are not present
+        if "username" in extracted_data:
+            del extracted_data["username"]
+            
+        if "recent_tags" in extracted_data:
+            del extracted_data["recent_tags"]
         
         return True, extracted_data, "Successfully extracted user information."
     
@@ -147,13 +153,10 @@ def process_contact_text(text: str, tags: List[str], current_user_id: int) -> Tu
             "last_name": words[1]
         }
         
-        # Add all other fields as None
-        for field in USER_FIELDS:
+        # Add all other fields as None for filtered fields only
+        for field in filtered_fields:
             if field not in user_data:
                 user_data[field] = None
-        
-        # Ensure recent_tags is set to DEFAULT_TAGS
-        user_data["recent_tags"] = DEFAULT_TAGS
         
         return True, user_data, "API processing failed. Used basic extraction instead."
 
@@ -178,8 +181,11 @@ def create_new_contact(text: str, tags: List[str], current_user_id: int) -> Tupl
         return False, message, None
     
     try:
+        # Import here to avoid circular imports
+        from config import IOS_SIMULATOR_URL
+        
         # Call the API to create the user
-        api_url = "http://127.0.0.1:8080/users"  # Assuming API is running locally
+        api_url = f"{IOS_SIMULATOR_URL}/users"
         response = requests.post(api_url, json=user_data)
         
         if response.status_code != 201:
@@ -198,12 +204,12 @@ def create_new_contact(text: str, tags: List[str], current_user_id: int) -> Tupl
             "user_id": current_user_id,
             "contact_id": new_user_id,
             "description": "Added via contact form",
-            "custom_note": text,  # Store the original text as a note
+            "notes": text,  # Store the original text as a note
             "tags": tags_str
         }
         
         # Call the API to create the relationship
-        relationship_url = "http://127.0.0.1:8080/connections"
+        relationship_url = f"{IOS_SIMULATOR_URL}/connections"
         rel_response = requests.post(relationship_url, json=relationship_data)
         
         if rel_response.status_code != 201:
