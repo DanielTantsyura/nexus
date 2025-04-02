@@ -263,7 +263,8 @@ struct EditProfileView: View {
             gender: gender,
             ethnicity: ethnicity,
             uniMajor: uniMajor,
-            jobTitle: jobTitle
+            jobTitle: jobTitle,
+            lastLogin: nil
         )
         
         coordinator.networkManager.updateUser(updatedUser) { success in
@@ -303,7 +304,8 @@ struct EditProfileView: View {
         gender: nil,
         ethnicity: nil,
         uniMajor: "Computer Science",
-        jobTitle: "Software Engineer"
+        jobTitle: "Software Engineer",
+        lastLogin: nil
     ))
     .environmentObject(AppCoordinator())
 } 

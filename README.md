@@ -1,126 +1,127 @@
 # Nexus Application
 
-A modern social networking application featuring a Flask backend API and a native iOS client built with SwiftUI. Nexus enables users to create profiles, search for connections, and manage their professional network.
+Nexus is a personal network management system with a Python Flask backend and a Swift iOS frontend. It helps users maintain an organized database of their personal and professional connections.
 
 ## Overview
 
-Nexus is a modern social networking platform with a Flask-based backend API and a native iOS client. The project implements user management, connection handling, and profile viewing capabilities in a clean, maintainable architecture.
+Nexus consists of two main components:
+1. A PostgreSQL database with a Flask API backend
+2. A native iOS client built with SwiftUI
 
-## Key Improvements
+The system allows users to:
+- Create and manage detailed contact profiles
+- Add new contacts using natural language processing
+- Tag and categorize connections
+- Track relationship information and notes
 
-### Backend Improvements
+## Key Features
 
-1. **Database Operations Consolidation**
-   - Consolidated `DatabaseUtils` and `DatabaseManager` into a single comprehensive class
-   - Implemented context managers for improved resource management
-   - Enhanced error handling throughout all database operations
-   - Added bidirectional relationship support with clear separation of one-way and two-way properties
-   - Implemented last login tracking for user activity monitoring
+### Backend Features
 
-2. **API Enhancements**
-   - Added command-line arguments for flexible port configuration
-   - Improved API response formats with consistent error handling
-   - Added endpoints for login tracking and relationship management
-   - Better organized endpoints with detailed documentation
+1. **Database Structure**
+   - PostgreSQL with three primary tables: `users`, `logins`, and `relationships`
+   - Comprehensive user profiles with personal and professional details
+   - Relationship tracking with custom notes and tags
+   - Last login timestamp tracking
 
-3. **Documentation Improvements**
-   - Created comprehensive README files with detailed setup instructions
-   - Added extensive docstrings to all modules and functions
-   - Documented database schema with clear explanation of relationship structure
-   - Added troubleshooting guides for common issues
+2. **Natural Language Contact Creation**
+   - OpenAI GPT integration via `newUser.py` module
+   - Free-form text parsing into structured user data
+   - Smart field extraction (names, universities, interests, etc.)
+   - Automatic relationship creation with appropriate tags
 
-### iOS Client Improvements
+3. **API Endpoints**
+   - RESTful Flask API with comprehensive error handling
+   - User CRUD operations (Create, Read, Update, Delete)
+   - Connection management with bidirectional relationship support
+   - Search functionality across multiple user fields
 
-1. **Code Organization**
-   - Extracted UI components into a dedicated `UIComponents.swift` file
-   - Split large views into smaller, more manageable components
-   - Separated `UserListRow.swift` and `UserDetailView.swift` from ContentView
-   - Consolidated all models into a single `Models.swift` file
-   - Flattened directory structure by moving all files to the main directory
+### iOS Client Features
 
-2. **UI Component Library**
-   - Implemented reusable button styles (`PrimaryButtonStyle`, `SecondaryButtonStyle`)
-   - Created standard UI components (`UserAvatar`, `InfoRow`, `SectionCard`)
-   - Added state handling views (`LoadingView`, `ErrorView`, `EmptyStateView`)
+1. **Modern SwiftUI Interface**
+   - Tab-based navigation with Network and Profile sections
+   - User detail views with comprehensive profile information
+   - Connection management directly from user profiles
+   - Form-based contact and profile editing
 
-3. **View Refactoring**
-   - Refactored `HomeView` to use the new component library
-   - Enhanced `UserListView` with improved search and error states
-   - Updated `UserDetailView` with better connection management
-   - Streamlined `ContentView` to focus on navigation coordination
+2. **State Management**
+   - Centralized state via NetworkManager and AppCoordinator
+   - Reactive UI updates through published properties
+   - Persistent login with UserDefaults
+   - Clean error handling and loading states
 
-## Architecture Highlights
+3. **Network Communication**
+   - Robust API client with standardized error handling
+   - Automatic retry for failed network requests
+   - Support for simulator and physical device testing
+   - Comprehensive data models that map directly to API responses
 
-### Backend
+## Architecture
 
-- **Flask-based RESTful API**: Clean separation of routes and database operations
-- **PostgreSQL Database**: Robust data storage with proper connection management
-- **Comprehensive Database Manager**: Unified class for all database operations
-- **Environment Configuration**: Flexible settings via environment variables
+### Backend Architecture
 
-### iOS Client
+- **Database Layer**
+   - `createDatabase.py` - Sets up the PostgreSQL schema
+   - `database_operations.py` - Unified class for all database operations
+   - `database_utils.py` - Helper utilities for database interactions
 
-- **MVVM + Coordinator Pattern**: Clean separation of concerns
-- **SwiftUI Framework**: Modern declarative UI development
-- **Centralized State Management**: Via AppCoordinator
-- **Reusable Component Library**: UI consistency and maintainability
-- **Flat File Structure**: Simpler navigation with all files in the main directory
+- **API Layer**
+   - `api.py` - Flask server with RESTful endpoints
+   - `config.py` - Environment-based configuration
+   - Comprehensive error handling and response formatting
 
-## Features
+- **Natural Language Processing**
+   - `newUser.py` - OpenAI GPT integration for text processing
+   - Structured user data extraction from free-form descriptions
+   - Integration with database operations for seamless contact creation
 
-- **User Management**:
-  - Create, read, update, and delete user profiles
-  - Search for users by name, university, location, or interests
-  - Comprehensive user profiles with personal and professional details
+### iOS Client Architecture
 
-- **Connection Management**:
-  - Bidirectional connections between users with relationship types
-  - View and manage user connections
-  - Automatic relationship synchronization
-  - Separate one-way and two-way relationship properties
+- **Data Models**
+   - `Models.swift` - Core data structures that match API responses
+   - `User`, `Connection`, `Login` and other model types
+   - Proper Codable implementation for JSON serialization
 
-- **Authentication**:
-  - Secure login system with username/password authentication
-  - User-specific data access
-  - Persistent login with UserDefaults storage
-  - Last login tracking for user activity monitoring
+- **Network Layer**
+   - `NetworkManager.swift` - Handles all API communication
+   - Published properties for reactive UI updates
+   - Comprehensive error handling and retry mechanisms
+   - Session management with persistent login
 
-- **Modern UI**:
-  - Clean, responsive SwiftUI interface
-  - Proper loading states and error handling
-  - Retry mechanisms for failed network requests
+- **UI Layer**
+   - `MainTabView.swift` - Tab-based main navigation
+   - `UserListView.swift`, `UserDetailView.swift`, etc. - Primary UI components
+   - `UIComponents.swift` - Reusable UI elements
+   - `AppCoordinator.swift` - Centralized navigation and state management
 
-## Project Structure
+## Database Features
 
-```
-nexus/
-├── database_code/                # Backend database code
-│   ├── api.py                    # Flask API server
-│   ├── config.py                 # Configuration settings
-│   ├── createDatabase.py         # Database schema creation
-│   ├── database_operations.py    # Unified database management class
-│   ├── newUser.py                # Natural language contact creation
-│   ├── insertSampleUsers.py      # Sample user data insertion
-│   ├── insertSampleRelationships.py # Sample relationship data
-│   ├── setup.py                  # One-step setup script
-│   ├── test_api.py               # API testing script
-│   └── README.md                 # Database code documentation
-├── requirements.txt              # Python dependencies
-└── swift_code/                   # iOS client application
-    └── nexus/                    # Main app code
-        ├── AppCoordinator.swift  # Navigation and state management
-        ├── Models.swift          # Combined data models
-        ├── NetworkManager.swift  # API communication
-        ├── ContentView.swift     # Container view
-        ├── HomeView.swift        # Home screen
-        ├── UserListView.swift    # User listing
-        ├── UserListRow.swift     # User list items
-        ├── UserDetailView.swift  # User detail view
-        ├── EditProfileView.swift # Profile editing
-        ├── LoginView.swift       # Authentication UI
-        ├── UIComponents.swift    # Reusable UI components
-        └── NexusApp.swift        # App entry point
-```
+### User Profiles
+
+The `users` table stores comprehensive information about each contact:
+- Basic info: name, email, phone, location
+- Professional details: company, job title, field of interest
+- Educational background: university, major, high school
+- Personal details: gender, ethnicity, birthday
+- Recent tags for quick access to frequently used categories
+
+### Relationship Management
+
+The `relationships` table manages connections between users:
+- Bidirectional relationship tracking
+- Custom notes specific to each relationship
+- Tag-based categorization with comma-separated tags
+- Last viewed timestamp for tracking recent interactions
+- One-to-many relationship model that allows each user to have their own perspective
+
+### Natural Language Processing
+
+The system leverages OpenAI's API to extract structured data from natural language:
+- Free-form text descriptions converted to proper database fields
+- Smart extraction of educational institutions
+- Detection of interests and professional details
+- Demographic information parsing
+- Fallback to basic extraction if API processing fails
 
 ## Getting Started
 
@@ -173,18 +174,14 @@ nexus/
    |----------|--------|-------------|
    | `/users` | GET | List all users |
    | `/users` | POST | Create a new user |
-   | `/users/{user_id}` | GET | Get user by ID |
-   | `/users/{user_id}` | PUT | Update a user |
-   | `/users/search?q={search_term}` | GET | Search for users |
-   | `/connections/{user_id}` | GET | Get user connections |
+   | `/users/<int:user_id>` | GET | Get user by ID |
+   | `/users/<int:user_id>` | PUT | Update a user |
+   | `/users/search` | GET | Search for users |
+   | `/users/<int:user_id>/connections` | GET | Get user connections |
    | `/connections` | POST | Create a new connection |
-   | `/connections` | PUT | Update a connection |
-   | `/connections` | DELETE | Remove a connection |
+   | `/connections/update` | PUT | Update a connection |
    | `/contacts/create` | POST | Create a contact from text |
-   | `/login` | POST | Validate login credentials |
-   | `/users/{user_id}/update-last-login` | POST | Update last login timestamp |
-   | `/utils/check-database` | GET | Check database state |
-   | `/utils/update-passwords` | POST | Update all user passwords |
+   | `/login` | POST | Authenticate user |
 
 ### iOS Client Setup
 
@@ -197,50 +194,6 @@ nexus/
    - Open the project in Xcode
    - Select a device or simulator
    - Run the application (⌘+R)
-
-## Database Features
-
-### Relationship Management
-
-The relationship system supports both one-way and two-way properties:
-
-- **Two-way properties**: `relationship_type` is shared in both directions
-- **One-way properties**: `note`, `tags`, and `last_viewed` are specific to each direction
-
-This design allows users to maintain their own perspective on the relationship while sharing a common relationship type.
-
-### Login Tracking
-
-The system tracks when users log in or open the application:
-
-- The `last_login` field in the `logins` table is automatically updated when:
-  - A user successfully logs in through the `/login` endpoint
-  - The app is opened and calls the `/users/{id}/update-last-login` endpoint
-
-This tracking enables features like showing "last seen" information, detecting inactive accounts, and providing activity analytics.
-
-### Natural Language Processing
-
-The system uses OpenAI's API to extract structured user data from free-form text:
-
-- Process text descriptions into structured user profiles
-- Extract additional notes that don't fit standard fields
-- Automatically create contacts with proper relationship data
-
-## Testing
-
-Run the comprehensive API test suite:
-
-```
-cd database_code
-python test_api.py
-```
-
-This tests:
-- API endpoints
-- Database operations
-- Connection management
-- User authentication
 
 ## Future Enhancement Opportunities
 

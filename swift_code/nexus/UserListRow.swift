@@ -101,7 +101,8 @@ struct UserListRow: View {
         gender: nil,
         ethnicity: nil,
         uniMajor: "Computer Science",
-        jobTitle: "iOS Developer"
+        jobTitle: "iOS Developer",
+        lastLogin: nil
     ))
     .padding()
 } 

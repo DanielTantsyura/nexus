@@ -747,6 +747,94 @@ class NetworkManager: ObservableObject {
         completion(.failure(error))
     }
     
+    /// Creates a new contact from free-form text description
+    /// - Parameters:
+    ///   - contactText: Free-form text describing the contact
+    ///   - tags: Tags to apply to the relationship
+    ///   - completion: Closure called with the result of the operation
+    func createContact(contactText: String, tags: [String], completion: @escaping (Result<String, Error>) -> Void) {
+        guard let userId = self.userId else {
+            let error = NSError(domain: "NetworkManager", code: 401, userInfo: [NSLocalizedDescriptionKey: "Not logged in"])
+            completion(.failure(error))
+            return
+        }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        guard let url = URL(string: "\(baseURL)/contacts/create") else {
+            isLoading = false
+            errorMessage = "Invalid URL"
+            let error = NSError(domain: "NetworkManager", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
+            completion(.failure(error))
+            return
+        }
+        
+        let requestData: [String: Any] = [
+            "user_id": userId,
+            "text": contactText,
+            "tags": tags
+        ]
+        
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: requestData) else {
+            isLoading = false
+            errorMessage = "Failed to encode request data"
+            let error = NSError(domain: "NetworkManager", code: 400, userInfo: [NSLocalizedDescriptionKey: "Failed to encode request data"])
+            completion(.failure(error))
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = jsonData
+        
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.isLoading = false
+                
+                if let error = error {
+                    self.errorMessage = error.localizedDescription
+                    completion(.failure(error))
+                    return
+                }
+                
+                if let httpResponse = response as? HTTPURLResponse, !(200...299).contains(httpResponse.statusCode) {
+                    self.errorMessage = "Server error: \(httpResponse.statusCode)"
+                    let error = NSError(domain: "NetworkManager", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Server error: \(httpResponse.statusCode)"])
+                    completion(.failure(error))
+                    return
+                }
+                
+                guard let data = data else {
+                    self.errorMessage = "No data received"
+                    let error = NSError(domain: "NetworkManager", code: 0, userInfo: [NSLocalizedDescriptionKey: "No data received"])
+                    completion(.failure(error))
+                    return
+                }
+                
+                do {
+                    let responseJson = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                    if let success = responseJson?["success"] as? Bool, success,
+                       let message = responseJson?["message"] as? String {
+                        // Refresh data after creating a contact
+                        self.refreshAll()
+                        completion(.success(message))
+                    } else {
+                        let errorMessage = (responseJson?["message"] as? String) ?? "Failed to create contact"
+                        self.errorMessage = errorMessage
+                        let error = NSError(domain: "NetworkManager", code: 400, userInfo: [NSLocalizedDescriptionKey: errorMessage])
+                        completion(.failure(error))
+                    }
+                } catch {
+                    self.errorMessage = "Failed to parse response: \(error.localizedDescription)"
+                    completion(.failure(error))
+                }
+            }
+        }.resume()
+    }
+    
     /// Refreshes all data from the server
     func refreshAll() {
         if let userId = self.userId {

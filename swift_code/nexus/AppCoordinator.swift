@@ -20,6 +20,19 @@ enum ActiveScreen: Equatable {
     
     /// Create new contact screen
     case createContact
+    
+    /// Add new contact tab
+    case addNew
+    
+    /// Home screen
+    case home
+}
+
+/// Tab selection options for main tab view
+enum TabSelection: Int {
+    case network = 0
+    case addNew = 1
+    case profile = 2
 }
 
 /// Centralized application coordinator that manages state and navigation
