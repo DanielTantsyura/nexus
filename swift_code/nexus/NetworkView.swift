@@ -62,9 +62,19 @@ struct NetworkView: View {
                     }
                 }
             }
-            .navigationTitle("My Network")
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    HStack {
+                        Image("AppLogo")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(height: 40)
+                        
+                        Text("My Network")
+                            .font(.headline)
+                    }
+                }
+                
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
                         coordinator.showCreateContact()

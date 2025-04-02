@@ -3,33 +3,33 @@ import SwiftUI
 /// View for creating a new contact with a free-form text entry and tag selection
 struct CreateContactView: View {
     // MARK: - Properties
-    
+   
     /// App coordinator for navigation and state management
     @EnvironmentObject private var coordinator: AppCoordinator
-    
+   
     /// Text content entered by the user
     @State private var contactText = ""
-    
+   
     /// New custom tag being created
     @State private var newTagText = ""
-    
+   
     /// Collection of tags added to the contact
     @State private var selectedTags: [String] = []
-    
+   
     /// Controls whether the keyboard is active
     @FocusState private var isContactTextFieldFocused: Bool
-    
+   
     /// Error message to display
     @State private var errorMessage: String? = nil
-    
+   
     /// Success message to display
     @State private var successMessage: String? = nil
-    
+   
     /// Whether a submit operation is in progress
     @State private var isSubmitting = false
-    
+   
     // MARK: - View Body
-    
+   
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -37,24 +37,24 @@ struct CreateContactView: View {
                 if let errorMessage = errorMessage {
                     errorBanner(message: errorMessage)
                 }
-                
+               
                 // Success message
                 if let successMessage = successMessage {
                     successBanner(message: successMessage)
                 }
-                
+               
                 // Contact text entry area
                 contactTextArea
-                
+               
                 // Selected tags display
                 selectedTagsView
-                
+               
                 // Tag section
                 tagSection
-                
+               
                 // Buttons
                 buttonSection
-                
+               
                 Spacer()
             }
             .padding()
@@ -75,21 +75,21 @@ struct CreateContactView: View {
             }
         )
     }
-    
+   
     // MARK: - UI Components
-    
+   
     /// Error banner displayed at the top of the form
     private func errorBanner(message: String) -> some View {
         HStack {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(.white)
-            
+           
             Text(message)
                 .font(.subheadline)
                 .foregroundColor(.white)
-            
+           
             Spacer()
-            
+           
             Button(action: {
                 withAnimation {
                     errorMessage = nil
@@ -103,19 +103,19 @@ struct CreateContactView: View {
         .background(Color.red)
         .cornerRadius(8)
     }
-    
+   
     /// Success banner displayed at the top of the form
     private func successBanner(message: String) -> some View {
         HStack {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundColor(.white)
-            
+           
             Text(message)
                 .font(.subheadline)
                 .foregroundColor(.white)
-            
+           
             Spacer()
-            
+           
             Button(action: {
                 withAnimation {
                     successMessage = nil
@@ -129,7 +129,7 @@ struct CreateContactView: View {
         .background(Color.green)
         .cornerRadius(8)
     }
-    
+   
     /// Multi-line text entry area for contact information
     private var contactTextArea: some View {
         SectionCard(title: "Contact Information") {
@@ -145,7 +145,7 @@ struct CreateContactView: View {
                 )
         }
     }
-    
+   
     /// View displaying selected tags with delete functionality
     private var selectedTagsView: some View {
         Group {
@@ -153,7 +153,7 @@ struct CreateContactView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Selected Tags")
                         .font(.headline)
-                    
+                   
                     FlowLayout(spacing: 8) {
                         ForEach(selectedTags, id: \.self) { tag in
                             tagBadge(tag)
@@ -163,7 +163,7 @@ struct CreateContactView: View {
             }
         }
     }
-    
+   
     /// Section for tag selection and creation
     private var tagSection: some View {
         SectionCard(title: "Add Tags") {
@@ -174,7 +174,7 @@ struct CreateContactView: View {
                         Text("Recent Tags")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
-                        
+                       
                         FlowLayout(spacing: 8) {
                             ForEach(coordinator.networkManager.recentTags, id: \.self) { tag in
                                 Button(action: {
@@ -192,7 +192,7 @@ struct CreateContactView: View {
                         }
                     }
                 }
-                
+               
                 // Custom tag creation
                 HStack {
                     TextField("Add custom tag...", text: $newTagText)
@@ -200,7 +200,7 @@ struct CreateContactView: View {
                         .padding(.vertical, 8)
                         .background(Color.gray.opacity(0.1))
                         .cornerRadius(8)
-                    
+                   
                     Button(action: addCustomTag) {
                         Text("Add")
                             .fontWeight(.medium)
@@ -215,7 +215,7 @@ struct CreateContactView: View {
             }
         }
     }
-    
+   
     /// Buttons for submitting or canceling the form
     private var buttonSection: some View {
         HStack(spacing: 16) {
@@ -228,7 +228,7 @@ struct CreateContactView: View {
                     .background(Color.blue.opacity(0.1))
                     .cornerRadius(10)
             }
-            
+           
             Button(action: submitContact) {
                 Text("Submit")
                     .fontWeight(.medium)
@@ -241,14 +241,14 @@ struct CreateContactView: View {
             .disabled(contactText.isEmpty)
         }
     }
-    
+   
     /// Creates a tag badge with remove functionality
     private func tagBadge(_ tag: String) -> some View {
         HStack(spacing: 4) {
             Text(tag)
                 .font(.caption)
                 .padding(.leading, 8)
-            
+           
             Button(action: {
                 removeTag(tag)
             }) {
@@ -262,18 +262,18 @@ struct CreateContactView: View {
         .foregroundColor(.blue)
         .cornerRadius(16)
     }
-    
+   
     // MARK: - Methods
-    
+   
     /// Adds a custom tag based on the newTagText value
     private func addCustomTag() {
         let trimmedText = newTagText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty else { return }
-        
+       
         addTag(trimmedText)
         newTagText = ""
     }
-    
+   
     /// Adds a tag to the selected tags array if not already present
     private func addTag(_ tag: String) {
         if !selectedTags.contains(tag) {
@@ -282,12 +282,12 @@ struct CreateContactView: View {
             removeTag(tag)
         }
     }
-    
+   
     /// Removes a tag from the selected tags array
     private func removeTag(_ tag: String) {
         selectedTags.removeAll { $0 == tag }
     }
-    
+   
     /// Clears the form fields
     private func clearForm() {
         contactText = ""
@@ -296,17 +296,17 @@ struct CreateContactView: View {
         errorMessage = nil
         successMessage = nil
     }
-    
+   
     /// Submits the contact information to the API
     private func submitContact() {
         guard !contactText.isEmpty else { return }
-        
+       
         isSubmitting = true
         errorMessage = nil
-        
+       
         coordinator.networkManager.createContact(fromText: contactText, tags: selectedTags) { result in
             isSubmitting = false
-            
+           
             switch result {
             case .success(let userId):
                 successMessage = "Contact created successfully!"
@@ -317,7 +317,7 @@ struct CreateContactView: View {
                         switch userResult {
                         case .success(let user):
                             clearForm()
-                            coordinator.showUserDetail(user: user)
+                            coordinator.showUserDetail(user)
                         case .failure:
                             // If we can't fetch the user, just go back
                             coordinator.backFromCreateContact()
@@ -331,72 +331,6 @@ struct CreateContactView: View {
     }
 }
 
-// MARK: - FlowLayout
-
-/// A layout that arranges elements in rows, wrapping to a new row when needed
-struct FlowLayout: Layout {
-    let spacing: CGFloat
-    
-    init(spacing: CGFloat = 10) {
-        self.spacing = spacing
-    }
-    
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let containerWidth = proposal.width ?? .infinity
-        
-        var rowWidth: CGFloat = 0
-        var rowHeight: CGFloat = 0
-        var totalHeight: CGFloat = 0
-        
-        for subview in subviews {
-            let subviewSize = subview.sizeThatFits(.unspecified)
-            
-            // If this element doesn't fit on the current row, start a new row
-            if rowWidth + subviewSize.width > containerWidth && rowWidth > 0 {
-                totalHeight += rowHeight + spacing
-                rowWidth = subviewSize.width
-                rowHeight = subviewSize.height
-            } else {
-                // Add to the current row
-                rowWidth += subviewSize.width + spacing
-                rowHeight = max(rowHeight, subviewSize.height)
-            }
-        }
-        
-        // Add the height of the last row
-        totalHeight += rowHeight
-        
-        return CGSize(width: containerWidth, height: totalHeight)
-    }
-    
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var rowWidth: CGFloat = 0
-        var rowHeight: CGFloat = 0
-        var rowMinY: CGFloat = bounds.minY
-        
-        for subview in subviews {
-            let subviewSize = subview.sizeThatFits(.unspecified)
-            
-            // Check if this element needs to go on a new row
-            if rowWidth + subviewSize.width > bounds.width && rowWidth > 0 {
-                rowMinY += rowHeight + spacing
-                rowWidth = 0
-                rowHeight = 0
-            }
-            
-            // Place the element
-            let xPos = bounds.minX + rowWidth
-            let yPos = rowMinY + (rowHeight - subviewSize.height) / 2
-            
-            subview.place(at: CGPoint(x: xPos, y: yPos), proposal: .unspecified)
-            
-            // Update tracking variables
-            rowWidth += subviewSize.width + spacing
-            rowHeight = max(rowHeight, subviewSize.height)
-        }
-    }
-}
-
 // MARK: - Preview
 
 #Preview {
@@ -404,5 +338,4 @@ struct FlowLayout: Layout {
         CreateContactView()
             .environmentObject(AppCoordinator())
     }
-} 
-} 
+}

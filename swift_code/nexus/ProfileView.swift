@@ -20,6 +20,13 @@ struct ProfileView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
+                // App logo
+                Image("AppLogo")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(height: 60)
+                    .padding(.bottom, 10)
+                
                 // Current user profile section
                 currentUserSection
                 
@@ -245,9 +252,7 @@ struct ProfileView: View {
         retryTimer?.invalidate()
         retryAttempts = 0
         
-        retryTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            
+        retryTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { timer in
             if self.coordinator.networkManager.currentUser == nil && !self.coordinator.networkManager.isLoading {
                 if self.retryAttempts < 2 {
                     self.retryAttempts += 1
@@ -275,4 +280,4 @@ struct ProfileView: View {
         ProfileView()
             .environmentObject(AppCoordinator())
     }
-} 
+}

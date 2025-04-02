@@ -61,7 +61,7 @@ final class AppCoordinator: ObservableObject {
     @Published var isLoggedIn: Bool = false
     
     /// ID of the logged-in user
-    @Published var userId: String? = nil
+    @Published var userId: Int? = nil
     
     /// Track if initial loading has completed
     @Published var initialLoadComplete = false
@@ -116,7 +116,7 @@ final class AppCoordinator: ObservableObject {
     /// Set up the initial state of the coordinator
     private func setupInitialState() {
         // Check if a session can be restored
-        if networkManager.restoreSession() {
+        if networkManager.isLoggedIn {
             activeScreen = .profile
             selectedTab = .profile
         } else {
@@ -287,22 +287,6 @@ final class AppCoordinator: ObservableObject {
         
         // Always refresh the current user to ensure latest data
         networkManager.fetchCurrentUser()
-        
-        // If we encounter session expiration or persistent errors, handle them
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-            guard let self = self else { return }
-            
-            if let errorMessage = self.networkManager.errorMessage {
-                if errorMessage.contains("session has expired") || 
-                   errorMessage.contains("User not found") ||
-                   (errorMessage.contains("404") && self.activeScreen == .profile) {
-                    // Session expired, log out and show login
-                    self.logout()
-                }
-                
-                // Print debug info
-                print("NetworkManager error: \(errorMessage)")
-            }
-        }
     }
-} 
+}
+

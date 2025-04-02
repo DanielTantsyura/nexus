@@ -9,8 +9,8 @@ struct LoginView: View {
     
     // MARK: - State
     
-    /// The email address entered by the user
-    @State private var email = ""
+    /// The username entered by the user
+    @State private var username = ""
     
     /// The password entered by the user
     @State private var password = ""
@@ -28,20 +28,21 @@ struct LoginView: View {
     
     var body: some View {
         VStack(spacing: 20) {
-            Text("Nexus")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .padding(.bottom, 30)
+            // App logo
+            Image("AppLogo")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 120, height: 120)
+                .padding(.bottom, 20)
             
             VStack(alignment: .leading, spacing: 8) {
-                Text("Email")
+                Text("Username")
                     .font(.headline)
                 
-                TextField("Enter your email", text: $email)
+                TextField("Enter your username", text: $username)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .textContentType(.emailAddress)
+                    .textContentType(.username)
                     .autocapitalization(.none)
-                    .keyboardType(.emailAddress)
                     .disableAutocorrection(true)
                     .padding(.bottom, 10)
                     .disabled(isLoggingIn)
@@ -80,7 +81,7 @@ struct LoginView: View {
                 .foregroundColor(.white)
                 .cornerRadius(10)
             }
-            .disabled(email.isEmpty || password.isEmpty || isLoggingIn)
+            .disabled(username.isEmpty || password.isEmpty || isLoggingIn)
             .padding(.top, 20)
             
             Button("Create Account") {
@@ -103,7 +104,7 @@ struct LoginView: View {
         isLoggingIn = true
         showError = false
         
-        coordinator.networkManager.login(email: email, password: password) { result in
+        coordinator.networkManager.login(username: username, password: password) { result in
             isLoggingIn = false
             
             switch result {

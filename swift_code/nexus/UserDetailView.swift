@@ -223,26 +223,10 @@ struct UserDetailView: View {
                 // No relationship exists
                 SectionCard(title: "Relationship") {
                     VStack(spacing: 16) {
-                        Text("You're not connected with this person yet.")
+                        Text("No relationship information available.")
                             .foregroundColor(.gray)
-                        
-                        Button(action: {
-                            // Show form to add connection
-                            showingEditContactSheet = true
-                        }) {
-                            HStack {
-                                Image(systemName: "plus.circle.fill")
-                                Text("Add Connection")
-                            }
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(Color.green)
-                            .cornerRadius(8)
-                        }
+                            .padding()
                     }
-                    .padding()
                     .frame(maxWidth: .infinity)
                 }
             }

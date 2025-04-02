@@ -51,19 +51,21 @@ class NetworkManager: ObservableObject {
     
     /// Initialize the network manager and restore session if available
     init() {
-        restoreSession()
+        let _ = restoreSession()
     }
     
     // MARK: - Session Management
     
     /// Restores user session from UserDefaults if available
-    private func restoreSession() {
+    func restoreSession() -> Bool {
         if let savedUserId = UserDefaults.standard.object(forKey: "userId") as? Int {
             self.userId = savedUserId
             self.isLoggedIn = true
             self.fetchCurrentUser()
             self.fetchRecentTags()
+            return true
         }
+        return false
     }
     
     /// Saves the user session to UserDefaults
@@ -271,15 +273,18 @@ class NetworkManager: ObservableObject {
     /// Fetches the current user's profile information
     func fetchCurrentUser() {
         guard let userId = self.userId else { return }
-        fetchUser(withId: userId, retryCount: 3) { [weak self] result in
+        
+        fetchUser(withId: userId, retryCount: 2) { [weak self] result in
             switch result {
             case .success(let user):
                 self?.currentUser = user
+                
             case .failure(let error):
                 self?.errorMessage = error.localizedDescription
                 
                 // If user not found (404) after retries, handle session expiration
-                if let nsError = error as? NSError, nsError.code == 404 {
+                let nsError = error as NSError
+                if nsError.code == 404 {
                     self?.handleSessionExpiration()
                 }
             }
@@ -287,11 +292,15 @@ class NetworkManager: ObservableObject {
     }
     
     /// Fetches all users from the API
-    func fetchUsers() {
+    func fetchAllUsers() {
         isLoading = true
         errorMessage = nil
         
-        guard let url = URL(string: "\(baseURL)/users") else { return }
+        guard let url = URL(string: "\(baseURL)/users") else {
+            isLoading = false
+            errorMessage = "Invalid URL"
+            return
+        }
         
         URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
             DispatchQueue.main.async {
@@ -974,6 +983,67 @@ class NetworkManager: ObservableObject {
             fetchRecentTags()
             updateLastLogin()
         }
-        fetchUsers()
+        fetchAllUsers()
+    }
+    
+    /// Updates user profile information
+    /// - Parameters:
+    ///   - user: The updated user profile
+    ///   - completion: Closure called with a boolean indicating success or failure
+    func updateUser(_ user: User, completion: @escaping (Bool) -> Void) {
+        isLoading = true
+        errorMessage = nil
+        
+        guard let url = URL(string: "\(baseURL)/users/\(user.id)") else {
+            isLoading = false
+            errorMessage = "Invalid URL"
+            completion(false)
+            return
+        }
+        
+        guard let jsonData = try? JSONEncoder().encode(user) else {
+            isLoading = false
+            errorMessage = "Failed to encode user data"
+            completion(false)
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = jsonData
+        
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.isLoading = false
+                
+                if let error = error {
+                    self.errorMessage = "Network error: \(error.localizedDescription)"
+                    completion(false)
+                    return
+                }
+                
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    self.errorMessage = "Invalid response"
+                    completion(false)
+                    return
+                }
+                
+                if !(200...299).contains(httpResponse.statusCode) {
+                    self.errorMessage = "Server error: \(httpResponse.statusCode)"
+                    completion(false)
+                    return
+                }
+                
+                // If updating the current user, refresh the current user data
+                if user.id == self.userId {
+                    self.currentUser = user
+                    self.fetchCurrentUser() // Refresh from server to get any server-side changes
+                }
+                
+                completion(true)
+            }
+        }.resume()
     }
 }

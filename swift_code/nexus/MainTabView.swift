@@ -21,7 +21,7 @@ struct MainTabView: View {
             .tabItem {
                 Label("Network", systemImage: "person.3")
             }
-            .tag(AppCoordinator.TabSelection.network)
+            .tag(TabSelection.network)
             
             // Profile Tab
             NavigationStack(path: $coordinator.profileTabPath) {
@@ -30,9 +30,9 @@ struct MainTabView: View {
             .tabItem {
                 Label("Profile", systemImage: "person.circle")
             }
-            .tag(AppCoordinator.TabSelection.profile)
+            .tag(TabSelection.profile)
         }
-        .onChange(of: coordinator.selectedTab) { newValue in
+        .onChange(of: coordinator.selectedTab) { oldValue, newValue in
             coordinator.selectTab(newValue)
         }
     }

@@ -264,12 +264,15 @@ struct EditProfileView: View {
             ethnicity: ethnicity,
             uniMajor: uniMajor,
             jobTitle: jobTitle,
-            lastLogin: nil
+            lastLogin: nil,
+            profileImageUrl: nil,
+            linkedinUrl: nil,
+            recentTags: nil
         )
         
         coordinator.networkManager.updateUser(updatedUser) { success in
             saveSuccess = success
-            saveAlertMessage = success 
+            saveAlertMessage = success
                 ? isInSheet ? "Contact information has been updated successfully." : "Your profile has been updated successfully."
                 : coordinator.networkManager.errorMessage ?? (isInSheet ? "Failed to update contact." : "Failed to update profile.")
             showingSaveAlert = true
@@ -305,7 +308,10 @@ struct EditProfileView: View {
         ethnicity: nil,
         uniMajor: "Computer Science",
         jobTitle: "Software Engineer",
-        lastLogin: nil
+        lastLogin: nil,
+        profileImageUrl: nil,
+        linkedinUrl: nil,
+        recentTags: nil
     ))
     .environmentObject(AppCoordinator())
-} 
+}
