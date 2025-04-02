@@ -35,7 +35,7 @@ enum TabSelection: Int {
     case profile = 2
 }
 
-/// Centralized application coordinator that manages state and navigation
+/// Coordinator handling the app's navigation and state
 final class AppCoordinator: ObservableObject {
     // MARK: - Published Properties
     
@@ -45,48 +45,82 @@ final class AppCoordinator: ObservableObject {
     /// Currently active screen
     @Published var activeScreen: ActiveScreen = .login
     
-    /// Current navigation path
-    @Published var navigationPath = NavigationPath()
-    
-    /// Track if initial loading has completed
-    @Published var initialLoadComplete = false
-    
     /// Currently selected tab
     @Published var selectedTab: TabSelection = .network
     
-    /// Network tab navigation path
+    /// Navigation path for the current navigation stack
+    @Published var navigationPath = NavigationPath()
+    
+    /// Navigation path for the network tab
     @Published var networkTabPath = NavigationPath()
     
-    /// Profile tab navigation path
+    /// Navigation path for the profile tab
     @Published var profileTabPath = NavigationPath()
+    
+    /// Current login state
+    @Published var isLoggedIn: Bool = false
+    
+    /// ID of the logged-in user
+    @Published var userId: String? = nil
+    
+    /// Track if initial loading has completed
+    @Published var initialLoadComplete = false
     
     // MARK: - Private Properties
     
     /// Timer to retry loading data if needed
     private var loadTimer: Timer?
     
+    /// Subscriptions for the coordinator
+    private var cancellables = Set<AnyCancellable>()
+    
     // MARK: - Initialization
     
     /// Initialize the coordinator
     init() {
         setupInitialState()
+        
+        // Set up listeners for login state changes
+        self.networkManager.$isLoggedIn
+            .receive(on: RunLoop.main)
+            .sink { [weak self] isLoggedIn in
+                self?.isLoggedIn = isLoggedIn
+                
+                // Update screen based on login state
+                if isLoggedIn {
+                    self?.activeScreen = .profile
+                } else {
+                    self?.userId = nil
+                    self?.activeScreen = .login
+                }
+            }
+            .store(in: &cancellables)
+        
+        // Listen for user ID changes from the network manager
+        self.networkManager.$userId
+            .receive(on: RunLoop.main)
+            .sink { [weak self] userId in
+                self?.userId = userId
+            }
+            .store(in: &cancellables)
     }
     
     /// Clean up resources when deallocated
     deinit {
         loadTimer?.invalidate()
+        cancellables.forEach { $0.cancel() }
     }
     
     // MARK: - Setup
     
     /// Set up the initial state of the coordinator
     private func setupInitialState() {
-        // Check if user is already logged in
-        if networkManager.isLoggedIn {
+        // Check if a session can be restored
+        if networkManager.restoreSession() {
             activeScreen = .profile
-            refreshData()
-            // Update last login when the app is opened
-            networkManager.updateLastLogin()
+            selectedTab = .profile
+        } else {
+            activeScreen = .login
         }
         
         // Set up a timer to check if data loaded successfully
@@ -101,7 +135,7 @@ final class AppCoordinator: ObservableObject {
         }
     }
     
-    // MARK: - Tab Navigation
+    // MARK: - Navigation
     
     /// Set the active tab
     /// - Parameter tab: The tab to select
@@ -110,47 +144,46 @@ final class AppCoordinator: ObservableObject {
         
         switch tab {
         case .network:
-            navigationPath = networkTabPath
             activeScreen = .userList
+            navigationPath = networkTabPath
         case .profile:
-            navigationPath = profileTabPath
             activeScreen = .profile
+            navigationPath = profileTabPath
         case .addNew:
             activeScreen = .addNew
         }
     }
     
-    // MARK: - Authentication Methods
-    
-    /// Handle user login
-    /// - Parameters:
-    ///   - username: The username to log in with
-    ///   - password: The password to authenticate with
-    ///   - completion: Closure called with success flag
-    func login(username: String, password: String, completion: @escaping (Bool) -> Void) {
-        networkManager.login(username: username, password: password) { [weak self] result in
-            switch result {
-            case .success(_):
-                self?.activeScreen = .userList
-                self?.selectedTab = .network
-                self?.refresh()
-                completion(true)
-            case .failure(_):
-                completion(false)
-            }
+    /// Navigate to the user list screen
+    func showUserListScreen() {
+        if selectedTab == .network {
+            networkTabPath = NavigationPath()
+        } else {
+            selectedTab = .network
+            networkTabPath = NavigationPath()
         }
+        navigationPath = networkTabPath
+        activeScreen = .userList
     }
     
-    /// Handle user logout
-    func logout() {
-        networkManager.logout()
-        activeScreen = .login
-        navigationPath = NavigationPath()
-        networkTabPath = NavigationPath()
-        profileTabPath = NavigationPath()
+    /// Navigate to the user detail screen for the specified user
+    /// - Parameter user: The user to display details for
+    func showUserDetail(_ user: User) {
+        networkManager.selectedUser = user
+        networkTabPath.append(user)
+        navigationPath = networkTabPath
+        activeScreen = .userDetail
     }
     
-    // MARK: - Navigation Methods
+    /// Navigate back from user detail to user list
+    func navigateBackFromUserDetail() {
+        // If we're showing user detail, go back to user list
+        if activeScreen == .userDetail {
+            networkTabPath.removeLast()
+            navigationPath = networkTabPath
+        }
+        activeScreen = .userList
+    }
     
     /// Navigate to the profile screen
     func showProfileScreen() {
@@ -163,18 +196,6 @@ final class AppCoordinator: ObservableObject {
         }
         navigationPath = profileTabPath
         activeScreen = .profile
-    }
-    
-    /// Navigate to the user list screen
-    func showUserList() {
-        if selectedTab == .network {
-            networkTabPath = NavigationPath()
-        } else {
-            selectedTab = .network
-            networkTabPath = NavigationPath()
-        }
-        navigationPath = networkTabPath
-        activeScreen = .userList
     }
     
     /// Navigate to the edit profile screen
@@ -212,35 +233,28 @@ final class AppCoordinator: ObservableObject {
         }
     }
     
-    /// Navigate to a user's detail view
-    /// - Parameter user: The user to display details for
-    func showUserDetail(user: User) {
-        networkManager.selectedUser = user
-        networkTabPath.append(user)
-        navigationPath = networkTabPath
-        activeScreen = .userDetail
-    }
+    // MARK: - Authentication Methods
     
-    /// Navigate back from user detail to user list
-    func backFromUserDetail() {
-        if !networkTabPath.isEmpty {
-            networkTabPath.removeLast()
-        }
-        navigationPath = networkTabPath
-        activeScreen = .userList
+    /// Log out the current user and return to the login screen
+    func logout() {
+        networkManager.logout()
+        activeScreen = .login
+        navigationPath = NavigationPath()
+        networkTabPath = NavigationPath()
+        profileTabPath = NavigationPath()
     }
     
     // MARK: - Data Management
     
     /// Refreshes all data from the API
     func refresh() {
-        loadData()
+        networkManager.refreshAll()
     }
     
     /// Refreshes all data with a custom delay
     func refreshWithDelay() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            self?.loadData()
+            self?.refresh()
         }
     }
     

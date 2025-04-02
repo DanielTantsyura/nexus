@@ -123,10 +123,12 @@ struct SectionCard<Content: View>: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.title2)
-                .fontWeight(.bold)
-                .padding(.bottom, 4)
+            if !title.isEmpty {
+                Text(title)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .padding(.bottom, 4)
+            }
             
             content
         }
@@ -198,7 +200,7 @@ struct EmptyStateView: View {
     /// Title of the empty state
     let title: String
     
-    /// Message describing the empty state
+    /// Message to display
     let message: String
     
     /// Title for the action button
@@ -208,29 +210,123 @@ struct EmptyStateView: View {
     let action: () -> Void
     
     var body: some View {
-        VStack(spacing: 20) {
-            Spacer()
-            
+        VStack(spacing: 16) {
             Image(systemName: icon)
-                .font(.system(size: 60))
-                .foregroundColor(.gray.opacity(0.7))
+                .font(.system(size: 50))
+                .foregroundColor(.gray)
                 .padding()
             
             Text(title)
                 .font(.headline)
-                .foregroundColor(.gray)
             
             Text(message)
-                .foregroundColor(.gray)
                 .multilineTextAlignment(.center)
+                .padding(.horizontal)
+                .foregroundColor(.gray)
             
-            Button(buttonTitle) {
-                action()
+            Button(action: action) {
+                Text(buttonTitle)
             }
-            .buttonStyle(PrimaryButtonStyle())
-            
-            Spacer()
+            .buttonStyle(SecondaryButtonStyle())
         }
         .padding()
+        .frame(maxWidth: .infinity, minHeight: 300)
+    }
+}
+
+/// A reusable flow layout for arranging views in a wrap-around manner
+struct FlowLayout: Layout {
+    /// Spacing between elements
+    let spacing: CGFloat
+    
+    init(spacing: CGFloat = 10) {
+        self.spacing = spacing
+    }
+    
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let containerWidth = proposal.width ?? .infinity
+        
+        var rowWidth: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var totalHeight: CGFloat = 0
+        
+        for subview in subviews {
+            let subviewSize = subview.sizeThatFits(.unspecified)
+            
+            // If this element doesn't fit on the current row, start a new row
+            if rowWidth + subviewSize.width > containerWidth && rowWidth > 0 {
+                totalHeight += rowHeight + spacing
+                rowWidth = subviewSize.width
+                rowHeight = subviewSize.height
+            } else {
+                // Add to the current row
+                rowWidth += subviewSize.width + spacing
+                rowHeight = max(rowHeight, subviewSize.height)
+            }
+        }
+        
+        // Add the height of the last row
+        totalHeight += rowHeight
+        
+        return CGSize(width: containerWidth, height: totalHeight)
+    }
+    
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var rowWidth: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var rowMinY: CGFloat = bounds.minY
+        
+        for subview in subviews {
+            let subviewSize = subview.sizeThatFits(.unspecified)
+            
+            // Check if this element needs to go on a new row
+            if rowWidth + subviewSize.width > bounds.width && rowWidth > 0 {
+                rowMinY += rowHeight + spacing
+                rowWidth = 0
+                rowHeight = 0
+            }
+            
+            // Place the element
+            let xPos = bounds.minX + rowWidth
+            let yPos = rowMinY + (rowHeight - subviewSize.height) / 2
+            
+            subview.place(at: CGPoint(x: xPos, y: yPos), proposal: .unspecified)
+            
+            // Update tracking variables
+            rowWidth += subviewSize.width + spacing
+            rowHeight = max(rowHeight, subviewSize.height)
+        }
+    }
+}
+
+/// A tag badge view with optional remove button
+struct TagBadge: View {
+    /// The text of the tag
+    let text: String
+    
+    /// Whether to show a remove button
+    let showRemoveButton: Bool
+    
+    /// Action to perform when the remove button is tapped
+    var onRemove: (() -> Void)?
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(text)
+                .font(.caption)
+                .padding(.leading, 8)
+            
+            if showRemoveButton, let onRemove = onRemove {
+                Button(action: onRemove) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.caption)
+                }
+                .padding(.trailing, 6)
+            }
+        }
+        .padding(.vertical, 6)
+        .background(Color.blue.opacity(0.2))
+        .foregroundColor(.blue)
+        .cornerRadius(16)
     }
 } 

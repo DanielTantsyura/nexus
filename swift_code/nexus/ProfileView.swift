@@ -203,62 +203,60 @@ struct ProfileView: View {
         }
     }
     
-    /// Card displayed when profile is unavailable
+    /// Card to display when user profile is unavailable
     private var userProfileUnavailableCard: some View {
-        SectionCard(title: "Profile") {
+        SectionCard(title: "My Profile") {
             VStack(spacing: 16) {
-                Text("User profile not available")
+                Image(systemName: "person.fill.questionmark")
+                    .font(.system(size: 50))
                     .foregroundColor(.gray)
                     .padding()
                 
-                // Manual refresh button if retries have exceeded
-                if retryAttempts >= 5 {
-                    Button(action: {
-                        retryAttempts = 0
-                        loadUserData()
-                    }) {
-                        HStack {
-                            Image(systemName: "arrow.clockwise")
-                            Text("Refresh Profile")
-                        }
-                    }
-                    .buttonStyle(SecondaryButtonStyle())
-                }
-            }
-        }
-    }
-    
-    // MARK: - Data Management
-    
-    /// Loads user data and sets up retry mechanism if needed
-    private func loadUserData() {
-        if coordinator.networkManager.userId != nil {
-            coordinator.networkManager.fetchCurrentUser()
-            
-            // Set up a retry timer if currentUser is nil
-            if coordinator.networkManager.currentUser == nil {
-                setupRetryTimer()
-            }
-        }
-    }
-    
-    /// Sets up a timer to retry loading user data
-    private func setupRetryTimer() {
-        // Invalidate existing timer if any
-        invalidateRetryTimer()
-        
-        // Create a new timer that retries fetching user data
-        retryTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            if coordinator.networkManager.currentUser == nil && retryAttempts < 5 {
-                retryAttempts += 1
+                Text("Profile unavailable")
+                    .font(.headline)
                 
-                if coordinator.networkManager.userId != nil {
-                    coordinator.networkManager.fetchCurrentUser()
+                Text("We couldn't load your profile information. Please try again.")
+                    .multilineTextAlignment(.center)
+                    .padding()
+                
+                Button(action: {
+                    loadUserData()
+                }) {
+                    Text("Retry")
+                }
+                .buttonStyle(PrimaryButtonStyle())
+            }
+            .padding()
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Loads the current user's data
+    private func loadUserData() {
+        coordinator.networkManager.fetchCurrentUser()
+        
+        // Set up a timer to retry if needed
+        setupRetryTimer()
+    }
+    
+    /// Sets up a timer to retry loading user data if initial attempt fails
+    private func setupRetryTimer() {
+        retryTimer?.invalidate()
+        retryAttempts = 0
+        
+        retryTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            
+            if self.coordinator.networkManager.currentUser == nil && !self.coordinator.networkManager.isLoading {
+                if self.retryAttempts < 2 {
+                    self.retryAttempts += 1
+                    self.coordinator.networkManager.fetchCurrentUser()
+                } else {
+                    self.invalidateRetryTimer()
                 }
             } else {
-                // Stop retrying after success or 5 attempts
-                invalidateRetryTimer()
-                retryAttempts = 0
+                self.invalidateRetryTimer()
             }
         }
     }
@@ -270,9 +268,11 @@ struct ProfileView: View {
     }
 }
 
-// MARK: - Previews
+// MARK: - Preview
 
 #Preview {
-    ProfileView()
-        .environmentObject(AppCoordinator())
+    NavigationView {
+        ProfileView()
+            .environmentObject(AppCoordinator())
+    }
 } 

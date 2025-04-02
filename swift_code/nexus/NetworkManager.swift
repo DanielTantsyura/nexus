@@ -30,6 +30,9 @@ class NetworkManager: ObservableObject {
     /// ID of the currently logged-in user
     @Published var userId: Int? = nil
     
+    /// Recent tags for the current user
+    @Published var recentTags: [String] = []
+    
     // MARK: - Private Properties
     
     /// Set of cancellables for Combine operations
@@ -59,6 +62,7 @@ class NetworkManager: ObservableObject {
             self.userId = savedUserId
             self.isLoggedIn = true
             self.fetchCurrentUser()
+            self.fetchRecentTags()
         }
     }
     
@@ -69,7 +73,7 @@ class NetworkManager: ObservableObject {
     
     // MARK: - Authentication Methods
     
-    /// Authenticates a user with the given credentials
+    /// Validates user login credentials
     /// - Parameters:
     ///   - username: The user's username
     ///   - password: The user's password
@@ -78,7 +82,7 @@ class NetworkManager: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        guard let url = URL(string: "\(baseURL)/login") else {
+        guard let url = URL(string: "\(baseURL)/login/validate") else {
             handleError("Invalid URL", error: .unknownError, completion: completion)
             return
         }
@@ -130,12 +134,18 @@ class NetworkManager: ObservableObject {
                     // Save session and fetch user data
                     self.saveSession(userId: loginResponse.userId)
                     
+                    // Update last login timestamp
+                    self.updateLastLogin()
+                    
                     // If user data is included in the response, use it directly
                     if let user = loginResponse.user {
                         self.currentUser = user
                     } else {
                         self.fetchCurrentUser()
                     }
+                    
+                    // Fetch recent tags
+                    self.fetchRecentTags()
                     
                     completion(.success(loginResponse.userId))
                 } catch {
@@ -147,18 +157,93 @@ class NetworkManager: ObservableObject {
         }.resume()
     }
     
-    /// Updates the last login timestamp for the current user when the app is opened
-    func updateLastLogin() {
-        guard let userId = self.userId else { return }
+    /// Creates login credentials for a user
+    /// - Parameters:
+    ///   - userId: The user ID to create credentials for
+    ///   - password: The password for the new credentials
+    ///   - completion: Closure called with result containing the generated username
+    func createLogin(userId: Int, password: String, completion: @escaping (Result<String, Error>) -> Void) {
+        isLoading = true
+        errorMessage = nil
         
-        guard let url = URL(string: "\(baseURL)/users/\(userId)/update-last-login") else {
-            print("Invalid URL for updating last login")
+        guard let url = URL(string: "\(baseURL)/login") else {
+            DispatchQueue.main.async {
+                self.isLoading = false
+                self.errorMessage = "Invalid URL"
+                completion(.failure(NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
+            }
+            return
+        }
+        
+        let loginData = CreateLoginRequest(userId: userId, passkey: password)
+        
+        guard let jsonData = try? JSONEncoder().encode(loginData) else {
+            DispatchQueue.main.async {
+                self.isLoading = false
+                self.errorMessage = "Failed to encode login data"
+                completion(.failure(NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Failed to encode login data"])))
+            }
             return
         }
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = jsonData
+        
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.isLoading = false
+                
+                if let error = error {
+                    self.errorMessage = error.localizedDescription
+                    completion(.failure(error))
+                    return
+                }
+                
+                guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+                    let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+                    let error = NSError(domain: "HTTPError", code: statusCode, userInfo: [NSLocalizedDescriptionKey: "Server error: \(statusCode)"])
+                    self.errorMessage = "Server error: \(statusCode)"
+                    completion(.failure(error))
+                    return
+                }
+                
+                guard let data = data else {
+                    let error = NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "No data received"])
+                    self.errorMessage = "No data received"
+                    completion(.failure(error))
+                    return
+                }
+                
+                do {
+                    let response = try JSONDecoder().decode(CreateLoginResponse.self, from: data)
+                    completion(.success(response.username))
+                } catch {
+                    self.errorMessage = "Failed to decode response: \(error.localizedDescription)"
+                    completion(.failure(error))
+                }
+            }
+        }.resume()
+    }
+    
+    /// Updates the last login timestamp for the current user when the app is opened
+    func updateLastLogin() {
+        guard let userId = self.userId else { return }
+        
+        guard let url = URL(string: "\(baseURL)/login/update") else {
+            print("Invalid URL for updating last login")
+            return
+        }
+        
+        let requestData = ["user_id": userId]
+        guard let jsonData = try? JSONEncoder().encode(requestData) else { return }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = jsonData
         
         URLSession.shared.dataTask(with: request) { _, response, error in
             if let error = error {
@@ -201,204 +286,20 @@ class NetworkManager: ObservableObject {
         }
     }
     
-    /// Handles session expiration by logging the user out
-    private func handleSessionExpiration() {
-        isLoggedIn = false
-        userId = nil
-        UserDefaults.standard.removeObject(forKey: "userId")
-        errorMessage = "Your session has expired. Please log in again."
-    }
-    
-    /// Fetches a user by their ID with retry functionality
-    /// - Parameters:
-    ///   - id: The ID of the user to fetch
-    ///   - retryCount: Number of retries if the request fails with a 404 or network error
-    ///   - completion: Closure called with the result
-    func fetchUser(withId id: Int, retryCount: Int = 0, completion: @escaping (Result<User, Error>) -> Void) {
-        fetchUserInternal(withId: id, currentRetry: 0, maxRetries: retryCount, completion: completion)
-    }
-    
-    /// Internal implementation of fetchUser with retry functionality
-    /// - Parameters:
-    ///   - id: The ID of the user to fetch
-    ///   - currentRetry: Current retry attempt
-    ///   - maxRetries: Maximum number of retry attempts
-    ///   - completion: Closure called with the result
-    private func fetchUserInternal(withId id: Int, currentRetry: Int, maxRetries: Int, completion: @escaping (Result<User, Error>) -> Void) {
+    /// Fetches all users from the API
+    func fetchUsers() {
         isLoading = true
         errorMessage = nil
         
-        let endpoint = "/users/\(id)"
+        guard let url = URL(string: "\(baseURL)/users") else { return }
         
-        guard let url = URL(string: "\(baseURL)\(endpoint)") else {
-            isLoading = false
-            errorMessage = "Invalid URL"
-            completion(.failure(NSError(domain: "NetworkManager", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
-            return
-        }
-        
-        var request = URLRequest(url: url)
-        // Avoid caching issues - always get fresh data
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-        
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                
-                // Keep isLoading true during retries unless it's the last attempt
-                if currentRetry >= maxRetries {
-                    self.isLoading = false
-                }
-                
-                // Handle network error with retry
-                if let error = error {
-                    // If we have retries left, try again after a short delay
-                    if currentRetry < maxRetries {
-                        self.retryFetchUser(id: id, currentRetry: currentRetry, maxRetries: maxRetries, error: error, completion: completion)
-                        return
-                    }
-                    
-                    self.errorMessage = "Network error: \(error.localizedDescription)"
-                    completion(.failure(error))
-                    return
-                }
-                
-                if let httpResponse = response as? HTTPURLResponse {
-                    // Handle HTTP error with retry
-                    if httpResponse.statusCode == 404 || httpResponse.statusCode >= 500 {
-                        // Server error or not found - might be temporary due to database issues
-                        if currentRetry < maxRetries {
-                            let serverError = NSError(
-                                domain: "NetworkManager",
-                                code: httpResponse.statusCode,
-                                userInfo: [NSLocalizedDescriptionKey: "Server error: \(httpResponse.statusCode)"]
-                            )
-                            self.retryFetchUser(id: id, currentRetry: currentRetry, maxRetries: maxRetries, error: serverError, completion: completion)
-                            return
-                        }
-                        
-                        if httpResponse.statusCode == 404 {
-                            // User not found after retries
-                            let notFoundError = NSError(
-                                domain: "NetworkManager",
-                                code: 404,
-                                userInfo: [NSLocalizedDescriptionKey: "User not found"]
-                            )
-                            self.errorMessage = "User not found"
-                            completion(.failure(notFoundError))
-                        } else {
-                            // Server error after retries
-                            let serverError = NSError(
-                                domain: "NetworkManager",
-                                code: httpResponse.statusCode,
-                                userInfo: [NSLocalizedDescriptionKey: "Server error: \(httpResponse.statusCode)"]
-                            )
-                            self.errorMessage = "Server error: \(httpResponse.statusCode)"
-                            completion(.failure(serverError))
-                        }
-                        return
-                    } else if httpResponse.statusCode != 200 {
-                        // Other non-success status codes
-                        let serverError = NSError(
-                            domain: "NetworkManager",
-                            code: httpResponse.statusCode,
-                            userInfo: [NSLocalizedDescriptionKey: "Server error: \(httpResponse.statusCode)"]
-                        )
-                        self.errorMessage = "Server error: \(httpResponse.statusCode)"
-                        completion(.failure(serverError))
-                        return
-                    }
-                }
-                
-                guard let data = data else {
-                    // No data with retry
-                    if currentRetry < maxRetries {
-                        let noDataError = NSError(
-                            domain: "NetworkManager",
-                            code: 0,
-                            userInfo: [NSLocalizedDescriptionKey: "No data received"]
-                        )
-                        self.retryFetchUser(id: id, currentRetry: currentRetry, maxRetries: maxRetries, error: noDataError, completion: completion)
-                        return
-                    }
-                    
-                    let error = NSError(
-                        domain: "NetworkManager",
-                        code: 0,
-                        userInfo: [NSLocalizedDescriptionKey: "No data received"]
-                    )
-                    self.errorMessage = "No data received"
-                    completion(.failure(error))
-                    return
-                }
-                
-                do {
-                    let user = try JSONDecoder().decode(User.self, from: data)
-                    self.isLoading = false
-                    completion(.success(user))
-                } catch {
-                    // JSON decoding error with retry
-                    if currentRetry < maxRetries {
-                        self.retryFetchUser(id: id, currentRetry: currentRetry, maxRetries: maxRetries, error: error, completion: completion)
-                        return
-                    }
-                    
-                    self.errorMessage = "Failed to decode user: \(error.localizedDescription)"
-                    completion(.failure(error))
-                }
-            }
-        }.resume()
-    }
-    
-    /// Retries fetching a user after a delay
-    private func retryFetchUser(id: Int, currentRetry: Int, maxRetries: Int, error: Error, completion: @escaping (Result<User, Error>) -> Void) {
-        let retryDelay = Double(currentRetry + 1) * 0.5 // Increasing delay for each retry
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + retryDelay) { [weak self] in
-            guard let self = self else { return }
-            print("Retrying fetchUser (attempt \(currentRetry + 1)/\(maxRetries)) for user ID \(id)")
-            self.fetchUserInternal(withId: id, currentRetry: currentRetry + 1, maxRetries: maxRetries, completion: completion)
-        }
-    }
-    
-    /// Searches for users matching the given search term
-    /// - Parameter term: The search term to find users by
-    func searchUsers(term: String) {
-        guard !term.isEmpty else {
-            fetchAllUsers()
-            return
-        }
-        
-        isLoading = true
-        errorMessage = nil
-        
-        guard let encodedTerm = term.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
-            isLoading = false
-            errorMessage = "Invalid search term"
-            return
-        }
-        
-        guard let url = URL(string: "\(baseURL)/users/search?term=\(encodedTerm)") else {
-            isLoading = false
-            errorMessage = "Invalid URL"
-            return
-        }
-        
-        var request = URLRequest(url: url)
-        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-        
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 self.isLoading = false
                 
                 if let error = error {
-                    self.errorMessage = error.localizedDescription
-                    return
-                }
-                
-                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
-                    self.errorMessage = "Server error: \(httpResponse.statusCode)"
+                    self.errorMessage = "Network error: \(error.localizedDescription)"
                     return
                 }
                 
@@ -417,178 +318,143 @@ class NetworkManager: ObservableObject {
         }.resume()
     }
     
-    /// Fetches all users from the server
-    func fetchAllUsers() {
-        fetchAllUsersInternal(currentRetry: 0, maxRetries: 3)
-    }
-    
-    /// Internal implementation of fetchAllUsers with retry functionality
+    /// Fetches information about a specific user by ID
     /// - Parameters:
-    ///   - currentRetry: Current retry attempt
-    ///   - maxRetries: Maximum number of retry attempts
-    private func fetchAllUsersInternal(currentRetry: Int, maxRetries: Int) {
+    ///   - userId: The ID of the user to fetch
+    ///   - retryCount: Number of retries for this operation
+    ///   - completion: Closure called with the result
+    func fetchUser(withId userId: Int, retryCount: Int = 0, completion: @escaping (Result<User, Error>) -> Void) {
         isLoading = true
         errorMessage = nil
         
-        guard let url = URL(string: "\(baseURL)/users") else {
+        guard let url = URL(string: "\(baseURL)/users/\(userId)") else {
             isLoading = false
-            errorMessage = "Invalid URL"
+            let error = NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
+            completion(.failure(error))
             return
         }
         
-        var request = URLRequest(url: url)
-        // Avoid caching issues - always get fresh data
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-        
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                
-                // Only set loading to false if this is the last retry attempt
-                if currentRetry >= maxRetries {
-                    self.isLoading = false
-                }
-                
-                if let error = error {
-                    // Network error with retry
-                    if currentRetry < maxRetries {
-                        self.retryFetchAllUsers(currentRetry: currentRetry, maxRetries: maxRetries)
-                        return
-                    }
-                    
-                    self.errorMessage = "Network error: \(error.localizedDescription)"
-                    return
-                }
-                
-                if let httpResponse = response as? HTTPURLResponse {
-                    if httpResponse.statusCode == 500 || httpResponse.statusCode == 503 {
-                        // Server error with retry
-                        if currentRetry < maxRetries {
-                            self.retryFetchAllUsers(currentRetry: currentRetry, maxRetries: maxRetries)
-                            return
-                        }
-                        
-                        self.errorMessage = "Server error \(httpResponse.statusCode): Unable to fetch users"
-                        return
-                    } else if httpResponse.statusCode != 200 {
-                        // Other HTTP error
-                        self.errorMessage = "Server error \(httpResponse.statusCode): Unable to fetch users"
-                        return
-                    }
-                }
-                
-                guard let data = data else {
-                    // No data with retry
-                    if currentRetry < maxRetries {
-                        self.retryFetchAllUsers(currentRetry: currentRetry, maxRetries: maxRetries)
-                        return
-                    }
-                    
-                    self.errorMessage = "No data received from server"
-                    return
-                }
-                
-                do {
-                    let users = try JSONDecoder().decode([User].self, from: data)
-                    
-                    if !users.isEmpty {
-                        self.users = users
-                        print("Successfully loaded \(users.count) users")
-                    } else if self.users.isEmpty {
-                        // If we got an empty array and don't have existing users, retry
-                        if currentRetry < maxRetries {
-                            print("Received empty users array, retrying...")
-                            self.retryFetchAllUsers(currentRetry: currentRetry, maxRetries: maxRetries)
-                            return
-                        }
-                        
-                        // Only set empty if we don't already have users and we're out of retries
-                        self.users = []
-                    }
-                } catch {
-                    // JSON decoding error with retry
-                    if currentRetry < maxRetries {
-                        self.retryFetchAllUsers(currentRetry: currentRetry, maxRetries: maxRetries)
-                        return
-                    }
-                    
-                    self.errorMessage = "Failed to decode users: \(error.localizedDescription)"
-                }
-            }
-        }.resume()
-    }
-    
-    /// Retries fetching all users after a delay
-    private func retryFetchAllUsers(currentRetry: Int, maxRetries: Int) {
-        let retryDelay = Double(currentRetry + 1) * 0.7 // Increasing delay for each retry
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + retryDelay) { [weak self] in
-            guard let self = self else { return }
-            print("Retrying fetchAllUsers (attempt \(currentRetry + 1)/\(maxRetries))")
-            self.fetchAllUsersInternal(currentRetry: currentRetry + 1, maxRetries: maxRetries)
-        }
-    }
-    
-    /// Updates a user's profile information
-    func updateUser(_ user: User, completion: @escaping (Bool) -> Void) {
-        isLoading = true
-        errorMessage = nil
-        
-        guard let url = URL(string: "\(baseURL)/users/\(user.id)") else {
-            isLoading = false
-            errorMessage = "Invalid URL"
-            completion(false)
-            return
-        }
-        
-        guard let jsonData = try? JSONEncoder().encode(user) else {
-            isLoading = false
-            errorMessage = "Failed to encode user data"
-            completion(false)
-            return
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = jsonData
-        
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 self.isLoading = false
                 
                 if let error = error {
-                    self.errorMessage = error.localizedDescription
-                    completion(false)
+                    if retryCount > 0 {
+                        // Retry after a delay
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            self.fetchUser(withId: userId, retryCount: retryCount - 1, completion: completion)
+                        }
+                    } else {
+                        self.errorMessage = "Network error: \(error.localizedDescription)"
+                        completion(.failure(error))
+                    }
                     return
                 }
                 
-                if let httpResponse = response as? HTTPURLResponse, !(200...299).contains(httpResponse.statusCode) {
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    let error = NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
+                    self.errorMessage = "Invalid response"
+                    completion(.failure(error))
+                    return
+                }
+                
+                if httpResponse.statusCode == 404 {
+                    let error = NSError(domain: "NetworkError", code: 404, userInfo: [NSLocalizedDescriptionKey: "User not found"])
+                    self.errorMessage = "User not found"
+                    completion(.failure(error))
+                    return
+                }
+                
+                if httpResponse.statusCode != 200 {
+                    let error = NSError(domain: "NetworkError", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Server error: \(httpResponse.statusCode)"])
                     self.errorMessage = "Server error: \(httpResponse.statusCode)"
-                    completion(false)
+                    completion(.failure(error))
                     return
                 }
                 
-                // If this is the current user, update the stored user
-                if self.currentUser?.id == user.id {
-                    self.currentUser = user
+                guard let data = data else {
+                    let error = NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "No data received"])
+                    self.errorMessage = "No data received"
+                    completion(.failure(error))
+                    return
                 }
                 
-                // Update in users array if present
-                if let index = self.users.firstIndex(where: { $0.id == user.id }) {
-                    self.users[index] = user
+                do {
+                    let user = try JSONDecoder().decode(User.self, from: data)
+                    completion(.success(user))
+                } catch {
+                    if retryCount > 0 {
+                        // Retry after a delay
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            self.fetchUser(withId: userId, retryCount: retryCount - 1, completion: completion)
+                        }
+                    } else {
+                        self.errorMessage = "Failed to decode user: \(error.localizedDescription)"
+                        completion(.failure(error))
+                    }
                 }
-                
-                completion(true)
             }
         }.resume()
     }
     
+    /// Searches for users matching the given term
+    /// - Parameter term: The search term to look for
+    func searchUsers(term: String) {
+        isLoading = true
+        errorMessage = nil
+        
+        guard let encoded = term.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "\(baseURL)/users/search?term=\(encoded)") else { 
+            isLoading = false
+            errorMessage = "Invalid search term"
+            return
+        }
+        
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.isLoading = false
+                
+                if let error = error {
+                    self.errorMessage = "Network error: \(error.localizedDescription)"
+                    return
+                }
+                
+                guard let data = data else {
+                    self.errorMessage = "No data received"
+                    return
+                }
+                
+                do {
+                    let users = try JSONDecoder().decode([User].self, from: data)
+                    self.users = users
+                } catch {
+                    self.errorMessage = "Failed to decode search results: \(error.localizedDescription)"
+                }
+            }
+        }.resume()
+    }
+    
+    /// Handles session expiration by logging the user out
+    private func handleSessionExpiration() {
+        isLoggedIn = false
+        userId = nil
+        UserDefaults.standard.removeObject(forKey: "userId")
+        errorMessage = "Your session has expired. Please log in again."
+    }
+    
     // MARK: - Connection API Methods
     
+    /// Fetches connections for the current user
+    func fetchUserConnections() {
+        guard let userId = self.userId else { return }
+        fetchConnections(forUserId: userId)
+    }
+    
     /// Fetches connections for a specific user
-    func getConnections(userId: Int) {
+    /// - Parameter userId: The ID of the user to fetch connections for
+    func fetchConnections(forUserId userId: Int) {
         isLoading = true
         errorMessage = nil
         
@@ -598,30 +464,14 @@ class NetworkManager: ObservableObject {
             return
         }
         
-        var request = URLRequest(url: url)
-        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-        
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 self.isLoading = false
                 
                 if let error = error {
-                    self.errorMessage = error.localizedDescription
+                    self.errorMessage = "Network error: \(error.localizedDescription)"
                     return
-                }
-                
-                if let httpResponse = response as? HTTPURLResponse {
-                    if httpResponse.statusCode == 404 {
-                        // User has no connections, clear existing
-                        self.connections = []
-                        return
-                    }
-                    
-                    if httpResponse.statusCode != 200 {
-                        self.errorMessage = "Server error: \(httpResponse.statusCode)"
-                        return
-                    }
                 }
                 
                 guard let data = data else {
@@ -631,7 +481,12 @@ class NetworkManager: ObservableObject {
                 
                 do {
                     let connections = try JSONDecoder().decode([Connection].self, from: data)
-                    self.connections = connections
+                    // Sort connections by last_viewed, placing most recently viewed at the top
+                    self.connections = connections.sorted { (conn1, conn2) in
+                        guard let lastViewed1 = conn1.lastViewed else { return false }
+                        guard let lastViewed2 = conn2.lastViewed else { return true }
+                        return lastViewed1 > lastViewed2
+                    }
                 } catch {
                     self.errorMessage = "Failed to decode connections: \(error.localizedDescription)"
                 }
@@ -639,31 +494,44 @@ class NetworkManager: ObservableObject {
         }.resume()
     }
     
-    /// Adds a connection between two users
-    func addConnection(userId: Int, connectionId: Int, relationshipType: String, completion: @escaping (Bool) -> Void) {
+    /// Creates a connection between the current user and another user
+    /// - Parameters:
+    ///   - contactId: ID of the contact to connect with
+    ///   - description: Description of the relationship
+    ///   - notes: Optional notes about the connection
+    ///   - tags: Optional tags for the connection
+    ///   - completion: Closure called when the operation completes
+    func createConnection(contactId: Int, description: String, notes: String? = nil, tags: [String]? = nil, completion: @escaping (Bool) -> Void) {
+        guard let userId = self.userId else {
+            completion(false)
+            return
+        }
+        
         isLoading = true
         errorMessage = nil
         
-        guard let url = URL(string: "\(baseURL)/users/\(userId)/connections") else {
+        guard let url = URL(string: "\(baseURL)/connections") else {
             isLoading = false
             errorMessage = "Invalid URL"
             completion(false)
             return
         }
         
-        struct ConnectionRequest: Codable {
-            let connectionId: Int
-            let relationshipDescription: String
-            
-            enum CodingKeys: String, CodingKey {
-                case connectionId = "connection_id"
-                case relationshipDescription = "relationship_description"
-            }
+        var requestDict: [String: Any] = [
+            "user_id": userId,
+            "contact_id": contactId,
+            "description": description
+        ]
+        
+        if let notes = notes {
+            requestDict["notes"] = notes
         }
         
-        let connectionRequest = ConnectionRequest(connectionId: connectionId, relationshipDescription: relationshipType)
+        if let tags = tags {
+            requestDict["tags"] = tags
+        }
         
-        guard let jsonData = try? JSONEncoder().encode(connectionRequest) else {
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: requestDict) else {
             isLoading = false
             errorMessage = "Failed to encode connection data"
             completion(false)
@@ -681,38 +549,81 @@ class NetworkManager: ObservableObject {
                 self.isLoading = false
                 
                 if let error = error {
-                    self.errorMessage = error.localizedDescription
+                    self.errorMessage = "Network error: \(error.localizedDescription)"
                     completion(false)
                     return
                 }
                 
-                if let httpResponse = response as? HTTPURLResponse, !(200...299).contains(httpResponse.statusCode) {
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    self.errorMessage = "Invalid response"
+                    completion(false)
+                    return
+                }
+                
+                if httpResponse.statusCode != 201 {
                     self.errorMessage = "Server error: \(httpResponse.statusCode)"
                     completion(false)
                     return
                 }
                 
-                // Refresh connections list
-                self.getConnections(userId: userId)
+                // Refresh the connections list
+                self.fetchConnections(forUserId: userId)
                 completion(true)
             }
         }.resume()
     }
     
-    /// Removes a connection between two users
-    func removeConnection(userId: Int, connectionId: Int, completion: @escaping (Bool) -> Void) {
+    /// Updates an existing connection
+    /// - Parameters:
+    ///   - contactId: ID of the contact in the connection
+    ///   - description: Optional new description
+    ///   - notes: Optional new notes
+    ///   - tags: Optional new tags
+    ///   - completion: Closure called when the operation completes
+    func updateConnection(contactId: Int, description: String? = nil, notes: String? = nil, tags: [String]? = nil, completion: @escaping (Bool) -> Void) {
+        guard let userId = self.userId else {
+            completion(false)
+            return
+        }
+        
         isLoading = true
         errorMessage = nil
         
-        guard let url = URL(string: "\(baseURL)/users/\(userId)/connections/\(connectionId)") else {
+        guard let url = URL(string: "\(baseURL)/connections/update") else {
             isLoading = false
             errorMessage = "Invalid URL"
             completion(false)
             return
         }
         
+        var requestDict: [String: Any] = [
+            "user_id": userId,
+            "contact_id": contactId
+        ]
+        
+        if let description = description {
+            requestDict["description"] = description
+        }
+        
+        if let notes = notes {
+            requestDict["notes"] = notes
+        }
+        
+        if let tags = tags {
+            requestDict["tags"] = tags
+        }
+        
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: requestDict) else {
+            isLoading = false
+            errorMessage = "Failed to encode connection data"
+            completion(false)
+            return
+        }
+        
         var request = URLRequest(url: url)
-        request.httpMethod = "DELETE"
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = jsonData
         
         URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             DispatchQueue.main.async {
@@ -720,41 +631,152 @@ class NetworkManager: ObservableObject {
                 self.isLoading = false
                 
                 if let error = error {
-                    self.errorMessage = error.localizedDescription
+                    self.errorMessage = "Network error: \(error.localizedDescription)"
                     completion(false)
                     return
                 }
                 
-                if let httpResponse = response as? HTTPURLResponse, !(200...299).contains(httpResponse.statusCode) {
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    self.errorMessage = "Invalid response"
+                    completion(false)
+                    return
+                }
+                
+                if httpResponse.statusCode != 200 {
                     self.errorMessage = "Server error: \(httpResponse.statusCode)"
                     completion(false)
                     return
                 }
                 
-                // Remove from local connections array
-                self.connections.removeAll { $0.id == connectionId }
+                // Refresh the connections list
+                self.fetchConnections(forUserId: userId)
                 completion(true)
             }
         }.resume()
     }
     
-    // MARK: - Helper Methods
-    
-    /// Handles API errors and executes the completion handler
-    private func handleError(_ message: String, error: AuthError, completion: @escaping (Result<Int, AuthError>) -> Void) {
-        isLoading = false
-        errorMessage = message
-        completion(.failure(error))
+    /// Updates the last_viewed timestamp for a connection
+    /// - Parameters:
+    ///   - contactId: ID of the contact in the connection
+    ///   - completion: Closure called when the operation completes
+    func updateConnectionTimestamp(contactId: Int, completion: @escaping (Bool) -> Void) {
+        guard let userId = self.userId else {
+            completion(false)
+            return
+        }
+        
+        guard let url = URL(string: "\(baseURL)/connections/update") else {
+            completion(false)
+            return
+        }
+        
+        let requestDict: [String: Any] = [
+            "user_id": userId,
+            "contact_id": contactId,
+            "update_timestamp_only": true
+        ]
+        
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: requestDict) else {
+            completion(false)
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = jsonData
+        
+        URLSession.shared.dataTask(with: request) { [weak self] _, response, error in
+            DispatchQueue.main.async {
+                if error != nil || (response as? HTTPURLResponse)?.statusCode != 200 {
+                    completion(false)
+                    return
+                }
+                
+                // Refresh the connections list if needed
+                self?.fetchConnections(forUserId: userId)
+                completion(true)
+            }
+        }.resume()
     }
     
-    /// Creates a new contact from free-form text description
+    /// Removes a connection between the current user and another user
     /// - Parameters:
-    ///   - contactText: Free-form text describing the contact
-    ///   - tags: Tags to apply to the relationship
-    ///   - completion: Closure called with the result of the operation
-    func createContact(contactText: String, tags: [String], completion: @escaping (Result<String, Error>) -> Void) {
+    ///   - contactId: ID of the contact to disconnect from
+    ///   - completion: Closure called when the operation completes
+    func removeConnection(contactId: Int, completion: @escaping (Bool) -> Void) {
         guard let userId = self.userId else {
-            let error = NSError(domain: "NetworkManager", code: 401, userInfo: [NSLocalizedDescriptionKey: "Not logged in"])
+            completion(false)
+            return
+        }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        guard let url = URL(string: "\(baseURL)/connections") else {
+            isLoading = false
+            errorMessage = "Invalid URL"
+            completion(false)
+            return
+        }
+        
+        let requestDict = [
+            "user_id": userId,
+            "contact_id": contactId
+        ]
+        
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: requestDict) else {
+            isLoading = false
+            errorMessage = "Failed to encode connection data"
+            completion(false)
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = jsonData
+        
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.isLoading = false
+                
+                if let error = error {
+                    self.errorMessage = "Network error: \(error.localizedDescription)"
+                    completion(false)
+                    return
+                }
+                
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    self.errorMessage = "Invalid response"
+                    completion(false)
+                    return
+                }
+                
+                if httpResponse.statusCode != 200 {
+                    self.errorMessage = "Server error: \(httpResponse.statusCode)"
+                    completion(false)
+                    return
+                }
+                
+                // Update the connections list
+                self.connections.removeAll { $0.id == contactId }
+                completion(true)
+            }
+        }.resume()
+    }
+    
+    // MARK: - Contact Creation Methods
+    
+    /// Creates a new contact from free-form text
+    /// - Parameters:
+    ///   - text: The text description of the contact
+    ///   - tags: Optional tags to associate with the contact
+    ///   - completion: Closure called when the operation completes
+    func createContact(fromText text: String, tags: [String]? = nil, completion: @escaping (Result<Int, Error>) -> Void) {
+        guard let userId = self.userId else {
+            let error = NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Not logged in"])
             completion(.failure(error))
             return
         }
@@ -764,22 +786,25 @@ class NetworkManager: ObservableObject {
         
         guard let url = URL(string: "\(baseURL)/contacts/create") else {
             isLoading = false
+            let error = NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
             errorMessage = "Invalid URL"
-            let error = NSError(domain: "NetworkManager", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
             completion(.failure(error))
             return
         }
         
-        let requestData: [String: Any] = [
-            "user_id": userId,
-            "text": contactText,
-            "tags": tags
+        var requestDict: [String: Any] = [
+            "text": text,
+            "user_id": userId
         ]
         
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: requestData) else {
+        if let tags = tags {
+            requestDict["tags"] = tags
+        }
+        
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: requestDict) else {
             isLoading = false
-            errorMessage = "Failed to encode request data"
-            let error = NSError(domain: "NetworkManager", code: 400, userInfo: [NSLocalizedDescriptionKey: "Failed to encode request data"])
+            let error = NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Failed to encode contact data"])
+            errorMessage = "Failed to encode contact data"
             completion(.failure(error))
             return
         }
@@ -795,36 +820,45 @@ class NetworkManager: ObservableObject {
                 self.isLoading = false
                 
                 if let error = error {
-                    self.errorMessage = error.localizedDescription
+                    self.errorMessage = "Network error: \(error.localizedDescription)"
                     completion(.failure(error))
                     return
                 }
                 
-                if let httpResponse = response as? HTTPURLResponse, !(200...299).contains(httpResponse.statusCode) {
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    let error = NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
+                    self.errorMessage = "Invalid response"
+                    completion(.failure(error))
+                    return
+                }
+                
+                if httpResponse.statusCode != 201 {
+                    let error = NSError(domain: "NetworkError", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Server error: \(httpResponse.statusCode)"])
                     self.errorMessage = "Server error: \(httpResponse.statusCode)"
-                    let error = NSError(domain: "NetworkManager", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Server error: \(httpResponse.statusCode)"])
                     completion(.failure(error))
                     return
                 }
                 
                 guard let data = data else {
+                    let error = NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "No data received"])
                     self.errorMessage = "No data received"
-                    let error = NSError(domain: "NetworkManager", code: 0, userInfo: [NSLocalizedDescriptionKey: "No data received"])
                     completion(.failure(error))
                     return
                 }
                 
                 do {
-                    let responseJson = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-                    if let success = responseJson?["success"] as? Bool, success,
-                       let message = responseJson?["message"] as? String {
-                        // Refresh data after creating a contact
-                        self.refreshAll()
-                        completion(.success(message))
+                    let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                    if let userId = json?["user_id"] as? Int {
+                        // If there are tags, update the recent tags
+                        if tags != nil && !tags!.isEmpty {
+                            self.fetchRecentTags()
+                        }
+                        // Refresh connections to include the new contact
+                        self.fetchUserConnections()
+                        completion(.success(userId))
                     } else {
-                        let errorMessage = (responseJson?["message"] as? String) ?? "Failed to create contact"
-                        self.errorMessage = errorMessage
-                        let error = NSError(domain: "NetworkManager", code: 400, userInfo: [NSLocalizedDescriptionKey: errorMessage])
+                        let error = NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Missing user ID in response"])
+                        self.errorMessage = "Missing user ID in response"
                         completion(.failure(error))
                     }
                 } catch {
@@ -833,16 +867,6 @@ class NetworkManager: ObservableObject {
                 }
             }
         }.resume()
-    }
-    
-    /// Refreshes all data from the server
-    func refreshAll() {
-        if let userId = self.userId {
-            fetchCurrentUser()
-            getConnections(userId: userId)
-            updateLastLogin()
-        }
-        fetchAllUsers()
     }
     
     /// Fetches recent tags used by the current user
@@ -894,5 +918,62 @@ class NetworkManager: ObservableObject {
                 }
             }
         }.resume()
+    }
+    
+    /// Fetches the current user's recent tags
+    func fetchRecentTags() {
+        guard let userId = self.userId else { return }
+        
+        guard let url = URL(string: "\(baseURL)/users/\(userId)/recent-tags") else {
+            print("Invalid URL for fetching recent tags")
+            return
+        }
+        
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                
+                if let error = error {
+                    print("Error fetching recent tags: \(error.localizedDescription)")
+                    return
+                }
+                
+                if let httpResponse = response as? HTTPURLResponse, !(200...299).contains(httpResponse.statusCode) {
+                    print("Server error fetching recent tags: \(httpResponse.statusCode)")
+                    return
+                }
+                
+                guard let data = data else {
+                    print("No data received for recent tags")
+                    return
+                }
+                
+                do {
+                    self.recentTags = try JSONDecoder().decode([String].self, from: data)
+                } catch {
+                    print("Failed to decode recent tags: \(error.localizedDescription)")
+                }
+            }
+        }.resume()
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Handle API errors and call completion handler
+    private func handleError<T>(_ message: String, error: AuthError, completion: @escaping (Result<T, AuthError>) -> Void) {
+        isLoading = false
+        errorMessage = message
+        completion(.failure(error))
+    }
+    
+    /// Refreshes all data from the server
+    func refreshAll() {
+        if let userId = self.userId {
+            fetchCurrentUser()
+            fetchConnections(forUserId: userId)
+            fetchRecentTags()
+            updateLastLogin()
+        }
+        fetchUsers()
     }
 }

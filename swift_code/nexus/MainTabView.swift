@@ -1,233 +1,124 @@
 import SwiftUI
 
-/// Main tab-based view for the application after login
+/// Main tab view containing the primary application screens
 struct MainTabView: View {
-    // MARK: - Properties
+    // MARK: - Environment
     
-    @EnvironmentObject private var coordinator: AppCoordinator
+    /// Reference to the app coordinator
+    @EnvironmentObject var coordinator: AppCoordinator
     
-    /// Computed property to bind to TabView selection
-    private var selection: Binding<Int> {
-        Binding(
-            get: { self.coordinator.selectedTab.rawValue },
-            set: { 
-                let tab = TabSelection(rawValue: $0) ?? .network
-                self.coordinator.selectTab(tab)
-            }
-        )
-    }
-    
-    // MARK: - View Body
+    // MARK: - View
     
     var body: some View {
-        ZStack(alignment: .bottom) {
-            // Main content
-            TabView(selection: selection) {
-                // Network Tab
-                networkTabView
-                    .tabItem {
-                        Text("Network")
+        TabView(selection: $coordinator.selectedTab) {
+            // Network Tab
+            NavigationStack(path: $coordinator.networkTabPath) {
+                NetworkView()
+                    .navigationDestination(for: User.self) { user in
+                        UserDetailView(user: user)
                     }
-                    .tag(TabSelection.network.rawValue)
-                
-                // Add New Tab (Middle Button)
-                addNewTabView
-                    .tabItem {
-                        Text("")
-                    }
-                    .tag(TabSelection.addNew.rawValue)
-                
-                // Profile Tab
-                profileTabView
-                    .tabItem {
-                        Text("Profile")
-                    }
-                    .tag(TabSelection.profile.rawValue)
             }
-            
-            // Custom middle button overlay positioned above the tab bar
-            VStack {
-                Spacer()
-                addButton
-                    .offset(y: -8) // Position above tab bar and home indicator
+            .tabItem {
+                Label("Network", systemImage: "person.3")
             }
-            .ignoresSafeArea()
-        }
-        .onAppear {
-            // Style tab bar to have text only
-            let appearance = UITabBarAppearance()
-            appearance.configureWithDefaultBackground()
+            .tag(AppCoordinator.TabSelection.network)
             
-            // Normal tabs - larger font
-            let normalAttributes: [NSAttributedString.Key: Any] = [
-                .foregroundColor: UIColor.lightGray,
-                .font: UIFont.systemFont(ofSize: 20, weight: .medium)
-            ]
-            appearance.stackedLayoutAppearance.normal.titleTextAttributes = normalAttributes
-            
-            // Selected tabs - larger font
-            let selectedAttributes: [NSAttributedString.Key: Any] = [
-                .foregroundColor: UIColor.black,
-                .font: UIFont.systemFont(ofSize: 20, weight: .semibold)
-            ]
-            appearance.stackedLayoutAppearance.selected.titleTextAttributes = selectedAttributes
-            
-            // Hide middle tab item text
-            appearance.stackedLayoutAppearance.normal.iconColor = .clear
-            appearance.stackedLayoutAppearance.selected.iconColor = .clear
-            
-            // Adjust vertical positioning
-            appearance.stackedLayoutAppearance.normal.titlePositionAdjustment = UIOffset(horizontal: 0, vertical: -5)
-            appearance.stackedLayoutAppearance.selected.titlePositionAdjustment = UIOffset(horizontal: 0, vertical: -5)
-            
-            // Increase tab bar height
-            let tabBarHeight: CGFloat = 80
-            
-            // Apply the custom appearance to the tab bar
-            UITabBar.appearance().standardAppearance = appearance
-            if #available(iOS 15.0, *) {
-                UITabBar.appearance().scrollEdgeAppearance = appearance
+            // Profile Tab
+            NavigationStack(path: $coordinator.profileTabPath) {
+                ProfileView()
             }
-            
-            // Increase the tab bar height
-            UITabBar.appearance().frame.size.height = tabBarHeight
-            UITabBar.appearance().bounds.size.height = tabBarHeight
-            
-            // Use fill equally to distribute tabs evenly
-            UITabBar.appearance().itemPositioning = .fill
-            
-            // Create a custom layout using a subclass to adjust tab positioning
-            setupTabBarItemPositioning()
-        }
-        .edgesIgnoringSafeArea(.bottom) // Make tab bar extend to screen edges
-    }
-    
-    // MARK: - Tab Bar Positioning
-    
-    /// Sets up custom tab bar item positioning
-    private func setupTabBarItemPositioning() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                  let window = windowScene.windows.first,
-                  let rootViewController = window.rootViewController else {
-                return
+            .tabItem {
+                Label("Profile", systemImage: "person.circle")
             }
-            
-            if let tabBarController = findTabBarController(in: rootViewController) {
-                // Get the tab bar
-                let tabBar = tabBarController.tabBar
-                
-                // Ensure we have 3 tab bar items
-                guard let items = tabBar.items, items.count == 3 else { return }
-                
-                // Calculate screen width and determine center points for each half
-                let screenWidth = window.bounds.width
-                
-                // Adjust the first tab (Network) - position in center of left half
-                // Move it right toward the center of the left half (screenWidth/4)
-                items[0].titlePositionAdjustment = UIOffset(horizontal: 42, vertical: 0)
-                
-                // Skip the middle tab (already hidden)
-                
-                // Adjust the last tab (Profile) - position in center of right half
-                // Move it left toward the center of the right half (-screenWidth/4)
-                items[2].titlePositionAdjustment = UIOffset(horizontal: -42, vertical: 0)
-            }
+            .tag(AppCoordinator.TabSelection.profile)
+        }
+        .onChange(of: coordinator.selectedTab) { newValue in
+            coordinator.selectTab(newValue)
         }
     }
+}
+
+/// View that serves as the entry point for the application
+struct MainView: View {
+    // MARK: - Environment
     
-    /// Recursively finds the UITabBarController in the view controller hierarchy
-    private func findTabBarController(in viewController: UIViewController) -> UITabBarController? {
-        if let tabBarController = viewController as? UITabBarController {
-            return tabBarController
-        }
-        
-        if let navigationController = viewController as? UINavigationController {
-            return findTabBarController(in: navigationController.visibleViewController ?? navigationController)
-        }
-        
-        if let presentedController = viewController.presentedViewController {
-            return findTabBarController(in: presentedController)
-        }
-        
-        return nil
-    }
+    /// Reference to the app coordinator
+    @EnvironmentObject var coordinator: AppCoordinator
     
-    // MARK: - Tab Components
+    // MARK: - View
     
-    /// Network tab view (User List)
-    private var networkTabView: some View {
-        NavigationStack(path: $coordinator.networkTabPath) {
-            UserListView()
-                .navigationTitle("Nexus")
-                .navigationBarTitleDisplayMode(.large)
-                .navigationDestination(for: User.self) { user in
-                    UserDetailView(user: user)
-                }
-                .navigationDestination(for: ActiveScreen.self) { screen in
-                    switch screen {
-                    case .editProfile:
-                        EditProfileView()
-                    default:
-                        UserListView()
-                    }
-                }
-        }
-    }
-    
-    /// Add New tab (placeholder)
-    private var addNewTabView: some View {
-        NavigationStack {
-            AddNewPlaceholderView()
-        }
-    }
-    
-    /// Profile tab view (ProfileView)
-    private var profileTabView: some View {
-        NavigationStack(path: $coordinator.profileTabPath) {
-            ProfileView()
-                .navigationTitle("Profile")
-                .navigationBarTitleDisplayMode(.large)
-                .navigationDestination(for: User.self) { user in
-                    UserDetailView(user: user)
-                }
-                .navigationDestination(for: ActiveScreen.self) { screen in
-                    switch screen {
-                    case .editProfile:
-                        EditProfileView()
-                    case .userList:
-                        UserListView()
-                            .navigationTitle("All Users")
-                            .navigationBarTitleDisplayMode(.large)
-                    default:
-                        ProfileView()
-                    }
-                }
-        }
-    }
-    
-    /// Custom add button in the middle of the tab bar
-    private var addButton: some View {
-        Button(action: {
-            coordinator.selectTab(.addNew)
-        }) {
-            ZStack {
-                Circle()
-                    .fill(Color.green)
-                    .frame(width: 70, height: 70)
-                    .shadow(radius: 2)
-                
-                Image(systemName: "plus")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(.white)
+    var body: some View {
+        Group {
+            if coordinator.isLoggedIn {
+                MainTabView()
+            } else {
+                LoginView()
             }
         }
     }
 }
 
-// MARK: - Previews
+/// Loading view displayed during data operations
+struct LoadingOverlayView: View {
+    let message: String
+    
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.4)
+                .edgesIgnoringSafeArea(.all)
+            
+            VStack(spacing: 16) {
+                ProgressView()
+                    .scaleEffect(1.5)
+                    .padding()
+                
+                Text(message)
+                    .font(.headline)
+                    .foregroundColor(.white)
+            }
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.gray.opacity(0.8))
+            )
+        }
+    }
+}
+
+// MARK: - Navigation Extensions
+
+extension View {
+    /// Conditionally applies a navigation title
+    /// - Parameters:
+    ///   - title: The title to display
+    ///   - displayMode: How to display the title
+    /// - Returns: A view with the navigation title applied
+    func conditionalNavigationTitle(_ title: String, displayMode: NavigationBarItem.TitleDisplayMode = .automatic) -> some View {
+        self.navigationTitle(title)
+            .navigationBarTitleDisplayMode(displayMode)
+    }
+    
+    /// Adds a back button to the navigation bar
+    /// - Parameter action: Action to perform when back is tapped
+    /// - Returns: A view with the back button added
+    func withBackButton(action: @escaping () -> Void) -> some View {
+        self.navigationBarBackButtonHidden(true)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: action) {
+                        HStack {
+                            Image(systemName: "chevron.left")
+                            Text("Back")
+                        }
+                    }
+                }
+            }
+    }
+}
+
+// MARK: - Preview
 
 #Preview {
-    MainTabView()
+    MainView()
         .environmentObject(AppCoordinator())
 } 

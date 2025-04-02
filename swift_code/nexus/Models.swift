@@ -60,6 +60,15 @@ struct User: Identifiable, Codable, Hashable {
     /// Last login timestamp
     let lastLogin: String?
     
+    /// Profile image URL
+    let profileImageUrl: String?
+    
+    /// LinkedIn profile URL
+    let linkedinUrl: String?
+    
+    /// Recent tags used by the user
+    let recentTags: [String]?
+    
     // MARK: - Coding Keys
     
     /// Maps Swift property names to JSON field names
@@ -82,6 +91,9 @@ struct User: Identifiable, Codable, Hashable {
         case uniMajor = "uni_major"
         case jobTitle = "job_title"
         case lastLogin = "last_login"
+        case profileImageUrl = "profile_image_url"
+        case linkedinUrl = "linkedin_url"
+        case recentTags = "recent_tags"
     }
     
     // MARK: - Computed Properties
@@ -153,6 +165,24 @@ struct Connection: Identifiable, Codable, Hashable {
     /// Job title of the connected user
     let jobTitle: String?
     
+    /// Current company of the connected user
+    let currentCompany: String?
+    
+    /// Profile image URL of the connected user
+    let profileImageUrl: String?
+    
+    /// LinkedIn profile URL of the connected user
+    let linkedinUrl: String?
+    
+    /// Notes about the connection
+    let notes: String?
+    
+    /// Tags associated with the connection
+    let tags: [String]?
+    
+    /// When the connection was last viewed
+    let lastViewed: String?
+    
     // MARK: - Coding Keys
     
     /// Maps Swift property names to JSON field names
@@ -172,6 +202,12 @@ struct Connection: Identifiable, Codable, Hashable {
         case ethnicity
         case uniMajor = "uni_major"
         case jobTitle = "job_title"
+        case currentCompany = "current_company"
+        case profileImageUrl = "profile_image_url"
+        case linkedinUrl = "linkedin_url"
+        case notes
+        case tags
+        case lastViewed = "last_viewed"
     }
     
     // MARK: - Computed Properties
@@ -203,6 +239,29 @@ struct Login: Codable {
     
     /// Password or passkey for authentication
     let passkey: String
+}
+
+/// Request to create new login credentials
+struct CreateLoginRequest: Codable {
+    /// User ID to create login for
+    let userId: Int
+    
+    /// Password or passkey for authentication
+    let passkey: String
+    
+    enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case passkey
+    }
+}
+
+/// Response from login creation
+struct CreateLoginResponse: Codable {
+    /// Whether the operation was successful
+    let success: Bool
+    
+    /// Generated username
+    let username: String
 }
 
 /// Response from a successful login

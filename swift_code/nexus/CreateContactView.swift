@@ -10,17 +10,11 @@ struct CreateContactView: View {
     /// Text content entered by the user
     @State private var contactText = ""
     
-    /// List of suggested tags
-    private let suggestedTags = ["Entrepreneurship", "Investing", "Self Improvement", "Physicality"]
-    
     /// New custom tag being created
     @State private var newTagText = ""
     
     /// Collection of tags added to the contact
     @State private var selectedTags: [String] = []
-    
-    /// Recent tags used by the user
-    @State private var recentTags: [String] = []
     
     /// Controls whether the keyboard is active
     @FocusState private var isContactTextFieldFocused: Bool
@@ -33,9 +27,6 @@ struct CreateContactView: View {
     
     /// Whether a submit operation is in progress
     @State private var isSubmitting = false
-    
-    /// Whether recent tags are loading
-    @State private var isLoadingRecentTags = false
     
     // MARK: - View Body
     
@@ -68,14 +59,12 @@ struct CreateContactView: View {
             }
             .padding()
         }
+        .navigationTitle("Create Contact")
         .onAppear {
             // Auto-focus text field when view appears
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 isContactTextFieldFocused = true
             }
-            
-            // Fetch recent tags
-            fetchRecentTags()
         }
         .disabled(isSubmitting)
         .overlay(
@@ -179,72 +168,46 @@ struct CreateContactView: View {
     private var tagSection: some View {
         SectionCard(title: "Add Tags") {
             VStack(alignment: .leading, spacing: 16) {
-                // Suggested tags
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Suggested Tags")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    
-                    FlowLayout(spacing: 8) {
-                        ForEach(suggestedTags, id: \.self) { tag in
-                            Button(action: {
-                                addTag(tag)
-                            }) {
-                                Text(tag)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(selectedTags.contains(tag) ? Color.blue.opacity(0.2) : Color.gray.opacity(0.2))
-                                    .foregroundColor(selectedTags.contains(tag) ? .blue : .primary)
-                                    .cornerRadius(16)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                    }
-                }
-                
                 // Recent tags
-                if !recentTags.isEmpty {
+                if !coordinator.networkManager.recentTags.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Recent Tags")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         
                         FlowLayout(spacing: 8) {
-                            ForEach(recentTags, id: \.self) { tag in
+                            ForEach(coordinator.networkManager.recentTags, id: \.self) { tag in
                                 Button(action: {
                                     addTag(tag)
                                 }) {
                                     Text(tag)
                                         .padding(.horizontal, 12)
                                         .padding(.vertical, 6)
-                                        .background(selectedTags.contains(tag) ? Color.blue.opacity(0.2) : Color.purple.opacity(0.2))
-                                        .foregroundColor(selectedTags.contains(tag) ? .blue : .purple)
+                                        .background(selectedTags.contains(tag) ? Color.blue.opacity(0.2) : Color.gray.opacity(0.2))
+                                        .foregroundColor(selectedTags.contains(tag) ? .blue : .primary)
                                         .cornerRadius(16)
                                 }
                                 .buttonStyle(PlainButtonStyle())
                             }
                         }
                     }
-                    .padding(.top, 8)
                 }
-                
-                Divider()
                 
                 // Custom tag creation
                 HStack {
-                    TextField("New tag", text: $newTagText)
-                        .padding(10)
-                        .background(Color(.systemGray6))
+                    TextField("Add custom tag...", text: $newTagText)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.gray.opacity(0.1))
                         .cornerRadius(8)
                     
-                    Button(action: {
-                        addCustomTag()
-                    }) {
+                    Button(action: addCustomTag) {
                         Text("Add")
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
-                            .background(newTagText.isEmpty ? Color.gray.opacity(0.3) : Color.blue)
-                            .foregroundColor(newTagText.isEmpty ? .gray : .white)
+                            .background(newTagText.isEmpty ? Color.gray : Color.blue)
                             .cornerRadius(8)
                     }
                     .disabled(newTagText.isEmpty)
@@ -253,42 +216,38 @@ struct CreateContactView: View {
         }
     }
     
-    /// Buttons for submission or form clearing
+    /// Buttons for submitting or canceling the form
     private var buttonSection: some View {
-        HStack(spacing: 15) {
-            Button(action: {
-                submitContact()
-            }) {
-                Text("Submit")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-            }
-            .buttonStyle(PrimaryButtonStyle())
-            .frame(width: UIScreen.main.bounds.width * 0.6)
-            .disabled(contactText.isEmpty || isSubmitting)
-            
-            Button(action: {
-                clearForm()
-            }) {
+        HStack(spacing: 16) {
+            Button(action: clearForm) {
                 Text("Clear")
-                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.blue)
+                    .padding()
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 4)
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(10)
             }
-            .buttonStyle(SecondaryButtonStyle())
-            .frame(width: UIScreen.main.bounds.width * 0.2)
-            .disabled(isSubmitting)
+            
+            Button(action: submitContact) {
+                Text("Submit")
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(contactText.isEmpty ? Color.gray : Color.blue)
+                    .cornerRadius(10)
+            }
+            .disabled(contactText.isEmpty)
         }
-        .padding(.top, 10)
     }
     
-    /// Creates a tag badge with delete functionality
-    /// - Parameter tag: The tag text to display
+    /// Creates a tag badge with remove functionality
     private func tagBadge(_ tag: String) -> some View {
         HStack(spacing: 4) {
             Text(tag)
-                .font(.subheadline)
+                .font(.caption)
+                .padding(.leading, 8)
             
             Button(action: {
                 removeTag(tag)
@@ -296,36 +255,26 @@ struct CreateContactView: View {
                 Image(systemName: "xmark.circle.fill")
                     .font(.caption)
             }
-            .buttonStyle(PlainButtonStyle())
+            .padding(.trailing, 6)
         }
-        .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(Color.blue.opacity(0.2))
         .foregroundColor(.blue)
         .cornerRadius(16)
     }
     
-    // MARK: - Action Methods
+    // MARK: - Methods
     
-    /// Fetch recent tags from the API
-    private func fetchRecentTags() {
-        isLoadingRecentTags = true
+    /// Adds a custom tag based on the newTagText value
+    private func addCustomTag() {
+        let trimmedText = newTagText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedText.isEmpty else { return }
         
-        coordinator.networkManager.fetchUserRecentTags { result in
-            isLoadingRecentTags = false
-            
-            switch result {
-            case .success(let tags):
-                self.recentTags = tags
-            case .failure(let error):
-                print("Failed to fetch recent tags: \(error.localizedDescription)")
-                // Don't show an error banner, just silently fail for recent tags
-            }
-        }
+        addTag(trimmedText)
+        newTagText = ""
     }
     
-    /// Adds a tag to the selected tags
-    /// - Parameter tag: The tag to add
+    /// Adds a tag to the selected tags array if not already present
     private func addTag(_ tag: String) {
         if !selectedTags.contains(tag) {
             selectedTags.append(tag)
@@ -334,126 +283,116 @@ struct CreateContactView: View {
         }
     }
     
-    /// Adds a custom tag from user input
-    private func addCustomTag() {
-        let trimmedTag = newTagText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedTag.isEmpty && !selectedTags.contains(trimmedTag) {
-            selectedTags.append(trimmedTag)
-            newTagText = ""
-        }
-    }
-    
-    /// Removes a tag from the selected tags
-    /// - Parameter tag: The tag to remove
+    /// Removes a tag from the selected tags array
     private func removeTag(_ tag: String) {
         selectedTags.removeAll { $0 == tag }
     }
     
-    /// Submit the contact by calling the API
-    private func submitContact() {
-        guard !contactText.isEmpty else {
-            errorMessage = "Please enter contact information"
-            return
-        }
-        
-        // Clear any existing messages
-        errorMessage = nil
-        successMessage = nil
-        isSubmitting = true
-        
-        // Call the API to create the contact
-        coordinator.networkManager.createContact(contactText: contactText, tags: selectedTags) { result in
-            isSubmitting = false
-            
-            switch result {
-            case .success(let message):
-                // Show success message and clear form
-                withAnimation {
-                    successMessage = message
-                }
-                clearForm()
-                
-                // Refresh recent tags after adding a contact with new tags
-                fetchRecentTags()
-                
-            case .failure(let error):
-                // Show error message
-                withAnimation {
-                    errorMessage = error.localizedDescription
-                }
-            }
-        }
-    }
-    
-    /// Clear form data without navigation
+    /// Clears the form fields
     private func clearForm() {
         contactText = ""
         selectedTags = []
         newTagText = ""
-        isContactTextFieldFocused = true
+        errorMessage = nil
+        successMessage = nil
+    }
+    
+    /// Submits the contact information to the API
+    private func submitContact() {
+        guard !contactText.isEmpty else { return }
+        
+        isSubmitting = true
+        errorMessage = nil
+        
+        coordinator.networkManager.createContact(fromText: contactText, tags: selectedTags) { result in
+            isSubmitting = false
+            
+            switch result {
+            case .success(let userId):
+                successMessage = "Contact created successfully!"
+                // Wait a moment so the user sees the success message
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    // Navigate to the user detail view for the new contact
+                    coordinator.networkManager.fetchUser(withId: userId) { userResult in
+                        switch userResult {
+                        case .success(let user):
+                            clearForm()
+                            coordinator.showUserDetail(user: user)
+                        case .failure:
+                            // If we can't fetch the user, just go back
+                            coordinator.backFromCreateContact()
+                        }
+                    }
+                }
+            case .failure(let error):
+                errorMessage = "Failed to create contact: \(error.localizedDescription)"
+            }
+        }
     }
 }
 
 // MARK: - FlowLayout
 
-/// Flow layout for tags that wraps to next line as needed
+/// A layout that arranges elements in rows, wrapping to a new row when needed
 struct FlowLayout: Layout {
     let spacing: CGFloat
+    
+    init(spacing: CGFloat = 10) {
+        self.spacing = spacing
+    }
     
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let containerWidth = proposal.width ?? .infinity
         
-        var height: CGFloat = 0
-        var width: CGFloat = 0
         var rowWidth: CGFloat = 0
         var rowHeight: CGFloat = 0
+        var totalHeight: CGFloat = 0
         
         for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+            let subviewSize = subview.sizeThatFits(.unspecified)
             
-            if rowWidth + size.width > containerWidth {
-                // Start a new row
-                width = max(width, rowWidth)
-                height += rowHeight + spacing
-                rowWidth = size.width
-                rowHeight = size.height
+            // If this element doesn't fit on the current row, start a new row
+            if rowWidth + subviewSize.width > containerWidth && rowWidth > 0 {
+                totalHeight += rowHeight + spacing
+                rowWidth = subviewSize.width
+                rowHeight = subviewSize.height
             } else {
-                // Add to current row
-                rowWidth += size.width + (rowWidth > 0 ? spacing : 0)
-                rowHeight = max(rowHeight, size.height)
+                // Add to the current row
+                rowWidth += subviewSize.width + spacing
+                rowHeight = max(rowHeight, subviewSize.height)
             }
         }
         
-        // Add the last row
-        height += rowHeight
-        width = max(width, rowWidth)
+        // Add the height of the last row
+        totalHeight += rowHeight
         
-        return CGSize(width: width, height: height)
+        return CGSize(width: containerWidth, height: totalHeight)
     }
     
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        guard !subviews.isEmpty else { return }
-        
-        let containerWidth = bounds.width
-        
-        var rowX: CGFloat = bounds.minX
-        var rowY: CGFloat = bounds.minY
+        var rowWidth: CGFloat = 0
         var rowHeight: CGFloat = 0
+        var rowMinY: CGFloat = bounds.minY
         
         for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+            let subviewSize = subview.sizeThatFits(.unspecified)
             
-            if rowX + size.width > containerWidth + bounds.minX {
-                // Start a new row
-                rowX = bounds.minX
-                rowY += rowHeight + spacing
+            // Check if this element needs to go on a new row
+            if rowWidth + subviewSize.width > bounds.width && rowWidth > 0 {
+                rowMinY += rowHeight + spacing
+                rowWidth = 0
                 rowHeight = 0
             }
             
-            subview.place(at: CGPoint(x: rowX, y: rowY), proposal: .unspecified)
+            // Place the element
+            let xPos = bounds.minX + rowWidth
+            let yPos = rowMinY + (rowHeight - subviewSize.height) / 2
             
-            rowHeight = max(rowHeight, size.height)
-            rowX += size.width + spacing
+            subview.place(at: CGPoint(x: xPos, y: yPos), proposal: .unspecified)
+            
+            // Update tracking variables
+            rowWidth += subviewSize.width + spacing
+            rowHeight = max(rowHeight, subviewSize.height)
         }
     }
 }
@@ -461,6 +400,9 @@ struct FlowLayout: Layout {
 // MARK: - Preview
 
 #Preview {
-    CreateContactView()
-        .environmentObject(AppCoordinator())
+    NavigationView {
+        CreateContactView()
+            .environmentObject(AppCoordinator())
+    }
+} 
 } 
