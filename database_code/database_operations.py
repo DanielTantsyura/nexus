@@ -365,7 +365,7 @@ class DatabaseManager:
             u.email, u.phone_number, u.location, u.university,
             u.field_of_interest, u.high_school, u.gender, u.ethnicity,
             u.uni_major, u.job_title, u.current_company, u.profile_image_url,
-            u.linkedin_url, r.relationship_type, r.note,
+            u.linkedin_url, r.relationship_description, r.custom_note,
             r.tags, r.last_viewed
         FROM relationships r
         JOIN users u ON r.contact_id = u.id
@@ -381,34 +381,34 @@ class DatabaseManager:
             print(f"Error retrieving connections: {e}")
             return []
     
-    def add_connection(self, user_id: int, contact_id: int, relationship_type: str, 
-                       note: str = None, tags: str = None) -> bool:
+    def add_connection(self, user_id: int, contact_id: int, relationship_description: str, 
+                       custom_note: str = None, tags: str = None) -> bool:
         """
         Add a new connection between two users.
-        relationship_type is bidirectional (shared in both directions)
-        note, tags, and last_viewed are unidirectional (specific to each direction)
+        relationship_description is bidirectional (shared in both directions)
+        custom_note, tags, and last_viewed are unidirectional (specific to each direction)
         
         Args:
             user_id: ID of the first user
             contact_id: ID of the second user
-            relationship_type: Type of the relationship
-            note: Optional detailed note about the connection (one-way)
+            relationship_description: Type of the relationship
+            custom_note: Optional detailed note about the connection (one-way)
             tags: Optional comma-separated tags for the connection (one-way)
             
         Returns:
             True if successful, False otherwise
         """
         query = """
-        INSERT INTO relationships (user_id, contact_id, relationship_type, note, tags, last_viewed)
+        INSERT INTO relationships (user_id, contact_id, relationship_description, custom_note, tags, last_viewed)
         VALUES (%s, %s, %s, %s, %s, NOW());
         """
         
         try:
             # First direction: user_id -> contact_id (with full data)
-            self.cursor.execute(query, (user_id, contact_id, relationship_type, note, tags))
+            self.cursor.execute(query, (user_id, contact_id, relationship_description, custom_note, tags))
             
-            # Second direction: contact_id -> user_id (with shared relationship_type only)
-            self.cursor.execute(query, (contact_id, user_id, relationship_type, None, None))
+            # Second direction: contact_id -> user_id (with shared relationship_description only)
+            self.cursor.execute(query, (contact_id, user_id, relationship_description, None, None))
             
             self.conn.commit()
             return True
@@ -445,14 +445,14 @@ class DatabaseManager:
     
     def update_connection(self, user_id: int, contact_id: int, data: Dict[str, Any]) -> bool:
         """
-        Update a connection with note, tags, or other metadata.
+        Update a connection with custom_note, tags, or other metadata.
         Only updates the one-way relationship (from user_id to contact_id).
-        If relationship_type is updated, it updates both directions.
+        If relationship_description is updated, it updates both directions.
         
         Args:
             user_id: ID of the user
             contact_id: ID of the contact
-            data: Dictionary of fields to update (relationship_type, note, tags)
+            data: Dictionary of fields to update (relationship_description, custom_note, tags)
             
         Returns:
             True if successful, False otherwise
@@ -461,9 +461,9 @@ class DatabaseManager:
         one_way_fields = []
         one_way_params = []
         
-        # Handle one-way fields (note, tags)
+        # Handle one-way fields (custom_note, tags)
         for key, value in data.items():
-            if key in ['note', 'tags']:
+            if key in ['custom_note', 'tags']:
                 one_way_fields.append(f"{key} = %s")
                 one_way_params.append(value)
         
@@ -480,12 +480,12 @@ class DatabaseManager:
             WHERE user_id = %s AND contact_id = %s;
             """
         
-        # Check if relationship_type needs to be updated (two-way)
+        # Check if relationship_description needs to be updated (two-way)
         two_way_query = None
-        if 'relationship_type' in data:
+        if 'relationship_description' in data:
             two_way_query = """
             UPDATE relationships
-            SET relationship_type = %s
+            SET relationship_description = %s
             WHERE (user_id = %s AND contact_id = %s) OR (user_id = %s AND contact_id = %s);
             """
         
@@ -497,7 +497,7 @@ class DatabaseManager:
             # Execute two-way update if needed
             if two_way_query:
                 self.cursor.execute(two_way_query, 
-                    (data['relationship_type'], user_id, contact_id, contact_id, user_id))
+                    (data['relationship_description'], user_id, contact_id, contact_id, user_id))
             
             self.conn.commit()
             return True
@@ -763,7 +763,7 @@ class DatabaseManager:
             
             # Get relationships
             self.cursor.execute("""
-                SELECT r.user_id, u1.first_name, r.contact_id, u2.first_name, r.relationship_type 
+                SELECT r.user_id, u1.first_name, r.contact_id, u2.first_name, r.relationship_description 
                 FROM relationships r
                 JOIN users u1 ON r.user_id = u1.id
                 JOIN users u2 ON r.contact_id = u2.id
@@ -772,7 +772,7 @@ class DatabaseManager:
             relationships = self.cursor.fetchall()
             print(f"\n=== Relationships ({len(relationships)}) ===")
             for rel in relationships:
-                print(f"{rel['user_id']} ({rel[1]}) -> {rel['contact_id']} ({rel[3]}): {rel['relationship_type']}")
+                print(f"{rel['user_id']} ({rel[1]}) -> {rel['contact_id']} ({rel[3]}): {rel['relationship_description']}")
             
             return True
         except Exception as e:
@@ -878,7 +878,7 @@ if __name__ == "__main__":
             print("\n--- Connections ---")
             connections = db.get_user_connections(user['id'])
             for conn in connections:
-                print(f"{conn['first_name']} {conn['last_name']} - {conn['relationship_type']}")
+                print(f"{conn['first_name']} {conn['last_name']} - {conn['relationship_description']}")
         
         # Example 5: Adding a new user (commented out to prevent actual insertion)
         """

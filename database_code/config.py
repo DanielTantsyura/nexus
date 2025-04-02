@@ -62,8 +62,17 @@ MAX_RECENT_TAGS = 10
 AUTH_SECRET_KEY = "dev-secret-key-change-in-production"  # Change this in production!
 AUTH_TOKEN_EXPIRY = 86400  # 24 hours in seconds
 
+# ==========================================================================
+# AI SETTINGS
+# ==========================================================================
+
+# OpenAI API configuration
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")  # Default to GPT-4o mini
+
 # Content Generation
 DEFAULT_MODELS = [
+    "gpt-4o-mini",  # New model
     "gpt-3.5-turbo",
     "gpt-4-turbo",
     "gemini-pro",

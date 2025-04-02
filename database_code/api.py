@@ -180,8 +180,8 @@ def add_connection():
     
     user_id = data['user_id']
     contact_id = data['contact_id']
-    relationship_type = data['relationship_type']
-    note = data.get('note')
+    relationship_description = data['relationship_type']
+    custom_note = data.get('note')
     tags = data.get('tags')
     
     try:
@@ -196,7 +196,7 @@ def add_connection():
                 return jsonify({"error": f"Contact with ID {contact_id} not found"}), 404
             
             # Add the connection
-            success = db_manager.add_connection(user_id, contact_id, relationship_type, note, tags)
+            success = db_manager.add_connection(user_id, contact_id, relationship_description, custom_note, tags)
         
         if success:
             return jsonify({"message": "Connection added successfully"}), 201
@@ -223,6 +223,13 @@ def update_connection():
     
     # Remove the ID fields from the data
     update_data = {k: v for k, v in data.items() if k not in ['user_id', 'contact_id']}
+    
+    # Map field names from API to database schema
+    if 'relationship_type' in update_data:
+        update_data['relationship_description'] = update_data.pop('relationship_type')
+    
+    if 'note' in update_data:
+        update_data['custom_note'] = update_data.pop('note')
     
     if not update_data:
         return jsonify({"error": "No fields to update"}), 400

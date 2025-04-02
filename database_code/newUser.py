@@ -14,15 +14,15 @@ import os
 import re
 import time
 from typing import Dict, Any, List, Tuple, Optional
-import openai
+from openai import OpenAI
 from dotenv import load_dotenv
-from config import DATABASE_URL, API_PORT, DEFAULT_TAGS
+from config import DATABASE_URL, API_PORT, DEFAULT_TAGS, OPENAI_API_KEY, OPENAI_MODEL
 
 # Load environment variables
 load_dotenv()
 
-# Initialize OpenAI with API key
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# Initialize OpenAI client
+client = OpenAI(api_key=OPENAI_API_KEY or os.getenv("OPENAI_API_KEY"))
 
 # API endpoints
 API_BASE_URL = f"http://localhost:{API_PORT}"
@@ -35,29 +35,33 @@ def get_user_fields_from_schema() -> List[str]:
         List of user field names
     """
     try:
-        # Read the createDatabase.py file to extract user fields
-        with open("createDatabase.py", "r") as f:
-            content = f.read()
-            
-        # Find the CREATE TABLE statement for users
-        match = re.search(r"CREATE TABLE users\s*\((.*?)\);", content, re.DOTALL)
-        if match:
-            create_table = match.group(1)
-            
-            # Extract field names
-            fields = []
-            for line in create_table.split("\n"):
-                line = line.strip()
-                if line and not line.startswith(("PRIMARY KEY", "CONSTRAINT", "--")):
-                    field_name = line.split()[0].strip()
-                    if field_name != "id":  # Skip ID field
-                        fields.append(field_name)
-            
-            print(f"Extracted {len(fields)} fields from database schema")
-            return fields
-        else:
-            print("Could not find CREATE TABLE statement for users")
-            raise ValueError("Failed to extract user fields from schema")
+        # Look for the createDatabase.py file in the current directory or setup_code directory
+        file_paths = ["createDatabase.py", "setup_code/createDatabase.py"]
+        
+        for file_path in file_paths:
+            if os.path.exists(file_path):
+                with open(file_path, "r") as f:
+                    content = f.read()
+                
+                # Find the CREATE TABLE statement for users
+                match = re.search(r"CREATE TABLE users\s*\((.*?)\);", content, re.DOTALL)
+                if match:
+                    create_table = match.group(1)
+                    
+                    # Extract field names
+                    fields = []
+                    for line in create_table.split("\n"):
+                        line = line.strip()
+                        if line and not line.startswith(("PRIMARY KEY", "CONSTRAINT", "--")):
+                            field_name = line.split()[0].strip()
+                            if field_name != "id":  # Skip ID field
+                                fields.append(field_name)
+                    
+                    print(f"Extracted {len(fields)} fields from database schema")
+                    return fields
+        
+        print("Could not find CREATE TABLE statement for users in any expected location")
+        raise ValueError("Failed to extract user fields from schema")
     except Exception as e:
         print(f"Error extracting user fields from schema: {e}")
         # Fallback to a hardcoded list of fields
@@ -103,9 +107,9 @@ def process_contact_text(text: str) -> Tuple[Dict[str, Any], str]:
     """
 
     try:
-        # Make the request to OpenAI API
-        response = openai.chat.completions.create(
-            model="gpt-3.5-turbo",
+        # Make the request to OpenAI API using the new client format
+        response = client.chat.completions.create(
+            model=OPENAI_MODEL,
             messages=[
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": text}
@@ -164,6 +168,7 @@ def create_new_contact(contact_text: str, user_id: int, relationship_type: str =
     
     try:
         # Create the user via API
+        print(f"Creating user with data: {json.dumps(user_data, indent=2)}")
         user_response = requests.post(
             f"{API_BASE_URL}/users", 
             json=user_data
@@ -225,12 +230,12 @@ if __name__ == "__main__":
     sample_text = "John Doe is a software engineer at Google. He graduated from MIT with a computer science degree. His email is john.doe@example.com and phone is 123-456-7890. He lives in San Francisco."
     sample_user_id = 1
     
-    success, message, result = create_new_contact(sample_text, sample_user_id)
-    print(f"Success: {success}")
-    print(f"Message: {message}")
-    if not success:
+    result = create_new_contact(sample_text, sample_user_id)
+    print(f"Success: {result.get('success', False)}")
+    print(f"Message: {result.get('message', 'No message')}")
+    if not result.get('success', False):
         print(f"Error details: {result}")
     else:
-        print(f"User: {result['user']}")
-        if result['notes']:
-            print(f"Additional notes: {result['notes']}") 
+        print(f"User: {result.get('user', {})}")
+        if result.get('notes'):
+            print(f"Additional notes: {result.get('notes')}") 
