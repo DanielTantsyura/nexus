@@ -77,7 +77,7 @@ class DatabaseUtils:
             cursor = conn.cursor()
             
             # Get users
-            cursor.execute("SELECT id, username, first_name, last_name FROM users ORDER BY id;")
+            cursor.execute("SELECT id, username, first_name, last_name FROM people ORDER BY id;")
             users = cursor.fetchall()
             print(f"=== Users ({len(users)}) ===")
             for user_id, username, first_name, last_name in users:
@@ -94,8 +94,8 @@ class DatabaseUtils:
             cursor.execute("""
                 SELECT r.user_id, u1.first_name, r.contact_id, u2.first_name, r.relationship_description 
                 FROM relationships r
-                JOIN users u1 ON r.user_id = u1.id
-                JOIN users u2 ON r.contact_id = u2.id
+                JOIN people u1 ON r.user_id = u1.id
+                JOIN people u2 ON r.contact_id = u2.id
                 ORDER BY r.user_id, r.contact_id;
             """)
             relationships = cursor.fetchall()
@@ -131,7 +131,7 @@ class DatabaseUtils:
             # Get all users who have non-null recent_tags and don't have login credentials
             query = """
             SELECT u.id, u.first_name, u.last_name
-            FROM users u
+            FROM people u
             LEFT JOIN logins l ON u.id = l.user_id
             WHERE l.id IS NULL AND u.recent_tags IS NOT NULL;
             """
@@ -197,7 +197,7 @@ class DatabaseUtils:
             deleted_logins = cursor.rowcount
             print(f"Deleted {deleted_logins} test logins")
             
-            cursor.execute(f"DELETE FROM users WHERE id > {real_user_id_threshold};")
+            cursor.execute(f"DELETE FROM people WHERE id > {real_user_id_threshold};")
             deleted_users = cursor.rowcount
             print(f"Deleted {deleted_users} test users")
             
@@ -233,7 +233,7 @@ class DatabaseUtils:
             
             # First update username if needed
             cursor.execute(
-                "UPDATE users SET username = %s WHERE id = %s AND (username IS NULL OR username != %s);", 
+                "UPDATE people SET username = %s WHERE id = %s AND (username IS NULL OR username != %s);", 
                 (username, user_id, username)
             )
             

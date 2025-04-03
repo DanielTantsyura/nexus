@@ -112,7 +112,7 @@ def insert_sample_users():
     """Insert sample users into the database."""
     # SQL INSERT command template - adjusted to match our table schema
     insert_sql = """
-    INSERT INTO users (
+    INSERT INTO people (
         username, first_name, last_name, email, phone_number,
         location, university, field_of_interest, high_school,
         gender, ethnicity, uni_major, job_title, current_company,

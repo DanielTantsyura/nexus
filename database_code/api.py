@@ -32,62 +32,34 @@ def root():
     """API root endpoint returns a status message."""
     return jsonify({"status": "API is running"})
 
-@app.route('/users', methods=['GET'])
-def get_users():
+@app.route('/people', methods=['GET'])
+def get_all_users():
     """Get all users from the database."""
     try:
         with db_manager:
             users = db_manager.get_all_users()
-        
-        # Even if we get an empty list, return it as valid response
-        return jsonify(users if users else [])
+        return jsonify(users)
     except Exception as e:
         error_message = f"Error retrieving users: {str(e)}"
         print(error_message)
-        # Return empty array instead of error for better client handling
-        return jsonify([])
+        return jsonify({"error": error_message}), 500
 
-@app.route('/users/<int:user_id>', methods=['GET'])
-def get_user(user_id):
+@app.route('/people/<int:user_id>', methods=['GET'])
+def get_user_by_id(user_id):
     """Get a specific user by ID."""
     try:
         with db_manager:
             user = db_manager.get_user_by_id(user_id)
-        
-        if user:
-            return jsonify(user)
-        else:
-            print(f"User with ID {user_id} not found")
-            # Return empty user object with ID instead of 404 error
-            return jsonify({
-                "id": user_id,
-                "username": "unknown",
-                "first_name": "Unknown",
-                "last_name": "User"
-            })
+            if user:
+                return jsonify(user)
+            else:
+                return jsonify({"error": f"User with ID {user_id} not found"}), 404
     except Exception as e:
         error_message = f"Error retrieving user: {str(e)}"
         print(error_message)
         return jsonify({"error": error_message}), 500
 
-@app.route('/users/search', methods=['GET'])
-def search_users():
-    """Search for users based on query parameters."""
-    search_term = request.args.get('q', '')
-    
-    if not search_term:
-        return jsonify({"error": "Search term is required"}), 400
-    
-    try:
-        with db_manager:
-            users = db_manager.search_users(search_term)
-        return jsonify(users)
-    except Exception as e:
-        error_message = f"Error searching users: {str(e)}"
-        print(error_message)
-        return jsonify({"error": error_message}), 500
-
-@app.route('/users', methods=['POST'])
+@app.route('/people', methods=['POST'])
 def add_user():
     """Add a new user to the database."""
     data = request.json
@@ -116,56 +88,50 @@ def add_user():
         print(error_message)
         return jsonify({"error": error_message}), 500
 
-@app.route('/users/<int:user_id>', methods=['PUT'])
+@app.route('/people/<int:user_id>', methods=['PUT'])
 def update_user(user_id):
-    """Update an existing user in the database."""
+    """Update an existing user."""
     data = request.json
-    
     try:
         with db_manager:
-            # Check if user exists
-            user = db_manager.get_user_by_id(user_id)
-            if not user:
-                return jsonify({"error": f"User with ID {user_id} not found"}), 404
-            
-            # Update the user
             success = db_manager.update_user(user_id, data)
-            
             if success:
                 updated_user = db_manager.get_user_by_id(user_id)
                 return jsonify(updated_user)
             else:
-                return jsonify({"error": "Failed to update user"}), 500
+                return jsonify({"error": f"User with ID {user_id} not found"}), 404
     except Exception as e:
         error_message = f"Error updating user: {str(e)}"
         print(error_message)
         return jsonify({"error": error_message}), 500
 
-@app.route('/users/<int:user_id>/connections', methods=['GET'])
+@app.route('/people/search', methods=['GET'])
+def search_users():
+    """Search for users by name, location, or interests."""
+    search_term = request.args.get('q', '')
+    if not search_term:
+        return jsonify({"error": "Search term is required"}), 400
+    
+    try:
+        with db_manager:
+            results = db_manager.search_users(search_term)
+        return jsonify(results)
+    except Exception as e:
+        error_message = f"Error searching users: {str(e)}"
+        print(error_message)
+        return jsonify({"error": error_message}), 500
+
+@app.route('/people/<int:user_id>/connections', methods=['GET'])
 def get_user_connections(user_id):
     """Get all connections for a specific user."""
     try:
         with db_manager:
-            # Check if user exists
-            user = db_manager.get_user_by_id(user_id)
-            if not user:
-                print(f"User with ID {user_id} not found when fetching connections")
-                # Return empty array instead of error
-                return jsonify([])
-            
             connections = db_manager.get_user_connections(user_id)
-        return jsonify(connections if connections else [])
+        return jsonify(connections)
     except Exception as e:
-        error_message = f"Error retrieving connections: {str(e)}"
+        error_message = f"Error retrieving user connections: {str(e)}"
         print(error_message)
-        # Return empty array instead of error
-        return jsonify([])
-
-@app.route('/connections/<int:user_id>', methods=['GET'])
-def get_connections(user_id):
-    """Get all connections for a specific user (legacy endpoint)."""
-    # Redirect to the standard endpoint
-    return get_user_connections(user_id)
+        return jsonify({"error": error_message}), 500
 
 @app.route('/connections', methods=['POST'])
 def add_connection():
@@ -381,7 +347,7 @@ def login():
             'message': f'Login service unavailable. Please try again later. Error: {str(e)}'
         }), 500
 
-@app.route('/users/<int:user_id>/update-last-login', methods=['POST'])
+@app.route('/people/<int:user_id>/update-last-login', methods=['POST'])
 def update_last_login(user_id):
     """Update the last_login timestamp for a user when the app is opened."""
     try:

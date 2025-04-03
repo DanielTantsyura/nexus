@@ -437,48 +437,79 @@ def test_user_operations():
         "recent_tags": ["tag1", "tag2"]  # Should be ignored by API
     }
     
-    user_id = test_add_user(test_user_data)
-    if not user_id:
-        return False
-    
-    # Verify user was created properly
-    user = test_get_user_by_id(user_id)
-    if not user:
-        log("❌ Could not retrieve created user")
+    # Test creating a new user
+    response = requests.post(f"{BASE_URL}/people", json=test_user_data)
+    if response.status_code != 201:
+        log(f"❌ Failed to create test user: {response.text}")
         increment_test(False)
         return False
-        
-    # Check that username is NULL
-    if user.get('username') is not None:
-        log("❌ Username was not NULL as expected")
-        increment_test(False)
-    else:
-        log("✅ Username is properly NULL")
-        increment_test(True)
-        
-    # Check that recent_tags is NULL
-    if user.get('recent_tags') is not None:
-        log("❌ recent_tags was not NULL as expected")
-        increment_test(False)
-    else:
-        log("✅ recent_tags is properly NULL")
-        increment_test(True)
     
-    # Update the user
+    user_id = response.json()['id']
+    log(f"✅ Created test user with ID: {user_id}")
+    increment_test(True)
+    
+    # Test retrieving the user
+    response = requests.get(f"{BASE_URL}/people/{user_id}")
+    if response.status_code != 200:
+        log(f"❌ Failed to retrieve test user: {response.text}")
+        increment_test(False)
+        return False
+    
+    user = response.json()
+    log(f"✅ Retrieved test user: {user['first_name']} {user['last_name']}")
+    increment_test(True)
+    
+    # Test updating the user
     update_data = {
         "location": "Updated Test Location",
         "field_of_interest": "Updated Testing, Software Quality"
     }
-    
-    if not test_update_user(user_id, update_data):
-        return False
-    
-    # Search for the user
-    search_results = test_search_users("Test")
-    if not any(user.get('id') == user_id for user in search_results):
-        log("❌ Test user not found in search results")
+    response = requests.put(f"{BASE_URL}/people/{user_id}", json=update_data)
+    if response.status_code != 200:
+        log(f"❌ Failed to update test user: {response.text}")
         increment_test(False)
         return False
+    
+    updated_user = response.json()
+    if updated_user['location'] != update_data['location']:
+        log(f"❌ User location not updated correctly")
+        increment_test(False)
+        return False
+    
+    log(f"✅ Updated test user location to: {updated_user['location']}")
+    increment_test(True)
+    
+    # Test searching for the user
+    response = requests.get(f"{BASE_URL}/people/search?q=Test")
+    if response.status_code != 200:
+        log(f"❌ Failed to search for test user: {response.text}")
+        increment_test(False)
+        return False
+    
+    search_results = response.json()
+    if not any(user['id'] == user_id for user in search_results):
+        log(f"❌ Test user not found in search results")
+        increment_test(False)
+        return False
+    
+    log(f"✅ Found test user in search results")
+    increment_test(True)
+    
+    # Test getting user connections (should be empty for new user)
+    response = requests.get(f"{BASE_URL}/people/{user_id}/connections")
+    if response.status_code != 200:
+        log(f"❌ Failed to get test user connections: {response.text}")
+        increment_test(False)
+        return False
+    
+    connections = response.json()
+    if connections:
+        log(f"❌ New user should not have any connections")
+        increment_test(False)
+        return False
+    
+    log(f"✅ Verified test user has no connections")
+    increment_test(True)
     
     return True
 

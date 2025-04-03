@@ -41,10 +41,10 @@ def get_user_fields_from_schema() -> List[str]:
         with open(os.path.join(os.path.dirname(__file__), 'setupFiles', 'createDatabase.py'), 'r') as file:
             schema_content = file.read()
         
-        # Extract the CREATE TABLE users section
-        users_table_match = re.search(r'CREATE TABLE users \(\s*(.*?)\s*\);', schema_content, re.DOTALL)
+        # Extract the CREATE TABLE people section
+        users_table_match = re.search(r'CREATE TABLE people \(\s*(.*?)\s*\);', schema_content, re.DOTALL)
         if not users_table_match:
-            raise ValueError("Could not find users table definition in createDatabase.py")
+            raise ValueError("Could not find people table definition in createDatabase.py")
         
         users_table_def = users_table_match.group(1)
         
@@ -56,7 +56,7 @@ def get_user_fields_from_schema() -> List[str]:
         fields = [field for field in field_matches if field not in excluded_fields]
         
         if not fields:
-            raise ValueError("No fields found in users table definition")
+            raise ValueError("No fields found in people table definition")
         
         return fields
     except Exception as e:

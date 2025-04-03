@@ -11,10 +11,10 @@ sql_commands = """
 -- Drop existing tables (if they exist) to ensure schema updates
 DROP TABLE IF EXISTS relationships;
 DROP TABLE IF EXISTS logins;
-DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS people;
 
--- Create the expanded users table
-CREATE TABLE users (
+-- Create the expanded people table
+CREATE TABLE people (
     id SERIAL PRIMARY KEY,
     
     -- Identity information
@@ -57,7 +57,7 @@ CREATE TABLE logins (
     id SERIAL PRIMARY KEY,
     
     -- User relationship
-    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id INT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
     
     -- Authentication information
     username VARCHAR(50) NOT NULL UNIQUE,
@@ -73,8 +73,8 @@ CREATE TABLE relationships (
     id SERIAL PRIMARY KEY,
     
     -- User relationships
-    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    contact_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id INT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+    contact_id INT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
     
     -- Relationship description
     relationship_description VARCHAR(255),

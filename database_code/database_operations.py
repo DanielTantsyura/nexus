@@ -126,8 +126,7 @@ class DatabaseManager:
             List of user dictionaries
         """
         query = """
-        SELECT * FROM users
-        ORDER BY first_name, last_name;
+        SELECT * FROM people
         """
         
         try:
@@ -149,7 +148,7 @@ class DatabaseManager:
             User dictionary or None if not found
         """
         query = """
-        SELECT * FROM users
+        SELECT * FROM people
         WHERE id = %s;
         """
         
@@ -172,7 +171,7 @@ class DatabaseManager:
             User dictionary or None if not found
         """
         query = """
-        SELECT * FROM users
+        SELECT * FROM people
         WHERE username = %s;
         """
         
@@ -195,7 +194,7 @@ class DatabaseManager:
             User dictionary or None if not found
         """
         query = """
-        SELECT * FROM users
+        SELECT * FROM people
         WHERE email = %s;
         """
         
@@ -218,7 +217,7 @@ class DatabaseManager:
             List of matching user dictionaries
         """
         query = """
-        SELECT * FROM users
+        SELECT * FROM people
         WHERE 
             first_name ILIKE %s OR
             last_name ILIKE %s OR
@@ -252,7 +251,7 @@ class DatabaseManager:
             ID of the newly created user
         """
         query = """
-        INSERT INTO users (
+        INSERT INTO people (
             username, first_name, last_name, email, phone_number,
             location, university, field_of_interest, high_school,
             gender, ethnicity, uni_major, job_title, current_company,
@@ -326,7 +325,7 @@ class DatabaseManager:
             return False
         
         query = f"""
-        UPDATE users
+        UPDATE people
         SET {', '.join(set_clauses)}
         WHERE id = %(id)s
         """
@@ -367,7 +366,7 @@ class DatabaseManager:
             u.uni_major, u.job_title, u.current_company, u.profile_image_url,
             u.linkedin_url, r.relationship_description, r.notes as custom_note,
             r.tags, r.last_viewed, r.created_at
-        FROM users u
+        FROM people u
         JOIN relationships r ON u.id = r.contact_id
         LEFT JOIN logins l ON u.id = l.user_id
         WHERE r.user_id = %s
@@ -375,31 +374,11 @@ class DatabaseManager:
         """
         
         try:
-            print(f"Fetching connections for user {user_id}")  # Debug log
             self.cursor.execute(query, (user_id,))
             connections = self.cursor.fetchall()
-            
-            # Convert to list of dicts and process any special fields
-            result = []
-            for conn in connections:
-                conn_dict = dict(conn)
-                
-                # Convert tags string to list if present
-                if conn_dict.get('tags'):
-                    try:
-                        if isinstance(conn_dict['tags'], str):
-                            conn_dict['tags'] = [tag.strip() for tag in conn_dict['tags'].split(',') if tag.strip()]
-                    except Exception as e:
-                        print(f"Error processing tags for connection: {e}")
-                        conn_dict['tags'] = []
-                
-                result.append(conn_dict)
-            
-            print(f"Found {len(result)} connections")  # Debug log
-            return result
-            
+            return [dict(conn) for conn in connections]
         except Exception as e:
-            print(f"Error retrieving connections: {e}")
+            print(f"Error retrieving user connections: {e}")
             return []
     
     def add_connection(self, user_id: int, contact_id: int, relationship_description: str, 
@@ -567,7 +546,7 @@ class DatabaseManager:
             List of recent tags or empty list if none found
         """
         query = """
-        SELECT recent_tags FROM users
+        SELECT recent_tags FROM people
         WHERE id = %s;
         """
         
@@ -619,7 +598,7 @@ class DatabaseManager:
         
         # Update the user record
         query = """
-        UPDATE users
+        UPDATE people
         SET recent_tags = %s
         WHERE id = %s
         """
@@ -716,7 +695,7 @@ class DatabaseManager:
         """
         try:
             # Get all users with usernames
-            self.cursor.execute("SELECT id, username, first_name, last_name FROM users WHERE username IS NOT NULL;")
+            self.cursor.execute("SELECT id, username, first_name, last_name FROM people WHERE username IS NOT NULL;")
             users = self.cursor.fetchall()
             print(f"Found {len(users)} users with usernames")
             
@@ -762,14 +741,14 @@ class DatabaseManager:
     
     def check_database(self) -> bool:
         """
-        Check the current state of the database, printing table summaries.
+        Check the current state of the database.
         
         Returns:
             True if check completed successfully
         """
         try:
             # Get users
-            self.cursor.execute("SELECT id, username, first_name, last_name FROM users ORDER BY id;")
+            self.cursor.execute("SELECT id, username, first_name, last_name FROM people ORDER BY id;")
             users = self.cursor.fetchall()
             print(f"=== Users ({len(users)}) ===")
             for user in users:
@@ -786,18 +765,18 @@ class DatabaseManager:
             self.cursor.execute("""
                 SELECT r.user_id, u1.first_name, r.contact_id, u2.first_name, r.relationship_description 
                 FROM relationships r
-                JOIN users u1 ON r.user_id = u1.id
-                JOIN users u2 ON r.contact_id = u2.id
+                JOIN people u1 ON r.user_id = u1.id
+                JOIN people u2 ON r.contact_id = u2.id
                 ORDER BY r.user_id, r.contact_id;
             """)
             relationships = self.cursor.fetchall()
             print(f"\n=== Relationships ({len(relationships)}) ===")
             for rel in relationships:
-                print(f"{rel['user_id']} ({rel[1]}) -> {rel['contact_id']} ({rel[3]}): {rel['relationship_description']}")
+                print(f"{rel['user_id']} ({rel['first_name']}) -> {rel['contact_id']} ({rel['first_name_1']}): {rel['relationship_description']}")
             
             return True
         except Exception as e:
-            print(f"Error checking database: {e}")
+            print("An error occurred:", e)
             return False
     
     def clean_test_data(self, real_user_id_threshold: int = 5) -> bool:
@@ -820,7 +799,7 @@ class DatabaseManager:
             deleted_logins = self.cursor.rowcount
             print(f"Deleted {deleted_logins} test logins")
             
-            self.cursor.execute(f"DELETE FROM users WHERE id > {real_user_id_threshold};")
+            self.cursor.execute(f"DELETE FROM people WHERE id > {real_user_id_threshold};")
             deleted_users = self.cursor.rowcount
             print(f"Deleted {deleted_users} test users")
             
@@ -828,8 +807,8 @@ class DatabaseManager:
             self.conn.commit()
             return True
         except Exception as e:
+            print("An error occurred:", e)
             self.conn.rollback()
-            print(f"Error cleaning test data: {e}")
             return False
             
     def __enter__(self):
