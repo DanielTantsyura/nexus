@@ -10,44 +10,65 @@ struct MainTabView: View {
     // MARK: - View
     
     var body: some View {
-        TabView(selection: $coordinator.selectedTab) {
-            // Network Tab
-            NavigationStack(path: $coordinator.networkTabPath) {
-                NetworkView()
-                    .navigationDestination(for: User.self) { user in
-                        UserDetailView(user: user)
-                    }
-            }
-            .tabItem {
-                Label("Network", systemImage: "person.3")
-            }
-            .tag(TabSelection.network)
-            
-            // Add New Tab (now a rounded rectangle button)
-            NavigationStack {
-                CreateContactView()
-            }
-            .tabItem {
-                Label("Add", systemImage: "plus.rectangle.fill")
-            }
-            .tag(TabSelection.addNew)
-            
-            // Profile Tab
-            NavigationStack(path: $coordinator.profileTabPath) {
-                ProfileView()
-                    .navigationDestination(for: ActiveScreen.self) { screen in
-                        switch screen {
-                        case .editProfile:
-                            EditProfileView()
-                        default:
-                            EmptyView()
+        ZStack(alignment: .bottom) {
+            TabView(selection: $coordinator.selectedTab) {
+                // Network Tab
+                NavigationStack(path: $coordinator.networkTabPath) {
+                    NetworkView()
+                        .navigationDestination(for: User.self) { user in
+                            UserDetailView(user: user)
                         }
-                    }
+                }
+                .tabItem {
+                    Label("Network", systemImage: "person.3")
+                }
+                .tag(TabSelection.network)
+                
+                // Add New Tab (now a rounded rectangle button)
+                NavigationStack {
+                    CreateContactView()
+                }
+                .tabItem {
+                    // Empty label to reserve space
+                    Label("", systemImage: "")
+                }
+                .tag(TabSelection.addNew)
+                
+                // Profile Tab
+                NavigationStack(path: $coordinator.profileTabPath) {
+                    ProfileView()
+                        .navigationDestination(for: ActiveScreen.self) { screen in
+                            switch screen {
+                            case .editProfile:
+                                EditProfileView()
+                            default:
+                                EmptyView()
+                            }
+                        }
+                }
+                .tabItem {
+                    Label("Profile", systemImage: "person.circle")
+                }
+                .tag(TabSelection.profile)
             }
-            .tabItem {
-                Label("Profile", systemImage: "person.circle")
+            
+            // Custom Add Button
+            Button(action: {
+                coordinator.selectedTab = .addNew
+            }) {
+                VStack(spacing: 4) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 20, weight: .bold))
+                    Text("Add")
+                        .font(.caption2)
+                }
+                .foregroundColor(.white)
+                .frame(width: 70, height: 70)
+                .background(Color.green)
+                .clipShape(Capsule())
             }
-            .tag(TabSelection.profile)
+            .offset(y: 4) // Move up from tab bar
+            .shadow(radius: 2)
         }
         .onChange(of: coordinator.selectedTab) { oldValue, newValue in
             coordinator.selectTab(newValue)

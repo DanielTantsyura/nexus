@@ -70,7 +70,7 @@ struct AppHeader<TrailingContent: View>: View {
     }
     
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 0) {
             HStack(spacing: 12) {
                 // App logo
                 Image("AppLogo")
@@ -95,7 +95,7 @@ struct AppHeader<TrailingContent: View>: View {
             Text(subtitle)
                 .font(.subheadline)
                 .foregroundColor(.gray)
-                .padding(.bottom, 8)
+                .padding(.top, 2)
         }
         .frame(maxWidth: .infinity)
     }

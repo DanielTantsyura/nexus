@@ -111,10 +111,6 @@ struct NetworkView: View {
     /// Content displayed when connections exist
     private var connectionListContent: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Your Network")
-                .font(.title2)
-                .fontWeight(.bold)
-                .padding(.top, 8)
             
             ForEach(coordinator.networkManager.connections) { connection in
                 connectionCard(for: connection)

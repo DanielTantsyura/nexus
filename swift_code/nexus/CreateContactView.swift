@@ -33,11 +33,19 @@ struct CreateContactView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                // App header
+                // App header with X button
                 AppHeader(
                     firstName: coordinator.networkManager.currentUser?.firstName,
                     subtitle: "Your personal network tracker"
-                )
+                ) {
+                    Button(action: {
+                        coordinator.backFromCreateContact()
+                    }) {
+                        Image(systemName: "xmark")
+                            .foregroundColor(.red)
+                            .font(.system(size: 18))
+                    }
+                }
                 .padding(.bottom, 10)
                 
                 // Title
@@ -149,7 +157,7 @@ struct CreateContactView: View {
    
     /// Multi-line text entry area for contact information
     private var contactTextArea: some View {
-        SectionCard(title: "Contact Information") {
+        SectionCard(title: "") {
             TextEditor(text: $contactText)
                 .frame(minHeight: 150)
                 .padding(4)
@@ -262,10 +270,10 @@ struct CreateContactView: View {
                 Text("Submit")
                     .fontWeight(.medium)
                     .foregroundColor(.white)
-                    .padding()
+                    .frame(height: 44)
                     .frame(maxWidth: .infinity)
-                    .background(contactText.isEmpty ? Color.gray : Color.blue)
-                    .cornerRadius(10)
+                    .background(Color.green.opacity(contactText.isEmpty ? 0.5 : 1))
+                    .clipShape(Capsule())
             }
             .disabled(contactText.isEmpty)
         }
