@@ -115,12 +115,12 @@ By default, the API runs on localhost:8080.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/users` | GET | List all users |
-| `/users` | POST | Create a new user |
-| `/users/<int:user_id>` | GET | Get user by ID |
-| `/users/<int:user_id>` | PUT | Update a user |
-| `/users/search` | GET | Search for users |
-| `/users/<int:user_id>/connections` | GET | Get user connections |
+| `/people` | GET | List all users |
+| `/people` | POST | Create a new user |
+| `/people/<int:user_id>` | GET | Get user by ID |
+| `/people/<int:user_id>` | PUT | Update a user |
+| `/people/search` | GET | Search for users |
+| `/people/<int:user_id>/connections` | GET | Get user connections |
 | `/connections` | POST | Create a new connection |
 | `/connections/update` | PUT | Update a connection |
 | `/contacts/create` | POST | Create a contact from text |

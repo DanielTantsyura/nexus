@@ -13,6 +13,15 @@ struct NetworkView: View {
     /// Error message to display
     @State private var errorMessage: String? = nil
     
+    /// Search text state
+    @State private var searchText = ""
+    
+    /// Selected tag filter
+    @State private var selectedTag: String?
+    
+    /// Tag filter options
+    private let tagOptions = ["All", "Recent", "Work", "School", "Family", "Friends"]
+    
     // MARK: - View Body
     
     var body: some View {
@@ -31,6 +40,58 @@ struct NetworkView: View {
                             .font(.system(size: 18))
                     }
                 }
+                
+                // Search bar with tag filter
+                HStack(spacing: 12) {
+                    // Search field
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.gray)
+                        TextField("Search...", text: $searchText)
+                    }
+                    .padding(8)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(8)
+                    
+                    // Tag dropdown
+                    Menu {
+                        ForEach(tagOptions, id: \.self) { tag in
+                            Button(action: {
+                                selectedTag = tag == "All" ? nil : tag
+                            }) {
+                                HStack {
+                                    Text(tag)
+                                    if tag == (selectedTag ?? "All") {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Text(selectedTag ?? "Tag")
+                            Image(systemName: "chevron.up.chevron.down")
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.green.opacity(0.1))
+                        .foregroundColor(.green)
+                        .cornerRadius(8)
+                    }
+                    
+                    // Search button
+                    Button(action: {
+                        performSearch()
+                    }) {
+                        Text("Search")
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                    }
+                }
+                .padding(.horizontal)
                 
                 // Error message
                 if let errorMessage = errorMessage {
@@ -132,15 +193,23 @@ struct NetworkView: View {
                             .font(.headline)
                         
                         if let title = connection.user.jobTitle, !title.isEmpty {
-                            Text(title)
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
+                            HStack(spacing: 4) {
+                                Text(title)
+                                if let company = connection.user.currentCompany, !company.isEmpty {
+                                    Text("•")
+                                    Text(company)
+                                }
+                            }
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
                         }
                         
-                        Text("Last Contact: \(connection.lastContactFormat)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.top, 2)
+                        if let university = connection.user.university, !university.isEmpty {
+                            Text(university)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .padding(.top, 2)
+                        }
                     }
                     
                     Spacer()
@@ -207,6 +276,12 @@ struct NetworkView: View {
         }
         
         isRefreshing = false
+    }
+    
+    /// Performs the search based on current search text and selected tag
+    private func performSearch() {
+        // Implement search logic here using searchText and selectedTag
+        coordinator.networkManager.searchUsers(term: searchText)
     }
 }
 

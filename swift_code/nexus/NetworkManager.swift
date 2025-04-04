@@ -295,7 +295,7 @@ class NetworkManager: ObservableObject {
                 let nsError = error as NSError
                 print("Failed to fetch user: \(error.localizedDescription), code: \(nsError.code)")
                 
-                // For 404 errors, try a second approach using the /users endpoint instead of /users/{id}
+                // For 404 errors, try a second approach using the /people endpoint instead of /people/{id}
                 if nsError.code == 404 {
                     print("User not found by ID, trying to find in all users list")
                     self?.findUserInAllUsers(userId)
@@ -322,7 +322,7 @@ class NetworkManager: ObservableObject {
         // Otherwise fetch all users and look for the one we need
         print("Fetching all users to find user ID: \(targetUserId)")
         
-        guard let url = URL(string: "\(baseURL)/users") else {
+        guard let url = URL(string: "\(baseURL)/people") else {
             print("Invalid URL for fetching all users")
             return
         }
@@ -392,7 +392,7 @@ class NetworkManager: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        guard let url = URL(string: "\(baseURL)/users") else {
+        guard let url = URL(string: "\(baseURL)/people") else {
             isLoading = false
             errorMessage = "Invalid URL"
             return
@@ -423,7 +423,7 @@ class NetworkManager: ObservableObject {
         }.resume()
     }
     
-    /// Fetches a user by username using the /users/<username> API endpoint
+    /// Fetches a user by username using the /people/<username> API endpoint
     /// - Parameters:
     ///   - username: The username to look up
     ///   - completion: Closure called with the result
@@ -431,7 +431,7 @@ class NetworkManager: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        guard let url = URL(string: "\(baseURL)/users/\(username)") else {
+        guard let url = URL(string: "\(baseURL)/people/\(username)") else {
             isLoading = false
             let error = NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
             completion(.failure(error))
@@ -512,7 +512,7 @@ class NetworkManager: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        guard let url = URL(string: "\(baseURL)/users/\(userId)") else {
+        guard let url = URL(string: "\(baseURL)/people/\(userId)") else {
             isLoading = false
             let error = NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
             completion(.failure(error))
@@ -590,7 +590,7 @@ class NetworkManager: ObservableObject {
         errorMessage = nil
         
         // Use proper URLComponents to build the search URL
-        guard let baseSearchUrl = URL(string: "\(baseURL)/users/search") else {
+        guard let baseSearchUrl = URL(string: "\(baseURL)/people/search") else {
             isLoading = false
             errorMessage = "Invalid URL"
             return
@@ -654,7 +654,7 @@ class NetworkManager: ObservableObject {
         
         print("Fetching connections for user ID: \(userId)")
         
-        guard let url = URL(string: "\(baseURL)/users/\(userId)/connections") else {
+        guard let url = URL(string: "\(baseURL)/people/\(userId)/connections") else {
             isLoading = false
             print("Invalid URL for fetching connections")
             // Don't set errorMessage to avoid showing to user
@@ -1154,7 +1154,7 @@ class NetworkManager: ObservableObject {
             return
         }
         
-        guard let url = URL(string: "\(baseURL)/users/\(userId)/recent-tags") else {
+        guard let url = URL(string: "\(baseURL)/people/\(userId)/recent-tags") else {
             errorMessage = "Invalid URL"
             completion(.failure(NSError(domain: "NetworkManager", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
             return
@@ -1231,7 +1231,7 @@ class NetworkManager: ObservableObject {
         
         print("Fetching recent tags for user ID: \(userId)")
         
-        guard let url = URL(string: "\(baseURL)/users/\(userId)/recent-tags") else {
+        guard let url = URL(string: "\(baseURL)/people/\(userId)/recent-tags") else {
             print("Invalid URL for recent tags")
             return
         }
@@ -1342,7 +1342,7 @@ class NetworkManager: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        guard let url = URL(string: "\(baseURL)/users/\(user.id)") else {
+        guard let url = URL(string: "\(baseURL)/people/\(user.id)") else {
             isLoading = false
             errorMessage = "Invalid URL"
             completion(false)

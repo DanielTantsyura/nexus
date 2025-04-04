@@ -191,7 +191,7 @@ def create_new_contact(contact_text: str, user_id: int, relationship_type: str =
         from config import IOS_SIMULATOR_URL
         
         # Call the API to create the user
-        api_url = f"{IOS_SIMULATOR_URL}/users"
+        api_url = f"{IOS_SIMULATOR_URL}/people"
         response = requests.post(api_url, json=user_data)
         
         if user_response.status_code != 201:
