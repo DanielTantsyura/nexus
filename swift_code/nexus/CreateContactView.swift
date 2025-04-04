@@ -28,6 +28,9 @@ struct CreateContactView: View {
     /// Whether a submit operation is in progress
     @State private var isSubmitting = false
    
+    /// User created after submitting the form
+    @State private var createdUser: User? = nil
+   
     // MARK: - View Body
    
     var body: some View {
@@ -76,6 +79,42 @@ struct CreateContactView: View {
                
                 // Buttons
                 buttonSection
+               
+                // Success state - show a success message and redirect options
+                if let user = createdUser {
+                    VStack(spacing: 20) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 60))
+                            .foregroundColor(.green)
+                        
+                        Text("Contact Created Successfully!")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                        
+                        Text("You've successfully added \(user.firstName ?? "") to your network!")
+                            .multilineTextAlignment(.center)
+                        
+                        HStack(spacing: 16) {
+                            Button(action: {
+                                coordinator.showContact(user)
+                            }) {
+                                Text("View Contact")
+                                    .padding()
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(PrimaryButtonStyle())
+                            
+                            Button(action: {
+                                clearForm()
+                            }) {
+                                Text("Add Another")
+                                    .padding()
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(SecondaryButtonStyle())
+                        }
+                    }
+                }
                
                 Spacer()
             }
@@ -291,6 +330,7 @@ struct CreateContactView: View {
         newTagText = ""
         errorMessage = nil
         successMessage = nil
+        createdUser = nil
     }
    
     /// Submits the contact information to the API
@@ -312,8 +352,7 @@ struct CreateContactView: View {
                     coordinator.networkManager.fetchUser(withId: userId) { userResult in
                         switch userResult {
                         case .success(let user):
-                            clearForm()
-                            coordinator.showUserDetail(user)
+                            createdUser = user
                         case .failure:
                             // If we can't fetch the user, just go back
                             coordinator.backFromCreateContact()

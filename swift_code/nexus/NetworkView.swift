@@ -368,7 +368,7 @@ struct NetworkView: View {
         }
         .padding(.horizontal, 0)
         .onTapGesture {
-            coordinator.showUserDetail(connection.user)
+            coordinator.showContact(connection.user)
         }
     }
     

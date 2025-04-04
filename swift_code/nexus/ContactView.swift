@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Displays detailed information about a user including their profile and relationship data
-struct UserDetailView: View {
+struct ContactView: View {
     @EnvironmentObject private var coordinator: AppCoordinator
     let user: User
     
@@ -37,7 +37,7 @@ struct UserDetailView: View {
             }
         }
         .onAppear {
-            coordinator.activeScreen = .userDetail
+            coordinator.activeScreen = .contact
             loadRelationship()
             updateLastViewed()
         }
@@ -287,7 +287,7 @@ struct UserDetailView: View {
 
 #Preview {
     NavigationView {
-        UserDetailView(user: User(
+        ContactView(user: User(
             id: 1,
             username: "johndoe",
             firstName: "John",

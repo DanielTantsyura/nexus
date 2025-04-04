@@ -13,7 +13,7 @@ enum ActiveScreen: Equatable {
     case userList
     
     /// Detailed view of a specific user
-    case userDetail
+    case contact
     
     /// Profile editing screen
     case editProfile
@@ -172,17 +172,17 @@ final class AppCoordinator: ObservableObject {
     
     /// Navigate to the user detail screen for the specified user
     /// - Parameter user: The user to display details for
-    func showUserDetail(_ user: User) {
+    func showContact(_ user: User) {
         networkManager.selectedUser = user
         networkTabPath.append(user)
         navigationPath = networkTabPath
-        activeScreen = .userDetail
+        activeScreen = .contact
     }
     
     /// Navigate back from user detail to user list
-    func navigateBackFromUserDetail() {
+    func navigateBackFromContact() {
         // If we're showing user detail, go back to user list
-        if activeScreen == .userDetail {
+        if activeScreen == .contact {
             networkTabPath.removeLast()
             navigationPath = networkTabPath
         }

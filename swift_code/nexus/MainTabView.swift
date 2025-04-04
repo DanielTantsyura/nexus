@@ -16,7 +16,7 @@ struct MainTabView: View {
                 NavigationStack(path: $coordinator.networkTabPath) {
                     NetworkView()
                         .navigationDestination(for: User.self) { user in
-                            UserDetailView(user: user)
+                            ContactView(user: user)
                         }
                 }
                 .tabItem {

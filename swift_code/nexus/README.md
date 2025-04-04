@@ -23,7 +23,7 @@ The Nexus iOS client follows a structured architecture with these key components
 
 - **MainTabView**: Tab-based navigation controller with custom styling
 - **UserListView**: Browse and search through available contacts
-- **UserDetailView**: View comprehensive contact information and manage connections
+- **ContactView**: View comprehensive contact information and manage connections
 - **CreateContactView**: Add new contacts using natural language processing
 - **ProfileView**: View and manage the current user's profile
 - **EditProfileView**: Update profile information with form-based editing
