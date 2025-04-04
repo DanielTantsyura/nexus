@@ -21,12 +21,12 @@ try:
     
     # Test a simple query
     print("Testing query...")
-    cursor.execute("SELECT COUNT(*) FROM users")
+    cursor.execute("SELECT COUNT(*) FROM people")
     result = cursor.fetchone()
     print(f"User count: {result[0]}")
     
     # Test specific user
-    cursor.execute("SELECT * FROM users WHERE id = 1")
+    cursor.execute("SELECT * FROM people WHERE id = 1")
     user = cursor.fetchone()
     if user:
         print(f"Found user with ID 1: {user['first_name']} {user['last_name']}")
@@ -70,7 +70,7 @@ try:
         SELECT 
             u.id, u.first_name, u.last_name
         FROM relationships r
-        JOIN users u ON r.contact_id = u.id
+        JOIN people u ON r.contact_id = u.id
         WHERE r.user_id = %s
         ORDER BY u.first_name, u.last_name
     """, (user_id,))

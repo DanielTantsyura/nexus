@@ -42,6 +42,58 @@ struct NetworkView: View {
                     }
                 }
                 
+                // Search bar with tag filter
+                HStack(spacing: 12) {
+                    // Search field
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.gray)
+                        TextField("Search...", text: $searchText)
+                    }
+                    .padding(8)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(8)
+                    
+                    // Tag dropdown
+                    Menu {
+                        ForEach(tagOptions, id: \.self) { tag in
+                            Button(action: {
+                                selectedTag = tag == "All" ? nil : tag
+                            }) {
+                                HStack {
+                                    Text(tag)
+                                    if tag == (selectedTag ?? "All") {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Text(selectedTag ?? "Tag")
+                            Image(systemName: "chevron.up.chevron.down")
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.green.opacity(0.1))
+                        .foregroundColor(.green)
+                        .cornerRadius(8)
+                    }
+                    
+                    // Search button
+                    Button(action: {
+                        performSearch()
+                    }) {
+                        Text("Search")
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                    }
+                }
+                .padding(.horizontal)
+                
                 // Error message
                 if let errorMessage = errorMessage {
                     errorBanner(message: errorMessage)
@@ -120,11 +172,17 @@ struct NetworkView: View {
             }
         )
         .onAppear {
-            refreshConnections()
+            Task {
+                refreshConnections()
+                // Add a small delay and trigger a refresh to ensure UI updates
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                refreshTrigger.toggle() // Force UI update
+            }
         }
         .refreshable {
             await refreshConnectionsAsync()
         }
+        .id(refreshTrigger) // Force view to refresh when trigger changes
     }
     
     // MARK: - UI Components
@@ -427,10 +485,11 @@ struct NetworkView: View {
     private func refreshConnectionsAsync() async {
         isRefreshing = true
         
-        await withCheckedContinuation { continuation in
-            refreshConnections()
-            continuation.resume()
-        }
+        // Call the refresh function
+        refreshConnections()
+        
+        // Add a delay to allow data to load
+        try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
         
         isRefreshing = false
     }

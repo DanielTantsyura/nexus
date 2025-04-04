@@ -45,9 +45,9 @@ def increment_test(passed=True):
 # ====== Basic API Testing Functions ======
 
 def test_get_all_users():
-    """Test the GET /users endpoint"""
-    log("\n--- Testing GET /users ---")
-    response = requests.get(f"{BASE_URL}/users")
+    """Test the GET /people endpoint"""
+    log("\n--- Testing GET /people ---")
+    response = requests.get(f"{BASE_URL}/people")
     if response.status_code == 200:
         users = response.json()
         log(f"✅ Success! Found {len(users)} users")
@@ -62,9 +62,9 @@ def test_get_all_users():
         return []
 
 def test_search_users(term):
-    """Test the GET /users/search endpoint"""
-    log(f"\n--- Testing GET /users/search?term={term} ---")
-    response = requests.get(f"{BASE_URL}/users/search", params={"term": term})
+    """Test the GET /people/search endpoint"""
+    log(f"\n--- Testing GET /people/search?term={term} ---")
+    response = requests.get(f"{BASE_URL}/people/search", params={"term": term})
     if response.status_code == 200:
         users = response.json()
         log(f"✅ Success! Found {len(users)} users matching '{term}'")
@@ -79,9 +79,9 @@ def test_search_users(term):
         return []
 
 def test_get_user_by_username(username):
-    """Test the GET /users/<username> endpoint"""
-    log(f"\n--- Testing GET /users/{username} ---")
-    response = requests.get(f"{BASE_URL}/users/{username}")
+    """Test the GET /people/<username> endpoint"""
+    log(f"\n--- Testing GET /people/{username} ---")
+    response = requests.get(f"{BASE_URL}/people/{username}")
     if response.status_code == 200:
         user = response.json()
         log(f"✅ Success! Found user: {user['first_name']} {user['last_name']}")
@@ -96,9 +96,9 @@ def test_get_user_by_username(username):
         return None
 
 def test_get_connections(user_id):
-    """Test the GET /users/<user_id>/connections endpoint"""
-    log(f"\n--- Testing GET /users/{user_id}/connections ---")
-    response = requests.get(f"{BASE_URL}/users/{user_id}/connections")
+    """Test the GET /people/<user_id>/connections endpoint"""
+    log(f"\n--- Testing GET /people/{user_id}/connections ---")
+    response = requests.get(f"{BASE_URL}/people/{user_id}/connections")
     if response.status_code == 200:
         connections = response.json()
         log(f"✅ Success! Found {len(connections)} connections for user ID {user_id}")
@@ -113,8 +113,8 @@ def test_get_connections(user_id):
         return []
 
 def test_add_user(user_data):
-    """Test the POST /users endpoint"""
-    log("\n--- Testing POST /users ---")
+    """Test the POST /people endpoint"""
+    log("\n--- Testing POST /people ---")
     # Ensure default values for all fields
     required_fields = [
         'gender', 'ethnicity', 'uni_major', 'job_title', 'current_company'
@@ -123,7 +123,7 @@ def test_add_user(user_data):
         if field not in user_data:
             user_data[field] = f"Test {field.replace('_', ' ').title()}"
         
-    response = requests.post(f"{BASE_URL}/users", json=user_data)
+    response = requests.post(f"{BASE_URL}/people", json=user_data)
     if response.status_code == 201:
         result = response.json()
         log(f"✅ Success! Added user with ID: {result['id']}")
@@ -136,9 +136,9 @@ def test_add_user(user_data):
         return None
 
 def test_update_user(user_id, user_data):
-    """Test the PUT /users/<user_id> endpoint"""
-    log(f"\n--- Testing PUT /users/{user_id} ---")
-    response = requests.put(f"{BASE_URL}/users/{user_id}", json=user_data)
+    """Test the PUT /people/<user_id> endpoint"""
+    log(f"\n--- Testing PUT /people/{user_id} ---")
+    response = requests.put(f"{BASE_URL}/people/{user_id}", json=user_data)
     if response.status_code == 200:
         log(f"✅ Success! Updated user with ID: {user_id}")
         increment_test(True)
@@ -233,7 +233,7 @@ def test_api_connection():
     log("\n=== Testing API Connection ===")
     
     try:
-        response = requests.get(f"{BASE_URL}/users")
+        response = requests.get(f"{BASE_URL}/people")
         if response.status_code == 200:
             log("✅ API is running and accessible")
             increment_test(True)

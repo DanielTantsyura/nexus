@@ -47,7 +47,7 @@ def create_test_contact(text, tags, current_user_id):
     # Create the new user
     try:
         # API endpoint for adding a new user
-        user_endpoint = f"{API_BASE_URL}/users"
+        user_endpoint = f"{API_BASE_URL}/people"
         user_response = requests.post(user_endpoint, json=user_data)
         
         if user_response.status_code != 201:

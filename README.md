@@ -19,7 +19,7 @@ The system allows users to:
 ### Backend Features
 
 1. **Database Structure**
-   - PostgreSQL with three primary tables: `users`, `logins`, and `relationships`
+   - PostgreSQL with three primary tables: `people`, `logins`, and `relationships`
    - Comprehensive user profiles with personal and professional details
    - Relationship tracking with custom notes and tags
    - Last login timestamp tracking
@@ -100,7 +100,7 @@ The system allows users to:
 
 ### User Profiles
 
-The `users` table stores comprehensive information about each contact:
+The `people` table stores comprehensive information about each contact:
 - Basic info: name, email, phone, location
 - Professional details: company, job title, field of interest
 - Educational background: university, major, high school
@@ -111,7 +111,7 @@ Email addresses are not required to be unique, allowing the system to store mult
 
 ### Relationship Management
 
-The `relationships` table manages connections between users:
+The `relationships` table manages connections between people:
 - Bidirectional relationship tracking
 - Custom notes specific to each relationship
 - Tag-based categorization with comma-separated tags
@@ -184,12 +184,12 @@ The system leverages OpenAI's API to extract structured data from natural langua
 
    | Endpoint | Method | Description |
    |----------|--------|-------------|
-   | `/users` | GET | List all users |
-   | `/users` | POST | Create a new user |
-   | `/users/<int:user_id>` | GET | Get user by ID |
-   | `/users/<int:user_id>` | PUT | Update a user |
-   | `/users/search` | GET | Search for users |
-   | `/users/<int:user_id>/connections` | GET | Get user connections |
+   | `/people` | GET | List all people |
+   | `/people` | POST | Create a new user |
+   | `/people/<int:user_id>` | GET | Get user by ID |
+   | `/people/<int:user_id>` | PUT | Update a user |
+   | `/people/search` | GET | Search for people |
+   | `/people/<int:user_id>/connections` | GET | Get user connections |
    | `/connections` | POST | Create a new connection |
    | `/connections/update` | PUT | Update a connection |
    | `/contacts/create` | POST | Create a contact from text |
