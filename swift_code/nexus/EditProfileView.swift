@@ -254,32 +254,28 @@ struct EditProfileView: View {
     
     /// Saves the current profile or contact information
     private func saveProfile() {
-        // Create updated user object from form data
-        let updatedUser = User(
-            id: user?.id ?? (coordinator.networkManager.userId ?? 0),
-            username: user?.username,
-            firstName: firstName,
-            lastName: lastName,
-            email: email,
-            phoneNumber: phoneNumber,
-            location: location,
-            university: university,
-            fieldOfInterest: interests,
-            highSchool: highSchool,
-            birthday: user?.birthday,
-            createdAt: user?.createdAt,
-            currentCompany: company,
-            gender: gender,
-            ethnicity: ethnicity,
-            uniMajor: uniMajor,
-            jobTitle: jobTitle,
-            lastLogin: nil,
-            profileImageUrl: nil,
-            linkedinUrl: nil,
-            recentTags: nil
-        )
+        // Prepare user data dictionary
+        var userData: [String: Any] = [:]
         
-        coordinator.networkManager.updateUser(updatedUser) { success in
+        userData["first_name"] = firstName
+        userData["last_name"] = lastName
+        userData["email"] = email
+        userData["phone_number"] = phoneNumber
+        userData["location"] = location
+        userData["university"] = university
+        userData["field_of_interest"] = interests
+        userData["high_school"] = highSchool
+        userData["current_company"] = company
+        userData["gender"] = gender
+        userData["ethnicity"] = ethnicity
+        userData["uni_major"] = uniMajor
+        userData["job_title"] = jobTitle
+        
+        // Get user ID
+        let userId = user?.id ?? (coordinator.networkManager.userId ?? 0)
+        
+        // Call the updated API with dictionary-based parameters
+        coordinator.networkManager.updateUser(userId: userId, userData: userData) { success in
             saveSuccess = success
             saveAlertMessage = success
                 ? isInSheet ? "Contact information has been updated successfully." : "Your profile has been updated successfully."

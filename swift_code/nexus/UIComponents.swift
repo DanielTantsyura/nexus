@@ -123,10 +123,17 @@ struct UserAvatar: View {
             .fill(Color.blue.opacity(0.2))
             .frame(width: size, height: size)
             .overlay(
-                Text(String(user.fullName.prefix(1)))
+                Text(getInitials())
                     .font(.system(size: size * 0.4, weight: .bold))
                     .foregroundColor(.blue)
             )
+    }
+    
+    /// Get the initials from first and last name
+    private func getInitials() -> String {
+        let firstName = user.firstName?.prefix(1) ?? ""
+        let lastName = user.lastName?.prefix(1) ?? ""
+        return "\(firstName)\(lastName)"
     }
 }
 
