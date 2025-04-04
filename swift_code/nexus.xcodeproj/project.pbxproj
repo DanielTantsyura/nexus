@@ -186,7 +186,7 @@
 					};
 				};
 			};
-			buildConfigurationList = E9F23D0D2D97B5D700CE7B92 /* Build configuration list for PBXProject "nexus" */;
+			buildConfigurationList = E9F23D0D2D97B5D700CE7B92 /* Build configuration list for PBXProject "Nexus" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -515,7 +515,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		E9F23D0D2D97B5D700CE7B92 /* Build configuration list for PBXProject "nexus" */ = {
+		E9F23D0D2D97B5D700CE7B92 /* Build configuration list for PBXProject "Nexus" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				E9F23D342D97B5D900CE7B92 /* Debug */,
