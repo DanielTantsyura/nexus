@@ -58,16 +58,16 @@ struct MainTabView: View {
             }) {
                 VStack(spacing: 4) {
                     Image(systemName: "plus")
-                        .font(.system(size: 20, weight: .bold))
+                        .font(.system(size: 30, weight: .bold))
                     Text("Add")
                         .font(.caption2)
                 }
                 .foregroundColor(.white)
-                .frame(width: 70, height: 70)
+                .frame(width: 100, height: 100)
                 .background(Color.green)
                 .clipShape(Capsule())
             }
-            .offset(y: 4) // Move up from tab bar
+            .offset(y: 8) // Moved 5 pixels lower (from -4 to 1)
             .shadow(radius: 2)
         }
         .onChange(of: coordinator.selectedTab) { oldValue, newValue in

@@ -343,18 +343,14 @@ class NetworkManager: ObservableObject {
     func updateLastLogin() {
         guard let userId = self.userId else { return }
         
-        guard let url = URL(string: "\(baseURL)/login/update") else {
+        guard let url = URL(string: "\(baseURL)/people/\(userId)/update-last-login") else {
             print("Invalid URL for updating last login")
             return
         }
         
-        let requestData = ["user_id": userId]
-        guard let jsonData = try? JSONEncoder().encode(requestData) else { return }
-        
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = jsonData
         
         URLSession.shared.dataTask(with: request) { _, response, error in
             if let error = error {
@@ -1446,6 +1442,7 @@ class NetworkManager: ObservableObject {
     func fetchRecentTags() {
         guard let userId = self.userId else { return }
         
+        isLoading = true
         print("Fetching recent tags for user ID: \(userId)")
         
         guard let url = URL(string: "\(baseURL)/people/\(userId)/recent-tags") else {
@@ -1584,9 +1581,10 @@ class NetworkManager: ObservableObject {
         fetchAllUsers()
     }
     
-    /// Updates user profile information
+    /// Updates user profile information with a dictionary of fields
     /// - Parameters:
-    ///   - user: The updated user profile
+    ///   - userId: The ID of the user to update
+    ///   - userData: Dictionary of user fields to update
     ///   - completion: Closure called with a boolean indicating success or failure
     func updateUser(_ user: User, completion: @escaping (Bool) -> Void) {
         setLoading(true)

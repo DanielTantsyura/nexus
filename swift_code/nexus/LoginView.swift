@@ -47,11 +47,6 @@ struct LoginView: View {
                     .padding(.bottom, 10)
                     .disabled(isLoggingIn)
                 
-                // Adding helper text to clarify username is used
-                Text("Use your username, not email")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                    .padding(.bottom, 5)
             }
             
             VStack(alignment: .leading, spacing: 8) {
