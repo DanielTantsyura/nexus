@@ -14,11 +14,16 @@ struct UserDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                // User info section
+                // User info section with tags
                 userInfoSection
                 
-                // Relationship section (if any)
-                relationshipSection
+                // Notes section (if any)
+                if let relationship = relationship, let notes = relationship.notes {
+                    notesSection(notes: notes)
+                }
+                
+                // Combined relationship description and contact information
+                combinedInfoSection
             }
             .padding()
         }
@@ -27,7 +32,7 @@ struct UserDetailView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { showingEditContactSheet = true }) {
-                    Image(systemName: "pencil")
+                    Image(systemName: "square.and.pencil")
                 }
             }
         }
@@ -50,15 +55,24 @@ struct UserDetailView: View {
                 // Header with name and basic info
                 userHeaderView
                 
-                Divider()
-                
-                // Personal details
-                personalDetailsSection
-                
-                Divider()
-                
-                // Education and work
-                educationWorkSection
+                // Tags displayed directly under header
+                if let relationship = relationship, let tags = relationship.tags, !tags.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(tags, id: \.self) { tag in
+                                Text(tag)
+                                    .font(.system(size: 12))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(tagColor(for: tag).opacity(0.2))
+                                    .foregroundColor(tagColor(for: tag))
+                                    .cornerRadius(16)
+                            }
+                        }
+                        .padding(.vertical, 8)
+                    }
+                    .padding(.top, 4)
+                }
             }
         }
         .contentShape(Rectangle())
@@ -73,24 +87,48 @@ struct UserDetailView: View {
                     .font(.largeTitle)
                     .fontWeight(.bold)
                 
+                // Job title and company with building icon
                 if let jobTitle = user.jobTitle, let company = user.currentCompany {
-                    Text("\(jobTitle) at \(company)")
-                        .font(.headline)
-                        .foregroundColor(.blue)
+                    HStack {
+                        Text(jobTitle)
+                            .fontWeight(.bold) // Bold job title
+                            .font(.subheadline) // Make job title smaller
+                            .foregroundColor(.gray) // Make job title gray
+                        Image(systemName: "building.2.fill") // Light blue work building icon
+                            .foregroundColor(Color.blue.opacity(0.5)) // Light blue icon
+                        Text(company)
+                            .foregroundColor(.gray) // Make company gray
+                    }
                 } else if let jobTitle = user.jobTitle {
                     Text(jobTitle)
-                        .font(.headline)
-                        .foregroundColor(.blue)
+                        .fontWeight(.bold) // Bold job title
+                        .font(.subheadline) // Make job title smaller
+                        .foregroundColor(.gray) // Make job title gray
                 } else if let company = user.currentCompany {
-                    Text("Works at \(company)")
-                        .font(.headline)
-                        .foregroundColor(.blue)
+                    HStack {
+                        Image(systemName: "building.2.fill") // Light blue work building icon
+                            .foregroundColor(Color.blue.opacity(0.5)) // Light blue icon
+                        Text(company)
+                            .foregroundColor(.gray) // Make company gray
+                    }
                 }
                 
-                if let location = user.location {
-                    Label(location, systemImage: "location.fill")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
+                // Education and location on the third line
+                HStack {
+                    if let university = user.university {
+                        Image(systemName: "graduationcap.fill") // Light blue university icon
+                            .foregroundColor(Color.blue.opacity(0.5)) // Light blue icon
+                        Text(university)
+                            .font(.subheadline) // Make university text smaller
+                            .foregroundColor(.gray)
+                    }
+                    if let location = user.location {
+                        Image(systemName: "location.fill") // Blue location icon
+                            .foregroundColor(.blue) // Blue icon
+                        Text(location)
+                            .font(.subheadline) // Make location text smaller
+                            .foregroundColor(.gray)
+                    }
                 }
             }
             Spacer()
@@ -113,14 +151,6 @@ struct UserDetailView: View {
                 
                 if let ethnicity = user.ethnicity {
                     InfoRow(icon: "person.2.fill", title: "Ethnicity", value: ethnicity)
-                }
-                
-                if let email = user.email {
-                    InfoRow(icon: "envelope.fill", title: "Email", value: email)
-                }
-                
-                if let phone = user.phoneNumber {
-                    InfoRow(icon: "phone.fill", title: "Phone", value: phone)
                 }
             }
         }
@@ -153,87 +183,7 @@ struct UserDetailView: View {
         }
     }
     
-    /// Displays the relationship information between the current user and this user
-    private var relationshipSection: some View {
-        Group {
-            if isLoadingRelationship {
-                SectionCard(title: "Relationship") {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                            .padding()
-                        Spacer()
-                    }
-                }
-            } else if let error = relationshipError {
-                SectionCard(title: "Relationship") {
-                    Text(error)
-                        .foregroundColor(.red)
-                        .padding()
-                }
-            } else if let relationship = relationship {
-                SectionCard(title: "Relationship") {
-                    VStack(alignment: .leading, spacing: 12) {
-                        if let description = relationship.relationshipDescription {
-                            InfoRow(icon: "person.2.fill", title: "Description", value: description)
-                        }
-                        
-                        if let notes = relationship.notes {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Notes")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                                
-                                Text(notes)
-                                    .foregroundColor(.primary)
-                                    .padding(.vertical, 4)
-                            }
-                        }
-                        
-                        if let tags = relationship.tags, !tags.isEmpty {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Tags")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                                
-                                FlowLayout(spacing: 8) {
-                                    ForEach(tags, id: \.self) { tag in
-                                        TagBadge(text: tag, showRemoveButton: false)
-                                    }
-                                }
-                            }
-                        }
-                        
-                        Button(action: {
-                            showingEditContactSheet = true
-                        }) {
-                            Text("Edit Relationship")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                                .background(Color.blue)
-                                .cornerRadius(8)
-                        }
-                        .padding(.top, 8)
-                    }
-                    .padding(.vertical, 4)
-                }
-            } else {
-                // No relationship exists
-                SectionCard(title: "Relationship") {
-                    VStack(spacing: 16) {
-                        Text("No relationship information available.")
-                            .foregroundColor(.gray)
-                            .padding()
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-            }
-        }
-    }
     
-    // MARK: - Helper Methods
     
     /// Load relationship data between current user and this user
     private func loadRelationship() {
@@ -262,6 +212,74 @@ struct UserDetailView: View {
         coordinator.networkManager.updateConnectionTimestamp(contactId: user.id) { _ in
             // Success or failure doesn't matter much here
         }
+    }
+    
+    // New sections to add
+    
+    private func tagsSection(tags: [String]) -> some View {
+        SectionCard(title: "Tags") {
+            FlowLayout(spacing: 8) {
+                ForEach(tags, id: \.self) { tag in
+                    TagBadge(text: tag, showRemoveButton: false)
+                }
+            }
+            .padding(.vertical, 8)
+        }
+    }
+    
+    private func notesSection(notes: String) -> some View {
+        SectionCard(title: "Notes") {
+            Text(notes)
+                .padding(.vertical, 8)
+        }
+    }
+    
+    // New combined section for relationship description and contact info
+    private var combinedInfoSection: some View {
+        SectionCard(title: "Contact Information") {
+            VStack(alignment: .leading, spacing: 12) {
+                // Relationship description first (if available)
+                if let relationship = relationship, let description = relationship.relationshipDescription {
+                    InfoRow(icon: "person.2.fill", title: "Relationship Description", value: description)
+                }
+                
+                // Divider only if both description and contact info exist
+                if (relationship?.relationshipDescription != nil) && 
+                   (user.email != nil || user.phoneNumber != nil) {
+                    Divider()
+                        .padding(.vertical, 4)
+                }
+                
+                // Contact information
+                if let email = user.email {
+                    InfoRow(icon: "envelope.fill", title: "Email", value: email)
+                }
+                
+                if let phone = user.phoneNumber {
+                    InfoRow(icon: "phone.fill", title: "Phone", value: phone)
+                }
+                
+                // Add edit button at the bottom of the section
+                Button(action: {
+                    showingEditContactSheet = true
+                }) {
+                    HStack {
+                        Image(systemName: "square.and.pencil")
+                        Text("Edit Contact")
+                    }
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .padding(.top, 10)
+            }
+            .padding(.vertical, 4)
+        }
+    }
+    
+    // Color function to match NetworkView tag coloring
+    private func tagColor(for tag: String) -> Color {
+        let colors: [Color] = [.blue, .green, .orange, .purple, .pink, .red]
+        let hash = abs(tag.hashValue)
+        return colors[hash % colors.count]
     }
 }
 

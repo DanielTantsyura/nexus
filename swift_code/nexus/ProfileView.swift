@@ -148,7 +148,7 @@ struct ProfileView: View {
                             startEditing(user)
                         }) {
                             HStack {
-                                Image(systemName: "pencil")
+                                Image(systemName: "square.and.pencil")
                                 Text("Edit Profile")
                             }
                         }

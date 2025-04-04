@@ -136,7 +136,7 @@ struct NetworkView: View {
         .refreshable {
             await refreshConnectionsAsync()
         }
-        .onChange(of: coordinator.networkManager.connections) { connections in
+        .onChange(of: coordinator.networkManager.connections) { oldValue, connections in
             // Force a refresh when we get non-zero connections for the first time
             if !connections.isEmpty && !hasShownConnections {
                 hasShownConnections = true
@@ -357,9 +357,9 @@ struct NetworkView: View {
                                     .minimumScaleFactor(0.8)
                             }
                         }
-                        .frame(width: 90)
+                        .frame(width: 100) // Increased width from 90 to 100
                         .layoutPriority(0)
-                        .padding(.trailing, -2)
+                        .padding(.trailing, -4) // Reduced right padding from -2 to -4
                     }
                 }
             }
