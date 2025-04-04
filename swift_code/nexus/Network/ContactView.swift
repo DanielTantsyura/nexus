@@ -6,10 +6,25 @@ struct ContactView: View {
     let user: User
     
     // MARK: - State
-    @State private var showingEditContactSheet = false
+    @State private var isEditing = false
     @State private var relationship: Connection?
     @State private var isLoadingRelationship = true
     @State private var relationshipError: String?
+    
+    // Editing state variables
+    @State private var editFirstName = ""
+    @State private var editLastName = ""
+    @State private var editJobTitle = ""
+    @State private var editCompany = ""
+    @State private var editUniversity = ""
+    @State private var editUniMajor = ""
+    @State private var editLocation = ""
+    @State private var editEmail = ""
+    @State private var editPhone = ""
+    @State private var editGender = ""
+    @State private var editEthnicity = ""
+    @State private var editInterests = ""
+    @State private var editHighSchool = ""
     
     var body: some View {
         ScrollView {
@@ -31,8 +46,14 @@ struct ContactView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: { showingEditContactSheet = true }) {
-                    Image(systemName: "square.and.pencil")
+                if isEditing {
+                    Button(action: { saveChanges() }) {
+                        Image(systemName: "checkmark")
+                    }
+                } else {
+                    Button(action: { startEditing() }) {
+                        Image(systemName: "square.and.pencil")
+                    }
                 }
             }
         }
@@ -40,9 +61,6 @@ struct ContactView: View {
             coordinator.activeScreen = .contact
             loadRelationship()
             updateLastViewed()
-        }
-        .sheet(isPresented: $showingEditContactSheet) {
-            EditProfileView(user: user)
         }
     }
     
@@ -76,58 +94,104 @@ struct ContactView: View {
             }
         }
         .contentShape(Rectangle())
-        .onLongPressGesture { showingEditContactSheet = true }
+        .onLongPressGesture { startEditing() }
     }
     
     /// Header with user's basic information
     private var userHeaderView: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(user.fullName)
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                
-                // Job title and company with building icon
-                if let jobTitle = user.jobTitle, let company = user.currentCompany {
+                if isEditing {
                     HStack {
+                        TextField("First Name", text: $editFirstName)
+                            .font(.title2)
+                            .fontWeight(.bold)
+                        TextField("Last Name", text: $editLastName)
+                            .font(.title2)
+                            .fontWeight(.bold)
+                    }
+                    
+                    // Job title field and company on same row
+                    HStack(spacing: 8) {
+                        TextField("Job Title", text: $editJobTitle)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        
+                        // Company icon and field
+                        HStack(spacing: 4) {
+                            Image(systemName: "building.2.fill")
+                                .font(.caption)
+                                .foregroundColor(.blue.opacity(0.6))
+                            TextField("Company", text: $editCompany)
+                                .font(.subheadline)
+                        }
+                    }
+                    
+                    // University and location fields
+                    HStack(spacing: 8) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "building.columns.fill")
+                                .font(.caption)
+                                .foregroundColor(.blue.opacity(0.7))
+                            TextField("University", text: $editUniversity)
+                                .font(.subheadline)
+                        }
+                        
+                        HStack(spacing: 4) {
+                            Image(systemName: "location.fill")
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                            TextField("Location", text: $editLocation)
+                                .font(.subheadline)
+                        }
+                    }
+                } else {
+                    Text(user.fullName)
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                
+                    // Job title and company with building icon
+                    if let jobTitle = user.jobTitle, let company = user.currentCompany {
+                        HStack {
+                            Text(jobTitle)
+                                .fontWeight(.bold) // Bold job title
+                                .font(.subheadline) // Make job title smaller
+                                .foregroundColor(.gray) // Make job title gray
+                            Image(systemName: "building.2.fill") // Light blue work building icon
+                                .foregroundColor(Color.blue.opacity(0.5)) // Light blue icon
+                            Text(company)
+                                .foregroundColor(.gray) // Make company gray
+                        }
+                    } else if let jobTitle = user.jobTitle {
                         Text(jobTitle)
                             .fontWeight(.bold) // Bold job title
                             .font(.subheadline) // Make job title smaller
                             .foregroundColor(.gray) // Make job title gray
-                        Image(systemName: "building.2.fill") // Light blue work building icon
-                            .foregroundColor(Color.blue.opacity(0.5)) // Light blue icon
-                        Text(company)
-                            .foregroundColor(.gray) // Make company gray
+                    } else if let company = user.currentCompany {
+                        HStack {
+                            Image(systemName: "building.2.fill") // Light blue work building icon
+                                .foregroundColor(Color.blue.opacity(0.5)) // Light blue icon
+                            Text(company)
+                                .foregroundColor(.gray) // Make company gray
+                        }
                     }
-                } else if let jobTitle = user.jobTitle {
-                    Text(jobTitle)
-                        .fontWeight(.bold) // Bold job title
-                        .font(.subheadline) // Make job title smaller
-                        .foregroundColor(.gray) // Make job title gray
-                } else if let company = user.currentCompany {
-                    HStack {
-                        Image(systemName: "building.2.fill") // Light blue work building icon
-                            .foregroundColor(Color.blue.opacity(0.5)) // Light blue icon
-                        Text(company)
-                            .foregroundColor(.gray) // Make company gray
-                    }
-                }
                 
-                // Education and location on the third line
-                HStack {
-                    if let university = user.university {
-                        Image(systemName: "graduationcap.fill") // Light blue university icon
-                            .foregroundColor(Color.blue.opacity(0.5)) // Light blue icon
-                        Text(university)
-                            .font(.subheadline) // Make university text smaller
-                            .foregroundColor(.gray)
-                    }
-                    if let location = user.location {
-                        Image(systemName: "location.fill") // Blue location icon
-                            .foregroundColor(.blue) // Blue icon
-                        Text(location)
-                            .font(.subheadline) // Make location text smaller
-                            .foregroundColor(.gray)
+                    // Education and location on the third line
+                    HStack {
+                        if let university = user.university {
+                            Image(systemName: "graduationcap.fill") // Light blue university icon
+                                .foregroundColor(Color.blue.opacity(0.5)) // Light blue icon
+                            Text(university)
+                                .font(.subheadline) // Make university text smaller
+                                .foregroundColor(.gray)
+                        }
+                        if let location = user.location {
+                            Image(systemName: "location.fill") // Blue location icon
+                                .foregroundColor(.blue) // Blue icon
+                            Text(location)
+                                .font(.subheadline) // Make location text smaller
+                                .foregroundColor(.gray)
+                        }
                     }
                 }
             }
@@ -145,12 +209,42 @@ struct ContactView: View {
                 .padding(.vertical, 4)
             
             Group {
-                if let gender = user.gender {
-                    InfoRow(icon: "person.fill", title: "Gender", value: gender)
-                }
+                if isEditing {
+                    HStack {
+                        Image(systemName: "person.fill")
+                            .foregroundColor(.blue)
+                            .frame(width: 20)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Gender")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            
+                            TextField("Gender", text: $editGender)
+                        }
+                    }
+                    
+                    HStack {
+                        Image(systemName: "person.2.fill")
+                            .foregroundColor(.blue)
+                            .frame(width: 20)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Ethnicity")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            
+                            TextField("Ethnicity", text: $editEthnicity)
+                        }
+                    }
+                } else {
+                    if let gender = user.gender {
+                        InfoRow(icon: "person.fill", title: "Gender", value: gender)
+                    }
                 
-                if let ethnicity = user.ethnicity {
-                    InfoRow(icon: "person.2.fill", title: "Ethnicity", value: ethnicity)
+                    if let ethnicity = user.ethnicity {
+                        InfoRow(icon: "person.2.fill", title: "Ethnicity", value: ethnicity)
+                    }
                 }
             }
         }
@@ -164,20 +258,78 @@ struct ContactView: View {
                 .padding(.vertical, 4)
             
             Group {
-                if let university = user.university {
-                    InfoRow(icon: "building.columns.fill", title: "University", value: university)
-                }
+                if isEditing {
+                    HStack {
+                        Image(systemName: "building.columns.fill")
+                            .foregroundColor(.blue)
+                            .frame(width: 20)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("University")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            
+                            TextField("University", text: $editUniversity)
+                        }
+                    }
+                    
+                    HStack {
+                        Image(systemName: "book.fill")
+                            .foregroundColor(.blue)
+                            .frame(width: 20)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Major")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            
+                            TextField("Major", text: $editUniMajor)
+                        }
+                    }
+                    
+                    HStack {
+                        Image(systemName: "graduationcap.fill")
+                            .foregroundColor(.blue)
+                            .frame(width: 20)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("High School")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            
+                            TextField("High School", text: $editHighSchool)
+                        }
+                    }
+                    
+                    HStack {
+                        Image(systemName: "star.fill")
+                            .foregroundColor(.blue)
+                            .frame(width: 20)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Interests")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            
+                            TextField("Interests", text: $editInterests)
+                        }
+                    }
+                } else {
+                    if let university = user.university {
+                        InfoRow(icon: "building.columns.fill", title: "University", value: university)
+                    }
                 
-                if let major = user.uniMajor {
-                    InfoRow(icon: "book.fill", title: "Major", value: major)
-                }
+                    if let major = user.uniMajor {
+                        InfoRow(icon: "book.fill", title: "Major", value: major)
+                    }
                 
-                if let highSchool = user.highSchool {
-                    InfoRow(icon: "graduationcap.fill", title: "High School", value: highSchool)
-                }
+                    if let highSchool = user.highSchool {
+                        InfoRow(icon: "graduationcap.fill", title: "High School", value: highSchool)
+                    }
                 
-                if let interests = user.fieldOfInterest {
-                    InfoRow(icon: "star.fill", title: "Interests", value: interests)
+                    if let interests = user.fieldOfInterest {
+                        InfoRow(icon: "star.fill", title: "Interests", value: interests)
+                    }
                 }
             }
         }
@@ -251,28 +403,170 @@ struct ContactView: View {
                 }
                 
                 // Contact information
-                if let email = user.email {
-                    InfoRow(icon: "envelope.fill", title: "Email", value: email)
-                }
-                
-                if let phone = user.phoneNumber {
-                    InfoRow(icon: "phone.fill", title: "Phone", value: phone)
-                }
-                
-                // Add edit button at the bottom of the section
-                Button(action: {
-                    showingEditContactSheet = true
-                }) {
+                if isEditing {
                     HStack {
-                        Image(systemName: "square.and.pencil")
-                        Text("Edit Contact")
+                        Image(systemName: "envelope.fill")
+                            .foregroundColor(.blue)
+                            .frame(width: 20)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Email")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            
+                            TextField("Email", text: $editEmail)
+                        }
                     }
+                    
+                    HStack {
+                        Image(systemName: "phone.fill")
+                            .foregroundColor(.blue)
+                            .frame(width: 20)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Phone")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            
+                            TextField("Phone", text: $editPhone)
+                        }
+                    }
+                    
+                    // Edit buttons
+                    HStack {
+                        Button(action: {
+                            saveChanges()
+                        }) {
+                            HStack {
+                                Image(systemName: "checkmark")
+                                    .imageScale(.small)
+                                Text("Save")
+                                    .font(.subheadline)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                        }
+                        .buttonStyle(PrimaryButtonStyle(backgroundColor: .green))
+                        
+                        Button(action: {
+                            cancelEditing()
+                        }) {
+                            HStack {
+                                Image(systemName: "xmark")
+                                    .imageScale(.small)
+                                Text("Cancel")
+                                    .font(.subheadline)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                        }
+                        .buttonStyle(PrimaryButtonStyle(backgroundColor: .red))
+                    }
+                    .padding(.top, 10)
+                } else {
+                    if let email = user.email {
+                        InfoRow(icon: "envelope.fill", title: "Email", value: email)
+                    }
+                
+                    if let phone = user.phoneNumber {
+                        InfoRow(icon: "phone.fill", title: "Phone", value: phone)
+                    }
+                
+                    // Add edit button at the bottom of the section
+                    Button(action: {
+                        startEditing()
+                    }) {
+                        HStack {
+                            Image(systemName: "square.and.pencil")
+                            Text("Edit Contact")
+                        }
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .padding(.top, 10)
                 }
-                .buttonStyle(PrimaryButtonStyle())
-                .padding(.top, 10)
             }
             .padding(.vertical, 4)
         }
+    }
+    
+    // MARK: - Edit Mode Methods
+    
+    /// Initialize edit mode with current user data
+    private func startEditing() {
+        editFirstName = user.firstName ?? ""
+        editLastName = user.lastName ?? ""
+        editJobTitle = user.jobTitle ?? ""
+        editCompany = user.currentCompany ?? ""
+        editUniversity = user.university ?? ""
+        editUniMajor = user.uniMajor ?? ""
+        editLocation = user.location ?? ""
+        editEmail = user.email ?? ""
+        editPhone = user.phoneNumber ?? ""
+        editGender = user.gender ?? ""
+        editEthnicity = user.ethnicity ?? ""
+        editInterests = user.fieldOfInterest ?? ""
+        editHighSchool = user.highSchool ?? ""
+        
+        isEditing = true
+    }
+    
+    /// Save changes to contact profile
+    private func saveChanges() {
+        // Prepare update data
+        var userData: [String: Any] = [:]
+        
+        userData["first_name"] = editFirstName
+        userData["last_name"] = editLastName
+        userData["job_title"] = editJobTitle
+        userData["current_company"] = editCompany
+        userData["university"] = editUniversity
+        userData["uni_major"] = editUniMajor
+        userData["location"] = editLocation
+        userData["email"] = editEmail
+        userData["phone_number"] = editPhone
+        userData["gender"] = editGender
+        userData["ethnicity"] = editEthnicity
+        userData["field_of_interest"] = editInterests
+        userData["high_school"] = editHighSchool
+        
+        // Update the contact through coordinator
+        coordinator.networkManager.updateUser(userId: user.id, userData: userData) { success in
+            // Temporarily create a local updated user until the network refresh happens
+            let updatedUser = User(
+                id: self.user.id,
+                username: self.user.username,
+                firstName: self.editFirstName,
+                lastName: self.editLastName,
+                email: self.editEmail,
+                phoneNumber: self.editPhone,
+                location: self.editLocation,
+                university: self.editUniversity,
+                fieldOfInterest: self.editInterests,
+                highSchool: self.editHighSchool,
+                birthday: self.user.birthday,
+                createdAt: self.user.createdAt,
+                currentCompany: self.editCompany,
+                gender: self.editGender,
+                ethnicity: self.editEthnicity,
+                uniMajor: self.editUniMajor,
+                jobTitle: self.editJobTitle,
+                lastLogin: self.user.lastLogin,
+                profileImageUrl: self.user.profileImageUrl,
+                linkedinUrl: self.user.linkedinUrl,
+                recentTags: self.user.recentTags
+            )
+            
+            // Reset editing state
+            self.isEditing = false
+            
+            // Refresh network data in background
+            coordinator.networkManager.fetchConnections(forUserId: coordinator.networkManager.userId ?? 0)
+        }
+    }
+    
+    /// Cancel editing and reset fields
+    private func cancelEditing() {
+        isEditing = false
     }
     
     // Color function to match NetworkView tag coloring

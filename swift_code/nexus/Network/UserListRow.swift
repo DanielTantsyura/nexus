@@ -29,9 +29,6 @@ struct UserListRow: View {
         .onLongPressGesture {
             showingEditContactSheet = true
         }
-        .sheet(isPresented: $showingEditContactSheet) {
-            EditProfileView(user: user)
-        }
     }
     
     /// User information display including name, education, location, and job

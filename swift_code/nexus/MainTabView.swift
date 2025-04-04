@@ -39,8 +39,6 @@ struct MainTabView: View {
                     ProfileView()
                         .navigationDestination(for: ActiveScreen.self) { screen in
                             switch screen {
-                            case .editProfile:
-                                EditProfileView()
                             default:
                                 EmptyView()
                             }

@@ -129,28 +129,40 @@ struct ProfileView: View {
                         }) {
                             HStack {
                                 Image(systemName: "checkmark")
+                                    .imageScale(.small)
                                 Text("Save")
+                                    .font(.subheadline)
                             }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
                         }
-                        .buttonStyle(PrimaryButtonStyle())
+                        .buttonStyle(PrimaryButtonStyle(backgroundColor: .green))
                         
                         Button(action: {
                             cancelEditing()
                         }) {
                             HStack {
                                 Image(systemName: "xmark")
+                                    .imageScale(.small)
                                 Text("Cancel")
+                                    .font(.subheadline)
                             }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
                         }
-                        .buttonStyle(SecondaryButtonStyle())
+                        .buttonStyle(PrimaryButtonStyle(backgroundColor: .red))
                     } else {
                         Button(action: {
                             startEditing(user)
                         }) {
                             HStack {
                                 Image(systemName: "square.and.pencil")
+                                    .imageScale(.small)
                                 Text("Edit Profile")
+                                    .font(.subheadline)
                             }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
                         }
                         .buttonStyle(PrimaryButtonStyle())
                     }

@@ -6,6 +6,9 @@ import SwiftUI
 /// 
 /// Use this style for the most important actions in each view
 struct PrimaryButtonStyle: ButtonStyle {
+    /// The background color of the button
+    var backgroundColor: Color = .blue
+    
     /// Creates a styled view from the button's label.
     /// - Parameter configuration: The button style configuration.
     /// - Returns: A styled button view.
@@ -15,7 +18,7 @@ struct PrimaryButtonStyle: ButtonStyle {
             .foregroundColor(.white)
             .padding()
             .frame(maxWidth: .infinity)
-            .background(configuration.isPressed ? Color.blue.opacity(0.8) : Color.blue)
+            .background(configuration.isPressed ? backgroundColor.opacity(0.8) : backgroundColor)
             .cornerRadius(10)
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
             .animation(.easeInOut(duration: 0.2), value: configuration.isPressed)
