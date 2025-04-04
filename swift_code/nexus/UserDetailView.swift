@@ -190,14 +190,14 @@ struct UserDetailView: View {
                             }
                         }
                         
-                        if !relationship.tags.isEmpty {
+                        if let tags = relationship.tags, !tags.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Tags")
                                     .font(.caption)
                                     .foregroundColor(.gray)
                                 
                                 FlowLayout(spacing: 8) {
-                                    ForEach(relationship.tags, id: \.self) { tag in
+                                    ForEach(tags, id: \.self) { tag in
                                         TagBadge(text: tag, showRemoveButton: false)
                                     }
                                 }

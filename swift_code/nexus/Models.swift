@@ -213,14 +213,19 @@ struct Connection: Identifiable, Codable, Hashable {
     let notes: String?
     
     /// Tags associated with the connection - may be stored as string or array
-    private let _tagsString: String?
+    private var _tagsString: String?
     
     /// Tags stored as an array after processing
-    var tags: [String] {
-        guard let tagsStr = _tagsString, !tagsStr.isEmpty else {
-            return []
+    var tags: [String]? {
+        get {
+            guard let tagsStr = _tagsString, !tagsStr.isEmpty else {
+                return nil
+            }
+            return tagsStr.split(separator: ",").map { String($0) }
         }
-        return tagsStr.split(separator: ",").map { String($0) }
+        set {
+            _tagsString = newValue?.joined(separator: ",")
+        }
     }
     
     /// When the connection was last viewed
@@ -386,26 +391,25 @@ struct LoginResponse: Codable {
     }
 }
 
-/// Errors that can occur during authentication
+// MARK: - Error Enums
+
+/// Authentication errors that can occur during login/logout
 enum AuthError: Error {
-    /// Invalid username or password
     case invalidCredentials
-    
-    /// Network connectivity issues
     case networkError
-    
-    /// Other unspecified errors
     case unknownError
+    case tooManyAttempts
     
-    /// Human-readable error message
-    var message: String {
+    var localizedDescription: String {
         switch self {
         case .invalidCredentials:
             return "Invalid username or password"
         case .networkError:
-            return "Network error. Please check your connection"
+            return "Network connection error"
         case .unknownError:
             return "An unknown error occurred"
+        case .tooManyAttempts:
+            return "Too many login attempts. Please try again later."
         }
     }
 } 

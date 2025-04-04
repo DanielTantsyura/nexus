@@ -19,6 +19,9 @@ struct NetworkView: View {
     /// Selected tag filter
     @State private var selectedTag: String?
     
+    /// Toggle to force UI refresh
+    @State private var refreshTrigger = false
+    
     /// Tag filter options
     private let tagOptions = ["All", "Recent", "Work", "School", "Family", "Friends"]
     
@@ -112,11 +115,17 @@ struct NetworkView: View {
             }
         )
         .onAppear {
-            refreshConnections()
+            Task {
+                refreshConnections()
+                // Add a small delay and trigger a refresh to ensure UI updates
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                refreshTrigger.toggle() // Force UI update
+            }
         }
         .refreshable {
             await refreshConnectionsAsync()
         }
+        .id(refreshTrigger) // Force view to refresh when trigger changes
     }
     
     // MARK: - UI Components
@@ -224,8 +233,8 @@ struct NetworkView: View {
                     }
                 }
                 
-                if !connection.tags.isEmpty {
-                    tagsList(tags: connection.tags)
+                if let tags = connection.tags, !tags.isEmpty {
+                    tagsList(tags: tags)
                 }
             }
         }
@@ -270,12 +279,14 @@ struct NetworkView: View {
     private func refreshConnectionsAsync() async {
         isRefreshing = true
         
-        await withCheckedContinuation { continuation in
-            refreshConnections()
-            continuation.resume()
-        }
+        // Call the refresh function
+        refreshConnections()
+        
+        // Add a delay to allow data to load
+        try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
         
         isRefreshing = false
+        refreshTrigger.toggle() // Force UI update after refresh
     }
     
     /// Performs the search based on current search text and selected tag

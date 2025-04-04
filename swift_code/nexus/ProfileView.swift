@@ -15,6 +15,9 @@ struct ProfileView: View {
     /// Timer for automatic retry of loading user data
     @State private var retryTimer: Timer?
     
+    /// Toggle to force UI refresh
+    @State private var refreshTrigger = false
+    
     // MARK: - View Body
     
     var body: some View {
@@ -49,12 +52,18 @@ struct ProfileView: View {
         .onAppear {
             // Refresh current user data when view appears
             coordinator.activeScreen = .profile
-            loadUserData()
+            Task {
+                loadUserData()
+                // Add a small delay and trigger a refresh to ensure UI updates
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                refreshTrigger.toggle() // Force UI update
+            }
         }
         .onDisappear {
             // Invalidate timer when view disappears
             invalidateRetryTimer()
         }
+        .id(refreshTrigger) // Force view to refresh when trigger changes
     }
     
     // MARK: - UI Components
@@ -221,27 +230,25 @@ struct ProfileView: View {
     private func loadUserData() {
         coordinator.networkManager.fetchCurrentUser()
         
-        // Set up a timer to retry if needed
-        setupRetryTimer()
+        // Set up a task to retry if needed after a delay
+        Task {
+            // Wait a moment to see if the data loads
+            try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+            
+            // If still no data, try once more and trigger refresh
+            if coordinator.networkManager.currentUser == nil && !coordinator.networkManager.isLoading {
+                coordinator.networkManager.fetchCurrentUser()
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                refreshTrigger.toggle() // Force UI update
+            }
+        }
     }
     
     /// Sets up a timer to retry loading user data if initial attempt fails
     private func setupRetryTimer() {
+        // This method is kept for backward compatibility but we use Task-based approach now
         retryTimer?.invalidate()
         retryAttempts = 0
-        
-        retryTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { timer in
-            if self.coordinator.networkManager.currentUser == nil && !self.coordinator.networkManager.isLoading {
-                if self.retryAttempts < 2 {
-                    self.retryAttempts += 1
-                    self.coordinator.networkManager.fetchCurrentUser()
-                } else {
-                    self.invalidateRetryTimer()
-                }
-            } else {
-                self.invalidateRetryTimer()
-            }
-        }
     }
     
     /// Invalidates and clears the retry timer
