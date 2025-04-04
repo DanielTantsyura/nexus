@@ -18,6 +18,9 @@ struct ProfileView: View {
     /// State to track whether the view is in edit mode
     @State private var isEditing = false
     
+    /// Toggle to force UI refresh
+    @State private var refreshTrigger = false
+    
     // Editing state variables
     @State private var editFirstName = ""
     @State private var editLastName = ""
@@ -62,20 +65,16 @@ struct ProfileView: View {
             logoutAlert
         }
         .onAppear {
-            // Refresh current user data when view appears
+            // Refresh current user data when view appears, but only if needed
             coordinator.activeScreen = .profile
-            Task {
+            if coordinator.networkManager.currentUser == nil && !coordinator.networkManager.isLoading {
                 loadUserData()
-                // Add a small delay and trigger a refresh to ensure UI updates
-                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-                refreshTrigger.toggle() // Force UI update
             }
         }
         .onDisappear {
             // Invalidate timer when view disappears
             invalidateRetryTimer()
         }
-        .id(refreshTrigger) // Force view to refresh when trigger changes
     }
     
     // MARK: - UI Components
@@ -430,10 +429,17 @@ struct ProfileView: View {
         // Update the user through coordinator
         coordinator.networkManager.updateUser(userId: user.id, userData: userData) { success in
             if success {
-                // Refresh user data
+                // Refresh user data once only
                 self.coordinator.networkManager.fetchCurrentUser()
+                
+                // Reset editing state
+                self.isEditing = false
+                
+                // Force a single UI refresh after saving
+                self.refreshTrigger.toggle()
+            } else {
+                self.isEditing = false
             }
-            self.isEditing = false
         }
     }
     
@@ -446,18 +452,19 @@ struct ProfileView: View {
     
     /// Loads the current user's data
     private func loadUserData() {
-        coordinator.networkManager.fetchCurrentUser()
-        
-        // Set up a task to retry if needed after a delay
-        Task {
-            // Wait a moment to see if the data loads
-            try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+        // Only fetch if we don't have data and are not already loading
+        if coordinator.networkManager.currentUser == nil && !coordinator.networkManager.isLoading {
+            coordinator.networkManager.fetchCurrentUser()
             
-            // If still no data, try once more and trigger refresh
-            if coordinator.networkManager.currentUser == nil && !coordinator.networkManager.isLoading {
-                coordinator.networkManager.fetchCurrentUser()
-                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-                refreshTrigger.toggle() // Force UI update
+            // Set up a task to retry once if needed after a delay
+            Task {
+                // Wait a moment to see if the data loads
+                try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
+                
+                // If still no data, try once more - no cascade of refreshes
+                if coordinator.networkManager.currentUser == nil && !coordinator.networkManager.isLoading {
+                    coordinator.networkManager.fetchCurrentUser()
+                }
             }
         }
     }

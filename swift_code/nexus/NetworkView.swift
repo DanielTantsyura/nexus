@@ -20,6 +20,12 @@ struct NetworkView: View {
     /// State for managing the tag filter
     @State private var selectedTag: String? = nil
     
+    /// Toggle to force UI refresh
+    @State private var refreshTrigger = false
+    
+    /// Track if we've shown connections already
+    @State private var hasShownConnections = false
+    
     /// List of available tag options for filtering
     private let tagOptions: [String] = ["All", "Tag1", "Tag2", "Tag3"]
     
@@ -40,63 +46,6 @@ struct NetworkView: View {
                             .foregroundColor(.blue)
                             .font(.system(size: 18))
                     }
-                }
-                
-                // Search bar with tag filter
-                HStack(spacing: 12) {
-                    // Search field
-                    HStack {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundColor(.gray)
-                        TextField("Search...", text: $searchText)
-                    }
-                    .padding(8)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(8)
-                    
-                    // Tag dropdown
-                    Menu {
-                        ForEach(tagOptions, id: \.self) { tag in
-                            Button(action: {
-                                selectedTag = tag == "All" ? nil : tag
-                            }) {
-                                HStack {
-                                    Text(tag)
-                                    if tag == (selectedTag ?? "All") {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    } label: {
-                        HStack {
-                            Text(selectedTag ?? "Tag")
-                            Image(systemName: "chevron.up.chevron.down")
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Color.green.opacity(0.1))
-                        .foregroundColor(.green)
-                        .cornerRadius(8)
-                    }
-                    
-                    // Search button
-                    Button(action: {
-                        performSearch()
-                    }) {
-                        Text("Search")
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(8)
-                    }
-                }
-                .padding(.horizontal)
-                
-                // Error message
-                if let errorMessage = errorMessage {
-                    errorBanner(message: errorMessage)
                 }
                 
                 // Search bar with tag filter
@@ -166,23 +115,35 @@ struct NetworkView: View {
         .navigationBarHidden(true)
         .overlay(
             Group {
-                if coordinator.networkManager.isLoading {
+                // Only show loading overlay if there are no connections AND we're loading
+                if coordinator.networkManager.isLoading && coordinator.networkManager.connections.isEmpty {
                     LoadingView(message: "Loading connections...")
                 }
             }
         )
         .onAppear {
-            Task {
+            // Always load connections when the view appears, but avoid duplicate loads
+            if !coordinator.networkManager.isLoading {
                 refreshConnections()
-                // Add a small delay and trigger a refresh to ensure UI updates
-                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-                refreshTrigger.toggle() // Force UI update
+                
+                // Force a refresh when the view first appears to ensure UI is updated
+                if !hasShownConnections && !coordinator.networkManager.connections.isEmpty {
+                    hasShownConnections = true
+                    refreshTrigger.toggle()
+                }
             }
         }
         .refreshable {
             await refreshConnectionsAsync()
         }
-        .id(refreshTrigger) // Force view to refresh when trigger changes
+        .onChange(of: coordinator.networkManager.connections) { connections in
+            // Force a refresh when we get non-zero connections for the first time
+            if !connections.isEmpty && !hasShownConnections {
+                hasShownConnections = true
+                refreshTrigger.toggle()
+            }
+        }
+        .id(refreshTrigger) // Re-add the ID modifier to allow forcing refresh when needed
     }
     
     // MARK: - UI Components
@@ -238,7 +199,23 @@ struct NetworkView: View {
     /// Content displayed when connections exist
     private var connectionListContent: some View {
         VStack(alignment: .leading, spacing: 16) {
+            // Show loading indicator inline
+            if coordinator.networkManager.isLoading {
+                HStack {
+                    Spacer()
+                    VStack {
+                        ProgressView()
+                        Text("Loading connections...")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                            .padding(.top, 8)
+                    }
+                    Spacer()
+                }
+                .padding(.vertical, 20)
+            }
             
+            // Show connections
             ForEach(coordinator.networkManager.connections) { connection in
                 connectionCard(for: connection)
             }
@@ -350,12 +327,12 @@ struct NetworkView: View {
                 Spacer(minLength: 0)
                 
                 // Right side: Tags
-                if !connection.tags.isEmpty {
+                if let tags = connection.tags, !tags.isEmpty {
                     VStack(alignment: .trailing, spacing: 2) {
                         // Grid layout for tags with max display and ellipsis
-                        let displayTags = connection.tags.count > 8 
-                            ? Array(connection.tags.prefix(7)) + ["..."] 
-                            : connection.tags
+                        let displayTags = tags.count > 8 
+                            ? Array(tags.prefix(7)) + ["..."] 
+                            : tags
                         
                         LazyVGrid(
                             columns: [
@@ -478,20 +455,42 @@ struct NetworkView: View {
     /// Refreshes the list of connections (non-async version)
     private func refreshConnections() {
         errorMessage = nil
+        
+        // Allow showing connections again after a manual refresh
+        if !coordinator.networkManager.connections.isEmpty {
+            hasShownConnections = false
+        }
+        
         coordinator.networkManager.fetchConnections(forUserId: coordinator.networkManager.userId ?? 0)
+        
+        // Add a delay to update UI after fetch completes
+        Task {
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            
+            // If connections loaded successfully and we haven't shown them yet
+            if !coordinator.networkManager.connections.isEmpty && !hasShownConnections {
+                hasShownConnections = true
+                refreshTrigger.toggle()
+            }
+        }
     }
     
     /// Refreshes the list of connections (async version for pull-to-refresh)
     private func refreshConnectionsAsync() async {
         isRefreshing = true
         
+        // Allow showing connections again after a pull-to-refresh
+        hasShownConnections = false
+        
         // Call the refresh function
-        refreshConnections()
+        coordinator.networkManager.fetchConnections(forUserId: coordinator.networkManager.userId ?? 0)
         
         // Add a delay to allow data to load
         try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
         
         isRefreshing = false
+        // We only toggle the refreshTrigger during manual pull-to-refresh
+        refreshTrigger.toggle() 
     }
     
     /// Performs a search based on the current search text and tag filter

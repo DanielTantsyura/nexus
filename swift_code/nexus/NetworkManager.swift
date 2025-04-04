@@ -861,8 +861,9 @@ class NetworkManager: ObservableObject {
                     throw NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
                 }
                 
-                if httpResponse.statusCode == 404 {
-                    // Not an error, just no connections
+                // Handle common status codes
+                if httpResponse.statusCode == 404 || httpResponse.statusCode == 204 {
+                    // Not an error, just no connections or no content
                     return "[]".data(using: .utf8)!
                 }
                 
@@ -870,10 +871,20 @@ class NetworkManager: ObservableObject {
                     throw NSError(domain: "NetworkError", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "Server error: \(httpResponse.statusCode)"])
                 }
                 
+                // If we get an empty response, return an empty array
+                if data.isEmpty {
+                    return "[]".data(using: .utf8)!
+                }
+                
                 return data
             }
             .tryMap { [weak self] data -> [Connection] in
                 guard let self = self else { return [] }
+                
+                // Handle empty data
+                if data.count <= 2 { // Just "[]" or similar
+                    return []
+                }
                 
                 // First try standard decoding
                 if let connections = try? JSONDecoder().decode([Connection].self, from: data) {
@@ -881,32 +892,38 @@ class NetworkManager: ObservableObject {
                 }
                 
                 // If that fails, try manual decoding with tag extraction
-                guard let jsonArray = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+                do {
+                    guard let jsonArray = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+                        print("Failed to parse JSON array for connections")
+                        return []
+                    }
+                    
+                    return jsonArray.compactMap { connectionDict -> Connection? in
+                        // Extract tags using our helper method
+                        let tags = self.extractTags(from: connectionDict["tags"])
+                        
+                        // Remove tags from the dictionary to avoid double processing
+                        var mutableDict = connectionDict
+                        mutableDict.removeValue(forKey: "tags")
+                        
+                        // Convert dictionary to JSON data
+                        guard let jsonData = try? JSONSerialization.data(withJSONObject: mutableDict) else {
+                            return nil
+                        }
+                        
+                        // Try to decode the connection
+                        guard var connection = try? JSONDecoder().decode(Connection.self, from: jsonData) else {
+                            return nil
+                        }
+                        
+                        // Set the extracted tags
+                        connection.tags = tags
+                        
+                        return connection
+                    }
+                } catch {
+                    print("Error parsing connections: \(error.localizedDescription)")
                     return []
-                }
-                
-                return jsonArray.compactMap { connectionDict -> Connection? in
-                    // Extract tags using our helper method
-                    let tags = self.extractTags(from: connectionDict["tags"])
-                    
-                    // Remove tags from the dictionary to avoid double processing
-                    var mutableDict = connectionDict
-                    mutableDict.removeValue(forKey: "tags")
-                    
-                    // Convert dictionary to JSON data
-                    guard let jsonData = try? JSONSerialization.data(withJSONObject: mutableDict) else {
-                        return nil
-                    }
-                    
-                    // Try to decode the connection
-                    guard var connection = try? JSONDecoder().decode(Connection.self, from: jsonData) else {
-                        return nil
-                    }
-                    
-                    // Set the extracted tags
-                    connection.tags = tags
-                    
-                    return connection
                 }
             }
             .receive(on: DispatchQueue.main)
@@ -1581,11 +1598,68 @@ class NetworkManager: ObservableObject {
         fetchAllUsers()
     }
     
-    /// Updates user profile information with a dictionary of fields
+    /// Updates a user with the given data dictionary
     /// - Parameters:
-    ///   - userId: The ID of the user to update
+    ///   - userId: ID of the user to update
     ///   - userData: Dictionary of user fields to update
-    ///   - completion: Closure called with a boolean indicating success or failure
+    ///   - completion: Callback with success status
+    func updateUser(userId: Int, userData: [String: Any], completion: @escaping (Bool) -> Void) {
+        guard let url = URL(string: "\(baseURL)/people/\(userId)") else {
+            setErrorMessage("Invalid URL")
+            completion(false)
+            return
+        }
+        
+        isLoading = true
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        do {
+            let jsonData = try JSONSerialization.data(withJSONObject: userData)
+            request.httpBody = jsonData
+        } catch {
+            isLoading = false
+            setErrorMessage("Failed to encode user data: \(error.localizedDescription)")
+            completion(false)
+            return
+        }
+        
+        URLSession.shared.dataTask(with: request) { [weak self] _, response, error in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.isLoading = false
+                
+                if let error = error {
+                    self.setErrorMessage("Network error: \(error.localizedDescription)")
+                    completion(false)
+                    return
+                }
+                
+                if let httpResponse = response as? HTTPURLResponse {
+                    if (200...299).contains(httpResponse.statusCode) {
+                        // If we're updating the current user, refresh the data
+                        if userId == self.userId {
+                            self.fetchCurrentUser()
+                        }
+                        completion(true)
+                    } else {
+                        self.setErrorMessage("Server error: \(httpResponse.statusCode)")
+                        completion(false)
+                    }
+                } else {
+                    self.setErrorMessage("Invalid response")
+                    completion(false)
+                }
+            }
+        }.resume()
+    }
+    
+    /// Updates a user with the given User object
+    /// - Parameters:
+    ///   - user: User object with updated fields
+    ///   - completion: Callback with success status
     func updateUser(_ user: User, completion: @escaping (Bool) -> Void) {
         setLoading(true)
         setErrorMessage(nil)
