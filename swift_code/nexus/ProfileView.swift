@@ -28,6 +28,7 @@ struct ProfileView: View {
     @State private var editPhone = ""
     @State private var editMajor = ""
     @State private var editInterests = ""
+    @State private var editCompany = ""
     
     // MARK: - View Body
     
@@ -172,9 +173,21 @@ struct ProfileView: View {
                             .fontWeight(.bold)
                     }
                     
-                    // Job title field
-                    TextField("Job Title", text: $editJobTitle)
-                        .font(.subheadline)
+                    // Job title field and company on same row
+                    HStack(spacing: 8) {
+                        TextField("Job Title", text: $editJobTitle)
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        
+                        // Company icon and field
+                        HStack(spacing: 4) {
+                            Image(systemName: "building.2.fill")
+                                .font(.caption)
+                                .foregroundColor(.blue.opacity(0.6))
+                            TextField("Company", text: $editCompany)
+                                .font(.subheadline)
+                        }
+                    }
                     
                     // University and location fields
                     HStack(spacing: 8) {
@@ -199,11 +212,26 @@ struct ProfileView: View {
                         .font(.title2)
                         .fontWeight(.bold)
                     
-                    // Job title on second line
-                    if let jobTitle = user.jobTitle {
-                        Text(jobTitle)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                    // Job title and company on second line
+                    HStack(spacing: 8) {
+                        if let jobTitle = user.jobTitle {
+                            Text(jobTitle)
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        // Company with icon if available
+                        if let company = user.currentCompany, !company.isEmpty {
+                            HStack(spacing: 4) {
+                                Image(systemName: "building.2.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.blue.opacity(0.6))
+                                Text(company)
+                                    .font(.subheadline)
+                                    .foregroundColor(.gray)
+                            }
+                        }
                     }
                     
                     // University and location on third line
@@ -230,12 +258,6 @@ struct ProfileView: View {
                             }
                         }
                     }
-                }
-                
-                if let company = user.currentCompany {
-                    Text(company)
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
                 }
             }
             .padding(.leading, 10)
@@ -378,6 +400,7 @@ struct ProfileView: View {
         editPhone = user.phoneNumber ?? ""
         editMajor = user.uniMajor ?? ""
         editInterests = user.fieldOfInterest ?? ""
+        editCompany = user.currentCompany ?? ""
         
         isEditing = true
     }
@@ -396,6 +419,7 @@ struct ProfileView: View {
         userData["phone_number"] = editPhone
         userData["uni_major"] = editMajor
         userData["field_of_interest"] = editInterests
+        userData["current_company"] = editCompany
         
         // Update the user through coordinator
         coordinator.networkManager.updateUser(userId: user.id, userData: userData) { success in
