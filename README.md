@@ -241,6 +241,11 @@ Follow these steps to deploy the Nexus API to Railway:
 - **Database Connection Issues**: Make sure the DATABASE_URL is correctly set
 - **Deployment Failures**: Check the logs for specific error messages
 - **API Not Responding**: Ensure API_HOST is set to `0.0.0.0` and the Procfile is correct
+- **Continuous Crashes/Restarts**: If your application keeps crashing and restarting:
+  - Check if gunicorn can find your application (if using `database_code.api:app` format doesn't work, try `cd database_code && gunicorn api:app`)
+  - Ensure your app correctly reads the PORT variable provided by Railway
+  - Verify your database credentials are correct and the database is accessible
+  - Look for any import errors in the logs that might indicate missing dependencies
 
 ## Future Enhancement Opportunities
 

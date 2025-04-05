@@ -1,1 +1,1 @@
-web: gunicorn database_code.api:app 
+web: cd database_code && gunicorn api:app 
