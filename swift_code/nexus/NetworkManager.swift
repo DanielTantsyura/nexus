@@ -861,6 +861,13 @@ class NetworkManager: ObservableObject {
                     throw NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
                 }
                 
+                // Debug: Print raw JSON response 
+                if let jsonString = String(data: data, encoding: .utf8) {
+                    print("===== Raw connections API response =====")
+                    print(jsonString)
+                    print("========================================")
+                }
+                
                 // Handle common status codes
                 if httpResponse.statusCode == 404 || httpResponse.statusCode == 204 {
                     // Not an error, just no connections or no content
@@ -932,7 +939,7 @@ class NetworkManager: ObservableObject {
                     guard let self = self else { return }
                     self.setLoading(false)
                     
-                    if case .failure(let error) = completion {
+                    if case let .failure(error) = completion {
                         print("Failed to fetch connections: \(error.localizedDescription)")
                         self.setConnections([])
                     }
@@ -995,7 +1002,7 @@ class NetworkManager: ObservableObject {
         var requestDict: [String: Any] = [
             "user_id": userId,
             "contact_id": contactId,
-            "description": description
+            "relationship_type": description
         ]
         
         if let notes = notes, !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -1042,7 +1049,7 @@ class NetworkManager: ObservableObject {
                     guard let self = self else { return }
                     self.setLoading(false)
                     
-                    if case .failure(let error) = completionStatus {
+                    if case let .failure(error) = completionStatus {
                         self.setErrorMessage(error.localizedDescription)
                         completion(.failure(error))
                     }
@@ -1082,7 +1089,7 @@ class NetworkManager: ObservableObject {
         setLoading(true)
         setErrorMessage(nil)
         
-        guard let url = URL(string: "\(baseURL)/connections/update") else {
+        guard let url = URL(string: "\(baseURL)/connections") else {
             setLoading(false)
             setErrorMessage("Invalid URL")
             completion(false)
@@ -1100,17 +1107,20 @@ class NetworkManager: ObservableObject {
         } else {
             // Only include these fields if we're doing a full update
             if let description = description {
-                requestDict["description"] = description
+                requestDict["relationship_type"] = description
             }
             
             if let notes = notes {
-                requestDict["notes"] = notes
+                requestDict["notes"] = notes  // Use "notes" to match actual database column name
             }
             
             if let tags = tags {
-                requestDict["tags"] = tags
+                // The tags need to be a simple comma-separated string for the database
+                requestDict["tags"] = tags.joined(separator: ",")
             }
         }
+        
+        print("Updating connection with data: \(requestDict)")
         
         guard let jsonData = try? JSONSerialization.data(withJSONObject: requestDict) else {
             setLoading(false)
@@ -1131,21 +1141,32 @@ class NetworkManager: ObservableObject {
                 
                 if let error = error {
                     self.setErrorMessage("Network error: \(error.localizedDescription)")
+                    print("Failed to update connection: \(error.localizedDescription)")
                     completion(false)
                     return
                 }
                 
                 guard let httpResponse = response as? HTTPURLResponse else {
                     self.setErrorMessage("Invalid response")
+                    print("Invalid response when updating connection")
                     completion(false)
-                        return
+                    return
+                }
+                
+                if httpResponse.statusCode != 200 {
+                    self.setErrorMessage("Server error: \(httpResponse.statusCode)")
+                    print("Server error when updating connection: \(httpResponse.statusCode)")
+                    
+                    // Print response body for debugging
+                    if let data = data, let responseString = String(data: data, encoding: .utf8) {
+                        print("Response body: \(responseString)")
                     }
                     
-                    if httpResponse.statusCode != 200 {
-                        self.setErrorMessage("Server error: \(httpResponse.statusCode)")
                     completion(false)
-                        return
-                    }
+                    return
+                }
+                
+                print("Successfully updated connection")
                 
                 // Refresh the connections list
                 self.fetchConnections(forUserId: userId)
@@ -1164,7 +1185,7 @@ class NetworkManager: ObservableObject {
                     return
                 }
                 
-        guard let url = URL(string: "\(baseURL)/connections/update") else {
+        guard let url = URL(string: "\(baseURL)/connections") else {
             completion(false)
             return
         }
@@ -1264,6 +1285,15 @@ class NetworkManager: ObservableObject {
                 completion(true)
             }
         }.resume()
+    }
+    
+    /// Deletes a contact by removing the connection between users
+    /// - Parameters:
+    ///   - contactId: ID of the contact to delete
+    ///   - completion: Closure called when the operation completes with success status
+    func deleteContact(contactId: Int, completion: @escaping (Bool) -> Void) {
+        // Use the existing removeConnection method since deletion is the same operation
+        removeConnection(contactId: contactId, completion: completion)
     }
     
     // MARK: - Contact Creation Methods

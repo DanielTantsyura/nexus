@@ -25,6 +25,10 @@ struct ContactView: View {
     @State private var editEthnicity = ""
     @State private var editInterests = ""
     @State private var editHighSchool = ""
+    @State private var editNotes = ""
+    
+    // Add state for confirmation dialog
+    @State private var showDeleteConfirmation = false
     
     var body: some View {
         ScrollView {
@@ -61,6 +65,20 @@ struct ContactView: View {
             coordinator.activeScreen = .contact
             loadRelationship()
             updateLastViewed()
+        }
+        .confirmationDialog(
+            "Delete Contact",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                deleteContact()
+            }
+            Button("Cancel", role: .cancel) {
+                showDeleteConfirmation = false
+            }
+        } message: {
+            Text("Are you sure you want to delete this contact? This action cannot be undone.")
         }
     }
     
@@ -342,6 +360,8 @@ struct ContactView: View {
         guard let currentUserId = coordinator.networkManager.userId else { return }
         guard currentUserId != user.id else { return } // Don't load relationship with self
         
+        print("Loading relationship for current user ID: \(currentUserId) and contact ID: \(user.id)")
+        
         isLoadingRelationship = true
         relationshipError = nil
         
@@ -351,7 +371,17 @@ struct ContactView: View {
         // Give time for the fetch to complete
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             // Find the connection to this user if it exists
-            self.relationship = coordinator.networkManager.connections.first { $0.id == self.user.id }
+            // In the API response, the id field is actually the contact's ID
+            self.relationship = coordinator.networkManager.connections.first { connection in
+                return connection.id == self.user.id
+            }
+            
+            if let relationship = self.relationship {
+                print("Found relationship: id=\(relationship.id), notes=\(relationship.notes ?? "nil"), tags=\(relationship.tags?.joined(separator: ",") ?? "nil")")
+            } else {
+                print("No relationship found between user \(currentUserId) and contact \(self.user.id)")
+            }
+            
             self.isLoadingRelationship = false
         }
     }
@@ -380,9 +410,28 @@ struct ContactView: View {
     }
     
     private func notesSection(notes: String) -> some View {
-        SectionCard(title: "Notes") {
-            Text(notes)
+        SectionCard(title: "Custom Notes") {
+            if isEditing {
+                VStack(alignment: .leading) {
+                    Text("Notes about this contact")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .padding(.bottom, 4)
+                    
+                    TextEditor(text: $editNotes)
+                        .frame(minHeight: 100)
+                        .padding(8)
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(8)
+                }
                 .padding(.vertical, 8)
+            } else {
+                Text(notes)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .lineLimit(nil)
+                    .multilineTextAlignment(.leading)
+            }
         }
     }
     
@@ -433,7 +482,7 @@ struct ContactView: View {
                     }
                     
                     // Edit buttons
-                    HStack {
+                    HStack(spacing: 12) {
                         Button(action: {
                             saveChanges()
                         }) {
@@ -444,9 +493,10 @@ struct ContactView: View {
                                     .font(.subheadline)
                             }
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 6)
                         }
                         .buttonStyle(PrimaryButtonStyle(backgroundColor: .green))
+                        .scaleEffect(0.9)
                         
                         Button(action: {
                             cancelEditing()
@@ -458,11 +508,29 @@ struct ContactView: View {
                                     .font(.subheadline)
                             }
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 6)
                         }
                         .buttonStyle(PrimaryButtonStyle(backgroundColor: .red))
+                        .scaleEffect(0.9)
                     }
                     .padding(.top, 10)
+                    
+                    // Delete contact button
+                    Button(action: {
+                        showDeleteConfirmation = true
+                    }) {
+                        HStack {
+                            Image(systemName: "trash")
+                                .imageScale(.small)
+                            Text("Delete Contact")
+                                .font(.subheadline)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
+                    }
+                    .buttonStyle(PrimaryButtonStyle(backgroundColor: .red))
+                    .scaleEffect(0.9)
+                    .padding(.top, 8)
                 } else {
                     if let email = user.email {
                         InfoRow(icon: "envelope.fill", title: "Email", value: email)
@@ -506,6 +574,7 @@ struct ContactView: View {
         editEthnicity = user.ethnicity ?? ""
         editInterests = user.fieldOfInterest ?? ""
         editHighSchool = user.highSchool ?? ""
+        editNotes = relationship?.notes ?? ""
         
         isEditing = true
     }
@@ -531,42 +600,50 @@ struct ContactView: View {
         
         // Update the contact through coordinator
         coordinator.networkManager.updateUser(userId: user.id, userData: userData) { success in
-            // Temporarily create a local updated user until the network refresh happens
-            let updatedUser = User(
-                id: self.user.id,
-                username: self.user.username,
-                firstName: self.editFirstName,
-                lastName: self.editLastName,
-                email: self.editEmail,
-                phoneNumber: self.editPhone,
-                location: self.editLocation,
-                university: self.editUniversity,
-                fieldOfInterest: self.editInterests,
-                highSchool: self.editHighSchool,
-                birthday: self.user.birthday,
-                createdAt: self.user.createdAt,
-                currentCompany: self.editCompany,
-                gender: self.editGender,
-                ethnicity: self.editEthnicity,
-                uniMajor: self.editUniMajor,
-                jobTitle: self.editJobTitle,
-                lastLogin: self.user.lastLogin,
-                profileImageUrl: self.user.profileImageUrl,
-                linkedinUrl: self.user.linkedinUrl,
-                recentTags: self.user.recentTags
-            )
+            // Update the relationship with the new notes if we have a relationship
+            if let relationship = self.relationship {
+                self.coordinator.networkManager.updateConnection(
+                    contactId: self.user.id,
+                    description: relationship.relationshipDescription,
+                    notes: self.editNotes,
+                    tags: relationship.tags
+                ) { success in
+                    if success {
+                        // Refresh data after updating
+                        self.coordinator.networkManager.fetchConnections(forUserId: self.coordinator.networkManager.userId ?? 0)
+                        
+                        // Reload the specific relationship data
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            // Update the relationship in our local state
+                            self.relationship = self.coordinator.networkManager.connections.first { connection in
+                                return connection.id == self.user.id
+                            }
+                        }
+                    }
+                }
+            }
             
             // Reset editing state
             self.isEditing = false
-            
-            // Refresh network data in background
-            coordinator.networkManager.fetchConnections(forUserId: coordinator.networkManager.userId ?? 0)
         }
     }
     
     /// Cancel editing and reset fields
     private func cancelEditing() {
         isEditing = false
+    }
+    
+    /// Delete the contact
+    private func deleteContact() {
+        coordinator.networkManager.deleteContact(contactId: user.id) { success in
+            if success {
+                // Navigate back
+                coordinator.navigateBack()
+            } else {
+                // Handle error - could show an alert here
+                print("Failed to delete contact")
+            }
+        }
     }
     
     // Color function to match NetworkView tag coloring

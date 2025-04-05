@@ -122,7 +122,7 @@ struct ProfileView: View {
                 contactInformationSection(user: user)
                 
                 // Edit/Save/Cancel buttons
-                HStack {
+                HStack(spacing: 12) {
                     if isEditing {
                         Button(action: {
                             saveChanges(user)
@@ -134,9 +134,10 @@ struct ProfileView: View {
                                     .font(.subheadline)
                             }
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 6)
                         }
                         .buttonStyle(PrimaryButtonStyle(backgroundColor: .green))
+                        .scaleEffect(0.9)
                         
                         Button(action: {
                             cancelEditing()
@@ -148,9 +149,10 @@ struct ProfileView: View {
                                     .font(.subheadline)
                             }
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 6)
                         }
                         .buttonStyle(PrimaryButtonStyle(backgroundColor: .red))
+                        .scaleEffect(0.9)
                     } else {
                         Button(action: {
                             startEditing(user)
@@ -162,9 +164,10 @@ struct ProfileView: View {
                                     .font(.subheadline)
                             }
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 6)
                         }
                         .buttonStyle(PrimaryButtonStyle())
+                        .scaleEffect(0.9)
                     }
                 }
                 .padding(.top, 10)

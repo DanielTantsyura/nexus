@@ -155,7 +155,7 @@ struct User: Identifiable, Codable, Hashable {
 struct Connection: Identifiable, Codable, Hashable {
     // MARK: - Properties
     
-    /// Unique identifier for the connection (user ID)
+    /// Unique identifier for the connection (contact's user ID)
     let id: Int
     
     /// Username of the connected user
@@ -301,7 +301,7 @@ struct Connection: Identifiable, Codable, Hashable {
         case currentCompany = "current_company"
         case profileImageUrl = "profile_image_url"
         case linkedinUrl = "linkedin_url"
-        case notes
+        case notes = "custom_note"
         case _tagsString = "tags"
         case lastViewed = "last_viewed"
     }
@@ -311,6 +311,11 @@ struct Connection: Identifiable, Codable, Hashable {
     /// Returns the full name of the connected user
     var fullName: String {
         return "\(firstName ?? "Unknown") \(lastName ?? "User")"
+    }
+    
+    /// Returns the contact's ID (same as id in this API)
+    var contactId: Int {
+        return id
     }
     
     // MARK: - Hashable Conformance

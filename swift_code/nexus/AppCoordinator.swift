@@ -189,6 +189,14 @@ final class AppCoordinator: ObservableObject {
         activeScreen = .userList
     }
     
+    /// Generic navigate back method - currently just calls navigateBackFromContact
+    func navigateBack() {
+        // If on the contact screen, navigate back to user list
+        if activeScreen == .contact {
+            navigateBackFromContact()
+        }
+    }
+    
     /// Navigate to the profile screen
     func showProfileScreen() {
         // Only clear path when explicitly returning to profile
