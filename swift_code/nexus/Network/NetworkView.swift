@@ -26,8 +26,63 @@ struct NetworkView: View {
     /// Track if we've shown connections already
     @State private var hasShownConnections = false
     
+    /// Computed property for filtered connections based on search text and selected tag
+    private var filteredConnections: [Connection] {
+        let connections = coordinator.networkManager.connections
+        
+        // If no search text or tag filter, return all connections
+        if searchText.isEmpty && selectedTag == nil {
+            return connections
+        }
+        
+        return connections.filter { connection in
+            // Filter by search text
+            let matchesSearch: Bool
+            if searchText.isEmpty {
+                matchesSearch = true
+            } else {
+                // Search in multiple fields
+                let searchableText = [
+                    connection.user.firstName,
+                    connection.user.lastName,
+                    connection.user.jobTitle,
+                    connection.user.currentCompany,
+                    connection.user.university,
+                    connection.user.location,
+                    connection.user.fieldOfInterest,
+                    connection.relationshipDescription,
+                    connection.notes
+                ].compactMap { $0 }.joined(separator: " ").lowercased()
+                
+                matchesSearch = searchableText.contains(searchText.lowercased())
+            }
+            
+            // Filter by tag
+            let matchesTag: Bool
+            if let selectedTag = selectedTag {
+                matchesTag = connection.tags?.contains(selectedTag) ?? false
+            } else {
+                matchesTag = true
+            }
+            
+            return matchesSearch && matchesTag
+        }
+    }
+    
     /// List of available tag options for filtering
-    private let tagOptions: [String] = ["All", "Tag1", "Tag2", "Tag3"]
+    private var tagOptions: [String] {
+        // Get unique tags from all connections
+        var allTags = Set<String>()
+        
+        for connection in coordinator.networkManager.connections {
+            if let tags = connection.tags {
+                tags.forEach { allTags.insert($0) }
+            }
+        }
+        
+        // Sort tags alphabetically
+        return ["All"] + allTags.sorted()
+    }
     
     // MARK: - View Body
     
@@ -55,7 +110,11 @@ struct NetworkView: View {
                         Image(systemName: "magnifyingglass")
                             .foregroundColor(.gray)
                             .padding(.leading, 4)
-                        TextField("Search...", text: $searchText)
+                        TextField("Search connections...", text: $searchText)
+                            .onChange(of: searchText) { oldValue, newValue in
+                                // No additional action needed - the filteredConnections 
+                                // computed property will update automatically
+                            }
                     }
                     .padding(8)
                     .background(Color(.systemGray6))
@@ -79,7 +138,7 @@ struct NetworkView: View {
                         }
                     } label: {
                         HStack(spacing: 4) {
-                            Text(selectedTag ?? "Tag")
+                            Text(selectedTag ?? "Tags")
                             Image(systemName: "chevron.up.chevron.down")
                         }
                         .padding(.horizontal, 6)
@@ -90,22 +149,32 @@ struct NetworkView: View {
                     }
                     .layoutPriority(1)
                     .fixedSize()
-                    
-                    // Search button
-                    Button(action: {
-                        performSearch()
-                    }) {
-                        Text("Search")
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(8)
-                    }
-                    .layoutPriority(1)
-                    .frame(width: 80)
                 }
                 .padding(.horizontal, 0)
+                
+                // Search results counter
+                if !searchText.isEmpty || selectedTag != nil {
+                    HStack {
+                        Text("\(filteredConnections.count) connection\(filteredConnections.count == 1 ? "" : "s") found")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Spacer()
+                        
+                        // Clear filters button
+                        if !searchText.isEmpty || selectedTag != nil {
+                            Button(action: {
+                                searchText = ""
+                                selectedTag = nil
+                            }) {
+                                Text("Clear filters")
+                                    .font(.caption)
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    }
+                    .padding(.top, 4)
+                }
                 
                 // Main content
                 connectionsList
@@ -151,8 +220,22 @@ struct NetworkView: View {
     /// List of connections
     private var connectionsList: some View {
         VStack(alignment: .leading, spacing: 16) {
-            if coordinator.networkManager.connections.isEmpty && !coordinator.networkManager.isLoading {
-                emptyState
+            if filteredConnections.isEmpty && !coordinator.networkManager.isLoading {
+                if coordinator.networkManager.connections.isEmpty {
+                    emptyState
+                } else {
+                    // No results from search
+                    EmptyStateView(
+                        icon: "magnifyingglass",
+                        title: "No Results Found",
+                        message: "No connections match your current search. Try adjusting your search terms or clear filters.",
+                        buttonTitle: "Clear Filters",
+                        action: {
+                            searchText = ""
+                            selectedTag = nil
+                        }
+                    )
+                }
             } else {
                 connectionListContent
             }
@@ -216,7 +299,7 @@ struct NetworkView: View {
             }
             
             // Show connections
-            ForEach(coordinator.networkManager.connections) { connection in
+            ForEach(filteredConnections) { connection in
                 connectionCard(for: connection)
             }
         }
@@ -491,11 +574,6 @@ struct NetworkView: View {
         isRefreshing = false
         // We only toggle the refreshTrigger during manual pull-to-refresh
         refreshTrigger.toggle() 
-    }
-    
-    /// Performs a search based on the current search text and tag filter
-    private func performSearch() {
-        // Implementation of performSearch method
     }
 }
 
