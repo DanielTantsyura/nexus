@@ -10,6 +10,7 @@ import psycopg2.extras
 from typing import Dict, List, Any, Optional, Tuple
 from config import DATABASE_URL, MAX_RECENT_TAGS, DEFAULT_TAGS
 import time
+import traceback
 
 class DatabaseManager:
     """
@@ -19,52 +20,46 @@ class DatabaseManager:
 
     def __init__(self, connection_string: str = DATABASE_URL):
         """Initialize the database manager with a connection string."""
-        self.connection_string = connection_string
-        self.conn = None
+        try:
+            self.connection_string = connection_string
+            print(f"Initializing DatabaseManager with connection string (partially hidden): {connection_string[:20]}...")
+            # Test connection to database
+            self.connection = None
+            self._connect()
+            print("Database connection successful!")
+        except Exception as e:
+            print(f"ERROR initializing database connection: {str(e)}")
+            traceback.print_exc()
+            # Don't raise here to allow the API to start even with db issues
+            self.connection = None
         self.cursor = None
         
-    def connect(self) -> bool:
-        """
-        Establishes a connection to the database.
-        Includes simple retry logic.
-        
-        Returns:
-            bool: True if connection successful, False otherwise
-        """
-        max_retries = 2
-        retry_count = 0
-        
-        while retry_count <= max_retries:
-            try:
-                self.conn = psycopg2.connect(self.connection_string)
-                self.cursor = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-                return True
-            except psycopg2.Error as e:
-                retry_count += 1
-                print(f"Connection attempt {retry_count} failed: {e}")
-                time.sleep(0.5)  # Simple delay before retry
-                
-                if retry_count > max_retries:
-                    print(f"Failed to connect to database after {max_retries} attempts")
-                    return False
-        
-        return False
+    def _connect(self):
+        """Establish a connection to the database."""
+        try:
+            if self.connection is None or self.connection.closed:
+                self.connection = psycopg2.connect(self.connection_string)
+                self.connection.autocommit = False
+        except Exception as e:
+            print(f"Error connecting to database: {str(e)}")
+            traceback.print_exc()
+            raise
     
     def disconnect(self) -> None:
         """Close the database connection and cursor."""
         try:
             if self.cursor:
                 self.cursor.close()
-            if self.conn:
-                self.conn.close()
+            if self.connection:
+                self.connection.close()
             self.cursor = None
-            self.conn = None
+            self.connection = None
         except Exception as e:
             print(f"Error disconnecting from database: {e}")
     
     def is_connected(self) -> bool:
         """Check if the database connection is active."""
-        if not self.conn:
+        if not self.connection:
             return False
         
         try:
@@ -99,7 +94,7 @@ class DatabaseManager:
                 elif fetch:
                     return self.cursor.fetchone()
                 else:
-                    self.conn.commit()
+                    self.connection.commit()
                     return True
             except psycopg2.Error as e:
                 retry_count += 1
@@ -108,7 +103,7 @@ class DatabaseManager:
                 # If connection was lost, try to reconnect
                 if "connection" in str(e).lower():
                     self.disconnect()
-                    self.connect()
+                    self._connect()
                 
                 if retry_count > max_retries:
                     print(f"Failed to execute query after {max_retries} attempts")
@@ -271,11 +266,11 @@ class DatabaseManager:
         try:
             self.cursor.execute(query, user_data)
             user_id = self.cursor.fetchone()['id']
-            self.conn.commit()
+            self.connection.commit()
             print(f"User created with ID: {user_id}")
             return user_id
         except Exception as e:
-            self.conn.rollback()
+            self.connection.rollback()
             print(f"Error adding user: {e}")
             raise
     
@@ -333,7 +328,7 @@ class DatabaseManager:
         try:
             self.cursor.execute(query, params)
             rows_affected = self.cursor.rowcount
-            self.conn.commit()
+            self.connection.commit()
             
             if rows_affected > 0:
                 print(f"User {user_id} updated successfully")
@@ -342,7 +337,7 @@ class DatabaseManager:
                 print(f"No user found with ID {user_id}")
                 return False
         except Exception as e:
-            self.conn.rollback()
+            self.connection.rollback()
             print(f"Error updating user: {e}")
             return False
     
@@ -410,10 +405,10 @@ class DatabaseManager:
             # Second direction: contact_id -> user_id (with shared relationship_description only)
             self.cursor.execute(query, (contact_id, user_id, relationship_description, None, None))
             
-            self.conn.commit()
+            self.connection.commit()
             return True
         except Exception as e:
-            self.conn.rollback()
+            self.connection.rollback()
             print(f"Error adding connection: {e}")
             return False
     
@@ -436,10 +431,10 @@ class DatabaseManager:
         try:
             # Remove connections in both directions
             self.cursor.execute(query, (user_id, contact_id, contact_id, user_id))
-            self.conn.commit()
+            self.connection.commit()
             return True
         except Exception as e:
-            self.conn.rollback()
+            self.connection.rollback()
             print(f"Error removing connection: {e}")
             return False
     
@@ -499,10 +494,10 @@ class DatabaseManager:
                 self.cursor.execute(two_way_query, 
                     (data['relationship_description'], user_id, contact_id, contact_id, user_id))
             
-            self.conn.commit()
+            self.connection.commit()
             return True
         except Exception as e:
-            self.conn.rollback()
+            self.connection.rollback()
             print(f"Error updating connection: {e}")
             return False
     
@@ -526,10 +521,10 @@ class DatabaseManager:
         
         try:
             self.cursor.execute(query, (user_id, contact_id))
-            self.conn.commit()
+            self.connection.commit()
             return True
         except Exception as e:
-            self.conn.rollback()
+            self.connection.rollback()
             print(f"Error updating last viewed timestamp: {e}")
             return False
 
@@ -605,7 +600,7 @@ class DatabaseManager:
         
         try:
             self.cursor.execute(query, (tags_string, user_id))
-            self.conn.commit()
+            self.connection.commit()
             
             if self.cursor.rowcount > 0:
                 print(f"Recent tags updated for user {user_id}")
@@ -614,7 +609,7 @@ class DatabaseManager:
                 print(f"No user found with ID {user_id}")
                 return False
         except Exception as e:
-            self.conn.rollback()
+            self.connection.rollback()
             print(f"Error updating user recent tags: {e}")
             return False
 
@@ -639,10 +634,10 @@ class DatabaseManager:
         
         try:
             self.cursor.execute(query, (user_id, username, passkey))
-            self.conn.commit()
+            self.connection.commit()
             return True
         except Exception as e:
-            self.conn.rollback()
+            self.connection.rollback()
             print(f"Error adding user login: {e}")
             return False
     
@@ -676,7 +671,7 @@ class DatabaseManager:
             if result:
                 # Update last login timestamp
                 self.cursor.execute(update_last_login_query, (username, passkey))
-                self.conn.commit()
+                self.connection.commit()
                 
             return result['user_id'] if result else None
         except Exception as e:
@@ -728,12 +723,12 @@ class DatabaseManager:
                 
                 password_updates += 1
             
-            self.conn.commit()
+            self.connection.commit()
             print(f"Updated {password_updates} user passwords to '{new_password}'")
             
             return True
         except Exception as e:
-            self.conn.rollback()
+            self.connection.rollback()
             print(f"Error updating passwords: {e}")
             return False
     
@@ -804,16 +799,16 @@ class DatabaseManager:
             print(f"Deleted {deleted_users} test users")
             
             # Commit the changes
-            self.conn.commit()
+            self.connection.commit()
             return True
         except Exception as e:
             print("An error occurred:", e)
-            self.conn.rollback()
+            self.connection.rollback()
             return False
             
     def __enter__(self):
         """Context manager entry point."""
-        self.connect()
+        self._connect()
         return self
         
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -847,7 +842,7 @@ if __name__ == "__main__":
     db = DatabaseManager()
     
     try:
-        db.connect()
+        db._connect()
         
         # Example 1: Get all users
         print("\n--- All Users ---")

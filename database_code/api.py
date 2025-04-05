@@ -37,7 +37,18 @@ db_manager = DatabaseManager(DATABASE_URL)
 @app.route('/', methods=['GET'])
 def root():
     """API root endpoint returns a status message."""
-    return jsonify({"status": "API is running"})
+    try:
+        # Try a simple database connection test
+        with db_manager:
+            db_status = "connected" if db_manager.is_connected() else "disconnected"
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+    
+    return jsonify({
+        "status": "API is running",
+        "database": db_status,
+        "environment": os.environ.get("RAILWAY_ENVIRONMENT", "development")
+    })
 
 @app.route('/people', methods=['GET'])
 def get_all_users():
@@ -378,6 +389,51 @@ def update_last_login(user_id):
         print(error_message)
         # Return success to avoid client errors
         return jsonify({"message": "Error recorded but continuing operation"}), 200
+
+@app.route('/diagnostic', methods=['GET'])
+def diagnostic():
+    """Diagnostic endpoint to check system status."""
+    result = {
+        "api_status": "running",
+        "timestamp": datetime.now().isoformat(),
+        "environment": os.environ.get("RAILWAY_ENVIRONMENT", "development"),
+        "python_version": sys.version,
+        "working_directory": os.getcwd(),
+        "environment_variables": {
+            "PORT": os.environ.get("PORT"),
+            "API_HOST": os.environ.get("API_HOST"),
+            "DATABASE_URL_EXISTS": os.environ.get("DATABASE_URL") is not None,
+            "OPENAI_API_KEY_EXISTS": os.environ.get("OPENAI_API_KEY") is not None
+        },
+        "config": {
+            "API_HOST": API_HOST,
+            "API_PORT": API_PORT,
+            "API_DEBUG": API_DEBUG,
+            "DATABASE_URL_LENGTH": len(DATABASE_URL) if DATABASE_URL else 0
+        }
+    }
+    
+    # Test database connection
+    try:
+        with db_manager:
+            if db_manager.is_connected():
+                result["database"] = {
+                    "status": "connected",
+                    "test_query": "successful" 
+                }
+            else:
+                result["database"] = {
+                    "status": "disconnected",
+                    "error": "Not connected but no exception thrown"
+                }
+    except Exception as e:
+        result["database"] = {
+            "status": "error",
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
+    
+    return jsonify(result)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run the Nexus API server')
