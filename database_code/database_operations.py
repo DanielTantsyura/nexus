@@ -25,15 +25,44 @@ class DatabaseManager:
             print(f"Initializing DatabaseManager with connection string (partially hidden): {connection_string[:20]}...")
             # Test connection to database
             self.connection = None
-            self._connect()
+            self.cursor = None
+            self.connect()
             print("Database connection successful!")
         except Exception as e:
             print(f"ERROR initializing database connection: {str(e)}")
             traceback.print_exc()
             # Don't raise here to allow the API to start even with db issues
             self.connection = None
-        self.cursor = None
+            self.cursor = None
         
+    def connect(self) -> bool:
+        """
+        Establishes a connection to the database.
+        Includes simple retry logic.
+        
+        Returns:
+            bool: True if connection successful, False otherwise
+        """
+        max_retries = 3
+        retry_count = 0
+        
+        while retry_count <= max_retries:
+            try:
+                print(f"Connection attempt {retry_count + 1}/{max_retries + 1}...")
+                self._connect()
+                self.cursor = self.connection.cursor(cursor_factory=psycopg2.extras.DictCursor)
+                return True
+            except psycopg2.Error as e:
+                retry_count += 1
+                print(f"Connection attempt {retry_count} failed: {e}")
+                time.sleep(1)  # Wait a second before retry
+                
+                if retry_count > max_retries:
+                    print(f"Failed to connect to database after {max_retries} attempts")
+                    return False
+        
+        return False
+    
     def _connect(self):
         """Establish a connection to the database."""
         try:
@@ -103,7 +132,7 @@ class DatabaseManager:
                 # If connection was lost, try to reconnect
                 if "connection" in str(e).lower():
                     self.disconnect()
-                    self._connect()
+                    self.connect()
                 
                 if retry_count > max_retries:
                     print(f"Failed to execute query after {max_retries} attempts")
@@ -808,7 +837,7 @@ class DatabaseManager:
             
     def __enter__(self):
         """Context manager entry point."""
-        self._connect()
+        self.connect()
         return self
         
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -842,7 +871,7 @@ if __name__ == "__main__":
     db = DatabaseManager()
     
     try:
-        db._connect()
+        db.connect()
         
         # Example 1: Get all users
         print("\n--- All Users ---")

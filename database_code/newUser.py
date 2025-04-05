@@ -13,6 +13,7 @@ import requests
 import os
 import re
 import time
+import traceback
 from typing import Dict, Any, List, Tuple, Optional
 try:
     # Try importing from newer OpenAI SDK (1.x+)
@@ -23,19 +24,37 @@ except ImportError:
     import openai
     USING_NEW_SDK = False
 from dotenv import load_dotenv
-from config import DEFAULT_TAGS, OPENAI_MODEL, API_PORT
+from config import DEFAULT_TAGS, OPENAI_MODEL, API_PORT, OPENAI_AVAILABLE, API_BASE_URL, IS_RAILWAY
 
 # Only load API key from environment variables
 load_dotenv()
 
-# Initialize OpenAI client with API key from environment
-if USING_NEW_SDK:
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Track if OpenAI is available
+OPENAI_WORKING = False
+
+# Initialize OpenAI client with API key from environment only if API key is available
+if OPENAI_AVAILABLE:
+    try:
+        if USING_NEW_SDK:
+            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            # Test the client with a simple call
+            client.models.list(limit=1)
+            OPENAI_WORKING = True
+        else:
+            openai.api_key = os.getenv("OPENAI_API_KEY")
+            # Test the API with a simple call
+            openai.Model.list(limit=1)
+            OPENAI_WORKING = True
+        print("OpenAI API initialized successfully")
+    except Exception as e:
+        print(f"OpenAI API initialization failed: {e}")
+        traceback.print_exc()
 else:
-    openai.api_key = os.getenv("OPENAI_API_KEY")
+    print("OpenAI API key not found - natural language processing features disabled")
 
 # API endpoints
-API_BASE_URL = f"http://localhost:{API_PORT}"
+API_BASE_URL = API_BASE_URL
+print(f"API_BASE_URL set to: {API_BASE_URL}")
 
 def get_user_fields_from_schema() -> List[str]:
     """
@@ -81,7 +100,7 @@ def get_user_fields_from_schema() -> List[str]:
 # Initialize USER_FIELDS with the fields from the schema
 USER_FIELDS = get_user_fields_from_schema()
 
-def process_contact_text(text: str) -> Tuple[Dict[str, Any], str]:
+def process_contact_text(text: str) -> Tuple[bool, Optional[Dict[str, Any]], str]:
     """
     Process free-form text into a structured user object and additional notes.
     
@@ -100,6 +119,11 @@ def process_contact_text(text: str) -> Tuple[Dict[str, Any], str]:
     
     # Create a filtered list of fields that excludes username and recent_tags
     filtered_fields = [field for field in USER_FIELDS if field not in ['username', 'recent_tags']]
+    
+    # If OpenAI is not available, use basic processing
+    if not OPENAI_AVAILABLE or not OPENAI_WORKING:
+        print("OpenAI API not available, using basic text processing")
+        return basic_text_processing(text, filtered_fields)
     
     try:
         # Create a system prompt that explains what we want the model to do
@@ -196,6 +220,25 @@ def process_contact_text(text: str) -> Tuple[Dict[str, Any], str]:
         print(f"Error processing text: {str(e)}")
         return False, None, "An error occurred while processing the text. Please try again later."
 
+def basic_text_processing(text: str, filtered_fields: List[str]) -> Tuple[bool, Dict[str, Any], str]:
+    """Basic text processing for when OpenAI is not available."""
+    words = text.strip().split()
+    if len(words) < 2:
+        return False, None, "At least first and last name are required."
+    
+    # Create a basic user object with just the required fields
+    user_data = {
+        "first_name": words[0],
+        "last_name": words[1] if len(words) > 1 else ""
+    }
+    
+    # Add all other fields as None for filtered fields only
+    for field in filtered_fields:
+        if field not in user_data:
+            user_data[field] = None
+    
+    return True, user_data, "Basic processing only (OpenAI unavailable)."
+
 def create_new_contact(contact_text: str, user_id: int, relationship_type: str = "contact") -> Dict[str, Any]:
     """
     Process text into a user profile and create a new contact relationship.
@@ -219,11 +262,9 @@ def create_new_contact(contact_text: str, user_id: int, relationship_type: str =
         user_data["recent_tags"] = DEFAULT_TAGS
     
     try:
-        # Import here to avoid circular imports
-        from config import IOS_SIMULATOR_URL
-        
         # Call the API to create the user
-        api_url = f"{IOS_SIMULATOR_URL}/people"
+        api_url = f"{API_BASE_URL}/people"
+        print(f"Creating user at URL: {api_url}")
         user_response = requests.post(api_url, json=user_data)
         
         if user_response.status_code != 201:
@@ -244,7 +285,8 @@ def create_new_contact(contact_text: str, user_id: int, relationship_type: str =
         }
         
         # Call the API to create the relationship
-        relationship_url = f"{IOS_SIMULATOR_URL}/connections"
+        relationship_url = f"{API_BASE_URL}/connections"
+        print(f"Creating connection at URL: {relationship_url}")
         connection_response = requests.post(relationship_url, json=connection_data)
         
         if connection_response.status_code != 201:
