@@ -8,8 +8,7 @@ This module provides configuration values from environment variables with fallba
 IS_RAILWAY = os.environ.get("RAILWAY_ENVIRONMENT") is not None
 
 # Database connection settings
-# Railway provides DATABASE_URL environment variable for PostgreSQL connection
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/nexus")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:FPrWvNwkoqBIigGDjuBeJmMaJXCrjlgv@switchback.proxy.rlwy.net:50887/railway")
 
 # API server settings
 API_HOST = os.getenv("API_HOST", "0.0.0.0")
