@@ -79,7 +79,7 @@ struct CreateAccountView: View {
                             .padding(.vertical, 8)
                             .autocapitalization(.none)
                             .disableAutocorrection(true)
-                            .onChange(of: username) { _ in
+                            .onChange(of: username) { oldValue, newValue in
                                 // Reset availability when username changes
                                 isUsernameValid = nil
                             }
@@ -127,8 +127,8 @@ struct CreateAccountView: View {
                         .padding(.vertical, 8)
                         .textContentType(.oneTimeCode)
                         .autocapitalization(.none)
-                        .onChange(of: confirmPassword) { _ in
-                            showingPasswordMismatch = !confirmPassword.isEmpty && password != confirmPassword
+                        .onChange(of: confirmPassword) { oldValue, newValue in
+                            showingPasswordMismatch = !newValue.isEmpty && password != newValue
                         }
                     
                     if showingPasswordMismatch {

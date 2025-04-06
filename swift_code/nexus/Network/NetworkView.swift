@@ -26,6 +26,12 @@ struct NetworkView: View {
     /// Track if we've shown connections already
     @State private var hasShownConnections = false
     
+    /// State to manage the delete confirmation dialog
+    @State private var showDeleteConfirmation = false
+    
+    /// The connection being considered for deletion
+    @State private var connectionToDelete: Connection? = nil
+    
     /// Computed property for filtered connections based on search text and selected tag
     private var filteredConnections: [Connection] {
         let connections = coordinator.networkManager.connections
@@ -94,13 +100,8 @@ struct NetworkView: View {
                     firstName: coordinator.networkManager.currentUser?.firstName,
                     subtitle: "Your personal network tracker"
                 ) {
-                    Button(action: {
-                        coordinator.selectedTab = .addNew
-                    }) {
-                        Image(systemName: "plus")
-                            .foregroundColor(.blue)
-                            .font(.system(size: 18))
-                    }
+                    // Plus button removed
+                    EmptyView()
                 }
                 
                 // Search bar with tag filter
@@ -213,6 +214,23 @@ struct NetworkView: View {
             }
         }
         .id(refreshTrigger) // Re-add the ID modifier to allow forcing refresh when needed
+        .confirmationDialog(
+            "Delete Contact",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                if let connection = connectionToDelete {
+                    deleteConnection(connection)
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                showDeleteConfirmation = false
+                connectionToDelete = nil
+            }
+        } message: {
+            Text("Are you sure you want to delete this contact? This action cannot be undone.")
+        }
     }
     
     // MARK: - UI Components
@@ -301,6 +319,19 @@ struct NetworkView: View {
             // Show connections
             ForEach(filteredConnections) { connection in
                 connectionCard(for: connection)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button(role: .destructive) {
+                            // Set the connection to delete and show confirmation
+                            connectionToDelete = connection
+                            showDeleteConfirmation = true
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                        .tint(.red)
+                    }
+                    .onTapGesture {
+                        coordinator.showContact(connection.user)
+                    }
             }
         }
     }
@@ -450,9 +481,6 @@ struct NetworkView: View {
             .padding(.horizontal, 0)
         }
         .padding(.horizontal, 0)
-        .onTapGesture {
-            coordinator.showContact(connection.user)
-        }
     }
     
     /// Color for tag based on tag name
@@ -574,6 +602,20 @@ struct NetworkView: View {
         isRefreshing = false
         // We only toggle the refreshTrigger during manual pull-to-refresh
         refreshTrigger.toggle() 
+    }
+    
+    /// Delete a connection
+    private func deleteConnection(_ connection: Connection) {
+        coordinator.networkManager.deleteContact(contactId: connection.id) { success in
+            if success {
+                // The connection list will be updated automatically by the NetworkManager
+                // We can add additional feedback if desired
+                print("Successfully deleted connection to \(connection.user.fullName)")
+            } else {
+                // Handle error - could show an alert here
+                print("Failed to delete connection to \(connection.user.fullName)")
+            }
+        }
     }
 }
 
