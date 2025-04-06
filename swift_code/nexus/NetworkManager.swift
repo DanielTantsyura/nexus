@@ -1579,6 +1579,232 @@ class NetworkManager: ObservableObject {
         }.resume()
     }
     
+    // MARK: - Account Management Methods
+
+    /// Checks if a username is available (not already taken)
+    /// - Parameters:
+    ///   - username: The username to check
+    ///   - completion: Closure called with result indicating whether the username is available
+    func checkUsernameAvailability(_ username: String, completion: @escaping (Result<Bool, Error>) -> Void) {
+        setLoading(true)
+        
+        guard let url = URL(string: "\(baseURL)/people/username-check?username=\(username)") else {
+            setLoading(false)
+            completion(.failure(NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
+            return
+        }
+        
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.setLoading(false)
+                
+                if let error = error {
+                    completion(.failure(error))
+                    return
+                }
+                
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    completion(.failure(NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])))
+                    return
+                }
+                
+                // If the check endpoint doesn't exist, fall back to search and check if there are results
+                if httpResponse.statusCode == 404 {
+                    self.searchForUsername(username, completion: completion)
+                    return
+                }
+                
+                guard let data = data else {
+                    completion(.failure(NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "No data received"])))
+                    return
+                }
+                
+                do {
+                    let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                    let isAvailable = json?["available"] as? Bool ?? false
+                    completion(.success(isAvailable))
+                } catch {
+                    completion(.failure(error))
+                }
+            }
+        }.resume()
+    }
+
+    /// Fallback method that searches for users with the given username
+    /// - Parameters:
+    ///   - username: The username to search for
+    ///   - completion: Closure called with result indicating whether the username is available
+    private func searchForUsername(_ username: String, completion: @escaping (Result<Bool, Error>) -> Void) {
+        guard let encodedUsername = username.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
+            completion(.failure(NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Failed to encode username"])))
+            return
+        }
+        
+        guard let url = URL(string: "\(baseURL)/people/search?q=\(encodedUsername)") else {
+            completion(.failure(NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
+            return
+        }
+        
+        URLSession.shared.dataTask(with: url) { data, response, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    completion(.failure(error))
+                    return
+                }
+                
+                guard let data = data else {
+                    completion(.failure(NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "No data received"])))
+                    return
+                }
+                
+                do {
+                    let users = try JSONDecoder().decode([User].self, from: data)
+                    // Check if any user has the exact username we're looking for
+                    let isUsernameTaken = users.contains { user in
+                        user.username?.lowercased() == username.lowercased()
+                    }
+                    completion(.success(!isUsernameTaken))
+                } catch {
+                    completion(.failure(error))
+                }
+            }
+        }.resume()
+    }
+
+    /// Creates a new user account with login credentials
+    /// - Parameters:
+    ///   - userData: Dictionary with user data (first_name, last_name, etc.)
+    ///   - username: Username for login
+    ///   - password: Password for login
+    ///   - completion: Closure called with result containing the new user ID
+    func createAccount(userData: [String: Any], username: String, password: String, completion: @escaping (Result<Int, Error>) -> Void) {
+        setLoading(true)
+        setErrorMessage(nil)
+        
+        // First check if username is available
+        checkUsernameAvailability(username) { [weak self] result in
+            guard let self = self else { return }
+            
+            switch result {
+            case .success(let isAvailable):
+                if !isAvailable {
+                    self.setLoading(false)
+                    completion(.failure(NSError(domain: "ValidationError", code: 409, userInfo: [NSLocalizedDescriptionKey: "Username already taken"])))
+                    return
+                }
+                
+                // Username is available, proceed with account creation
+                self.createUser(userData: userData, username: username, password: password, completion: completion)
+                
+            case .failure(let error):
+                self.setLoading(false)
+                completion(.failure(error))
+            }
+        }
+    }
+
+    /// Creates a new user in the database
+    /// - Parameters:
+    ///   - userData: Dictionary with user data
+    ///   - username: Username for login
+    ///   - password: Password for login
+    ///   - completion: Closure called with result containing the new user ID
+    private func createUser(userData: [String: Any], username: String, password: String, completion: @escaping (Result<Int, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/people") else {
+            setLoading(false)
+            completion(.failure(NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
+            return
+        }
+        
+        // Start with a copy of userData 
+        var completeUserData = userData
+        
+        // Add password for login creation
+        completeUserData["password"] = password
+        
+        // Important: DON'T add username to the people table fields
+        // Instead send it as a query parameter to handle separately
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        components?.queryItems = [URLQueryItem(name: "username", value: username)]
+        
+        guard let finalUrl = components?.url else {
+            setLoading(false)
+            completion(.failure(NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Failed to create URL with parameters"])))
+            return
+        }
+        
+        // Create the request
+        var request = URLRequest(url: finalUrl)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // Also send username in header as backup
+        request.setValue(username, forHTTPHeaderField: "X-Username")
+        
+        do {
+            let jsonData = try JSONSerialization.data(withJSONObject: completeUserData)
+            request.httpBody = jsonData
+            
+            // For debugging
+            print("Creating user with data:")
+            if let jsonString = String(data: jsonData, encoding: .utf8) {
+                print(jsonString)
+            }
+            print("Username (via URL param & header): \(username)")
+        } catch {
+            setLoading(false)
+            completion(.failure(error))
+            return
+        }
+        
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.setLoading(false)
+                
+                if let error = error {
+                    completion(.failure(error))
+                    return
+                }
+                
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    completion(.failure(NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])))
+                    return
+                }
+                
+                guard (200...299).contains(httpResponse.statusCode) else {
+                    var errorMessage = "Server error: \(httpResponse.statusCode)"
+                    
+                    // Try to extract error message from response
+                    if let data = data, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let serverError = json["error"] as? String {
+                        errorMessage = serverError
+                    }
+                    
+                    completion(.failure(NSError(domain: "NetworkError", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: errorMessage])))
+                    return
+                }
+                
+                guard let data = data else {
+                    completion(.failure(NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "No data received"])))
+                    return
+                }
+                
+                do {
+                    let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                    if let userId = json?["id"] as? Int {
+                        completion(.success(userId))
+                    } else {
+                        completion(.failure(NSError(domain: "NetworkError", code: 0, userInfo: [NSLocalizedDescriptionKey: "User ID not found in response"])))
+                    }
+                } catch {
+                    completion(.failure(error))
+                }
+            }
+        }.resume()
+    }
+    
     // MARK: - Helper Methods
     
     /// Creates a URLRequest with standard configuration

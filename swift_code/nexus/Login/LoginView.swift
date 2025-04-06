@@ -10,10 +10,10 @@ struct LoginView: View {
     // MARK: - State
     
     /// The username entered by the user
-    @State private var username = ""
+    @State private var username: String = ""
     
     /// The password entered by the user
-    @State private var password = ""
+    @State private var password: String = ""
     
     /// Whether the login is currently in progress
     @State private var isLoggingIn = false
@@ -23,6 +23,9 @@ struct LoginView: View {
     
     /// The current error message to display
     @State private var errorMessage = "Invalid credentials. Please try again."
+    
+    /// Whether to show the create account view
+    @State private var showingCreateAccount = false
     
     // MARK: - View
     
@@ -41,9 +44,11 @@ struct LoginView: View {
                 
                 TextField("Enter your username", text: $username)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .font(.title3)
                     .textContentType(.username)
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
+                    .padding(.vertical, 12)
                     .padding(.bottom, 10)
                     .disabled(isLoggingIn)
                 
@@ -55,7 +60,9 @@ struct LoginView: View {
                 
                 SecureField("Enter your password", text: $password)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .font(.title3)
                     .textContentType(.password)
+                    .padding(.vertical, 12)
                     .disabled(isLoggingIn)
             }
             
@@ -66,36 +73,51 @@ struct LoginView: View {
                     .padding(.top, 5)
             }
             
-            Button(action: loginAction) {
-                Group {
-                    if isLoggingIn {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    } else {
-                        Text("Log In")
-                            .fontWeight(.semibold)
+            // Container for buttons to ensure they have the same width
+            VStack(spacing: 12) {
+                Button(action: loginAction) {
+                    Group {
+                        if isLoggingIn {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        } else {
+                            Text("Log In")
+                                .fontWeight(.semibold)
+                        }
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
                 }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.blue)
-                .foregroundColor(.white)
-                .cornerRadius(10)
+                .disabled(username.isEmpty || password.isEmpty || isLoggingIn)
+                
+                Button(action: {
+                    showingCreateAccount = true
+                }) {
+                    Text("Create Account")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.orange)
+                        .cornerRadius(10)
+                }
             }
-            .disabled(username.isEmpty || password.isEmpty || isLoggingIn)
+            .frame(maxWidth: .infinity)
             .padding(.top, 20)
-            
-            Button("Create Account") {
-                showCreateAccount()
-            }
-            .foregroundColor(.blue)
-            .padding(.top, 5)
             
             Spacer()
         }
         .padding()
         .frame(maxWidth: 400)
         .padding(.top, 50)
+        .sheet(isPresented: $showingCreateAccount) {
+            CreateAccountView()
+                .environmentObject(coordinator)
+                .environmentObject(coordinator.networkManager)
+        }
     }
     
     // MARK: - Actions
@@ -119,12 +141,6 @@ struct LoginView: View {
             }
         }
     }
-    
-    /// Navigate to the create account screen
-    private func showCreateAccount() {
-        // Implementation for navigating to account creation
-    }
-    
 }
 
 // MARK: - Previews
@@ -132,4 +148,4 @@ struct LoginView: View {
 #Preview {
     LoginView()
         .environmentObject(AppCoordinator())
-} 
+}

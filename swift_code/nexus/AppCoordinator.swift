@@ -26,6 +26,9 @@ enum ActiveScreen: Equatable {
     
     /// Home screen
     case home
+    
+    /// Create account screen
+    case createAccount
 }
 
 /// Tab selection options for main tab view
@@ -221,6 +224,13 @@ final class AppCoordinator: ObservableObject {
     func showCreateContact() {
         // Simply call selectTab(.addNew) instead of manipulating the navigation path
         selectTab(.addNew)
+    }
+    
+    /// Navigate to the create account screen
+    func showCreateAccount() {
+        // Present the CreateAccountView
+        // Note: The actual presentation is handled by the LoginView's sheet
+        activeScreen = .createAccount
     }
     
     /// Navigate back from create contact to home

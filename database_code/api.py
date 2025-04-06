@@ -64,20 +64,32 @@ def add_user():
     """Add a new user to the database."""
     data = request.json
     
+    # Get username from URL query parameter, header, or JSON data
+    username = request.args.get('username') or request.headers.get('X-Username') or data.get('username')
+    
     # Validate required fields
-    required_fields = ['username', 'first_name', 'last_name']
-    for field in required_fields:
-        if field not in data:
-            return jsonify({"error": f"Missing required field: {field}"}), 400
+    if not username:
+        return jsonify({"error": "Missing required field: username"}), 400
+        
+    if 'first_name' not in data or 'last_name' not in data:
+        return jsonify({"error": "Missing required fields: first_name and last_name"}), 400
     
     try:
         with db_manager:
-            # Add the user
+            # Get the password from the data
+            password = data.pop('password', None)
+            
+            # Ensure username is not in the data going to the people table
+            # The API might have received it in the JSON body
+            if 'username' in data:
+                data.pop('username')
+            
+            # Add the user to the people table first
             user_id = db_manager.add_user(data)
             
-            # Add login if provided
-            if 'password' in data:
-                db_manager.add_user_login(user_id, data['username'], data['password'])
+            # Now create login entry with the username and password
+            if username and password:
+                db_manager.add_user_login(user_id, username, password)
             
             # Get the newly created user
             new_user = db_manager.get_user_by_id(user_id)
@@ -194,8 +206,12 @@ def update_connection():
     if 'relationship_type' in update_data:
         update_data['relationship_description'] = update_data.pop('relationship_type')
     
+    # Handle note field - client may send either 'note' or 'notes'
     if 'note' in update_data:
-        update_data['custom_note'] = update_data.pop('note')
+        update_data['notes'] = update_data.pop('note')
+    elif 'notes' in update_data:
+        # Ensure it stays as 'notes' to match database column
+        pass
     
     if not update_data:
         return jsonify({"error": "No fields to update"}), 400

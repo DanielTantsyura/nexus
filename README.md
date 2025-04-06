@@ -22,29 +22,28 @@ The system allows users to:
    - PostgreSQL with three primary tables: `people`, `logins`, and `relationships`
    - Comprehensive user profiles with personal and professional details
    - Relationship tracking with custom notes and tags
-   - Last login timestamp tracking
-   - Non-unique email addresses, allowing multiple users with the same email
+   - Last login timestamp tracking for sorting the contacts
 
 2. **Natural Language Contact Creation**
    - OpenAI GPT integration via `newUser.py` module
    - Free-form text parsing into structured user data
    - Smart field extraction (names, universities, interests, etc.)
-   - Automatic relationship creation with appropriate tags
+   - Suggested filling in of fields like email and location 
 
 3. **API Endpoints**
    - RESTful Flask API with comprehensive error handling
    - User CRUD operations (Create, Read, Update, Delete)
-   - Connection management with bidirectional relationship support
-   - Search functionality across multiple user fields
-   - Simplified login credential creation with auto-generated usernames
+   - Connection management through the `relationships` table
+   - Search functionality across multiple tags
+   - Simplified login credential creation with usernames
 
 ### iOS Client Features
 
 1. **Modern SwiftUI Interface**
-   - Tab-based navigation with Network and Profile sections
-   - User detail views with comprehensive profile information
+   - Tab-based navigation with Network, Profile, Add Contact, and Login sections
+   - Detailed connection views with profile information
    - Connection management directly from user profiles
-   - Form-based contact and profile editing
+   - Contact and profile editing
 
 2. **State Management**
    - Centralized state via NetworkManager and AppCoordinator
@@ -225,7 +224,7 @@ The system leverages OpenAI's API to extract structured data from natural langua
 ## Key Technologies
 
 ### Backend
-- **Python 3.9+**
+- **Python 3.11+**
 - **Flask** - Web framework
 - **PostgreSQL** - Relational database
 - **psycopg2** - PostgreSQL adapter

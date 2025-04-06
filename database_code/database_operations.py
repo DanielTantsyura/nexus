@@ -250,14 +250,19 @@ class DatabaseManager:
         Returns:
             ID of the newly created user
         """
+        # Extract username for login creation but don't include it in people table
+        username = user_data.pop('username', None)
+        password = user_data.pop('password', None)
+        
+        # Fixed query that doesn't include username column
         query = """
         INSERT INTO people (
-            username, first_name, last_name, email, phone_number,
+            first_name, last_name, email, phone_number,
             location, university, field_of_interest, high_school,
             gender, ethnicity, uni_major, job_title, current_company,
             profile_image_url, linkedin_url, recent_tags
         ) VALUES (
-            %(username)s, %(first_name)s, %(last_name)s, %(email)s, %(phone_number)s,
+            %(first_name)s, %(last_name)s, %(email)s, %(phone_number)s,
             %(location)s, %(university)s, %(field_of_interest)s, %(high_school)s,
             %(gender)s, %(ethnicity)s, %(uni_major)s, %(job_title)s, %(current_company)s,
             %(profile_image_url)s, %(linkedin_url)s, %(recent_tags)s
@@ -272,6 +277,11 @@ class DatabaseManager:
             self.cursor.execute(query, user_data)
             user_id = self.cursor.fetchone()['id']
             self.conn.commit()
+            
+            # Add login if username and password were provided
+            if username and password:
+                self.add_user_login(user_id, username, password)
+                
             print(f"User created with ID: {user_id}")
             return user_id
         except Exception as e:
