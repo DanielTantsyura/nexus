@@ -47,6 +47,7 @@ Thumbs.db
 # Swift/Xcode
 ## User settings
 xcuserdata/
+swift_code/nexus.xcodeproj/project.xcworkspace/xcuserdata/danieltantsyura.xcuserdatad/UserInterfaceState.xcuserstate
 
 ## Obj-C/Swift specific
 *.hmap

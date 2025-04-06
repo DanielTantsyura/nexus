@@ -74,23 +74,40 @@ struct AppHeader<TrailingContent: View>: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                // App logo
-                Image("AppLogo")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(height: 40)
+            ZStack {
+                HStack {
+                    // App logo (anchored to the left)
+                    Image("AppLogo")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(height: 40)
+                    
+                    Spacer()
+                    
+                    // Invisible placeholder for trailing content to balance layout
+                    if trailingContent != nil {
+                        Color.clear
+                            .frame(width: 40, height: 40)
+                    }
+                }
                 
-                // App name with user's first name
+                // App name with user's first name (centered)
                 Text("\(firstName?.isEmpty == false ? "\(firstName!)'s " : "")Nexus")
                     .font(.title)
                     .fontWeight(.bold)
+                    .frame(maxWidth: .infinity)
                 
-                Spacer()
-                
-                // Trailing content if provided
-                if let trailingContent = trailingContent {
-                    trailingContent
+                HStack {
+                    // Invisible placeholder for logo to balance layout
+                    Color.clear
+                        .frame(width: 40, height: 40)
+                    
+                    Spacer()
+                    
+                    // Trailing content if provided (anchored to the right)
+                    if let trailingContent = trailingContent {
+                        trailingContent
+                    }
                 }
             }
             

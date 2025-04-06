@@ -1361,7 +1361,7 @@ class NetworkManager: ObservableObject {
         }
         
         var requestDict: [String: Any] = [
-            "text": text,
+            "contact_text": text,
             "user_id": userId
         ]
         

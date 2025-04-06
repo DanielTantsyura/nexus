@@ -77,37 +77,48 @@ def get_user_by_id(user_id):
         print(error_message)
         return jsonify({"error": error_message}), 500
 
+@app.route('/people/<int:user_id>/recent-tags', methods=['GET'])
+def get_user_recent_tags(user_id):
+    """Get recent tags used by a specific user."""
+    try:
+        with db_manager:
+            # Check if user exists
+            user = db_manager.get_user_by_id(user_id)
+            if not user:
+                return jsonify({"error": f"User with ID {user_id} not found"}), 404
+            
+            # Fetch recent tags for the user
+            tags = db_manager.get_user_recent_tags(user_id)
+            
+            # If no tags, return empty list
+            if not tags:
+                return jsonify([])
+                
+            return jsonify(tags)
+    except Exception as e:
+        error_message = f"Error retrieving recent tags: {str(e)}"
+        print(error_message)
+        return jsonify({"error": error_message}), 500
+
 @app.route('/people', methods=['POST'])
 def add_user():
     """Add a new user to the database."""
     data = request.json
     
-    # Get username from URL query parameter, header, or JSON data
-    username = request.args.get('username') or request.headers.get('X-Username') or data.get('username')
-    
     # Validate required fields
-    if not username:
-        return jsonify({"error": "Missing required field: username"}), 400
-        
-    if 'first_name' not in data or 'last_name' not in data:
-        return jsonify({"error": "Missing required fields: first_name and last_name"}), 400
+    required_fields = ['username', 'first_name', 'last_name']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({"error": f"Missing required field: {field}"}), 400
     
     try:
         with db_manager:
-            # Get the password from the data
-            password = data.pop('password', None)
-            
-            # Ensure username is not in the data going to the people table
-            # The API might have received it in the JSON body
-            if 'username' in data:
-                data.pop('username')
-            
-            # Add the user to the people table first
+            # Add the user
             user_id = db_manager.add_user(data)
             
-            # Now create login entry with the username and password
-            if username and password:
-                db_manager.add_user_login(user_id, username, password)
+            # Add login if provided
+            if 'password' in data:
+                db_manager.add_user_login(user_id, data['username'], data['password'])
             
             # Get the newly created user
             new_user = db_manager.get_user_by_id(user_id)
@@ -224,12 +235,8 @@ def update_connection():
     if 'relationship_type' in update_data:
         update_data['relationship_description'] = update_data.pop('relationship_type')
     
-    # Handle note field - client may send either 'note' or 'notes'
     if 'note' in update_data:
-        update_data['notes'] = update_data.pop('note')
-    elif 'notes' in update_data:
-        # Ensure it stays as 'notes' to match database column
-        pass
+        update_data['custom_note'] = update_data.pop('note')
     
     if not update_data:
         return jsonify({"error": "No fields to update"}), 400
@@ -247,6 +254,12 @@ def update_connection():
         error_message = f"Error updating connection: {str(e)}"
         print(error_message)
         return jsonify({"error": error_message}), 500
+
+@app.route('/connections/update', methods=['PUT'])
+def update_connection_compat():
+    """Update an existing connection between two users - compatibility endpoint."""
+    # Just delegate to the main update_connection function
+    return update_connection()
 
 @app.route('/connections', methods=['DELETE'])
 def remove_connection():

@@ -40,11 +40,12 @@ struct LoginView: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 Text("Username")
-                    .font(.headline)
+                    .font(.title3)
+                    .fontWeight(.medium)
                 
                 TextField("Enter your username", text: $username)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .font(.title3)
+                    .font(.title2)
                     .textContentType(.username)
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
@@ -56,11 +57,12 @@ struct LoginView: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 Text("Password")
-                    .font(.headline)
+                    .font(.title3)
+                    .fontWeight(.medium)
                 
                 SecureField("Enter your password", text: $password)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .font(.title3)
+                    .font(.title2)
                     .textContentType(.password)
                     .padding(.vertical, 12)
                     .disabled(isLoggingIn)
