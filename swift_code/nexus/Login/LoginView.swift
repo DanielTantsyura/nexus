@@ -38,7 +38,7 @@ struct LoginView: View {
                 .frame(width: 120, height: 120)
                 .padding(.bottom, 20)
             
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text("Username")
                     .font(.headline)
                 
@@ -49,12 +49,12 @@ struct LoginView: View {
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
                     .padding(.vertical, 12)
-                    .padding(.bottom, 10)
+                    .padding(.bottom, -15)
                     .disabled(isLoggingIn)
                 
             }
             
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text("Password")
                     .font(.headline)
                 

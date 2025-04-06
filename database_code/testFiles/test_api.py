@@ -319,7 +319,7 @@ def test_create_login(user_id, passkey):
         db = DatabaseManager()
         try:
             db.connect()
-            db.cursor.execute("SELECT username FROM logins WHERE user_id = %s", (user_id,))
+            db.cursor.execute("SELECT username FROM logins WHERE people_id = %s", (user_id,))
             result = db.cursor.fetchone()
             username = result['username'] if result else None
             log(f"Retrieved existing username: {username}")
@@ -754,7 +754,7 @@ def test_login_operations():
         if has_login:
             log(f"ℹ️ User already has login credentials")
             # Get the existing username
-            db_manager.cursor.execute("SELECT username FROM logins WHERE user_id = %s", (user_id,))
+            db_manager.cursor.execute("SELECT username FROM logins WHERE people_id = %s", (user_id,))
             login_record = db_manager.cursor.fetchone()
             if login_record:
                 username = login_record['username']

@@ -402,7 +402,7 @@ class DatabaseManager:
             r.tags, r.last_viewed, r.created_at
         FROM people u
         JOIN relationships r ON u.id = r.contact_id
-        LEFT JOIN logins l ON u.id = l.user_id
+        LEFT JOIN logins l ON u.id = l.people_id
         WHERE r.user_id = %s
         ORDER BY r.last_viewed DESC NULLS LAST, u.first_name, u.last_name;
         """
@@ -667,7 +667,7 @@ class DatabaseManager:
             True if successful, False otherwise
         """
         query = """
-        INSERT INTO logins (user_id, username, passkey, last_login)
+        INSERT INTO logins (people_id, username, passkey, last_login)
         VALUES (%s, %s, %s, NOW())
         """
         
@@ -692,7 +692,7 @@ class DatabaseManager:
             User ID if login successful, None otherwise
         """
         query = """
-        SELECT user_id
+        SELECT people_id
         FROM logins
         WHERE username = %s AND passkey = %s
         """
@@ -712,7 +712,7 @@ class DatabaseManager:
                 self.cursor.execute(update_last_login_query, (username, passkey))
                 self.connection.commit()
                 
-            return result['user_id'] if result else None
+            return result['people_id'] if result else None
         except Exception as e:
             print(f"Error validating login: {e}")
             return None
@@ -742,20 +742,20 @@ class DatabaseManager:
                 last_name = user['last_name']
                 
                 # Check if login exists
-                self.cursor.execute("SELECT id FROM logins WHERE user_id = %s;", (user_id,))
+                self.cursor.execute("SELECT id FROM logins WHERE people_id = %s;", (user_id,))
                 login = self.cursor.fetchone()
                 
                 if login:
                     # Update existing login
                     self.cursor.execute(
-                        "UPDATE logins SET passkey = %s WHERE user_id = %s;", 
+                        "UPDATE logins SET passkey = %s WHERE people_id = %s;", 
                         (new_password, user_id)
                     )
                     print(f"Updated password for {first_name} {last_name} (ID: {user_id})")
                 else:
                     # Create new login
                     self.cursor.execute(
-                        "INSERT INTO logins (user_id, username, passkey) VALUES (%s, %s, %s);",
+                        "INSERT INTO logins (people_id, username, passkey) VALUES (%s, %s, %s);",
                         (user_id, username, new_password)
                     )
                     print(f"Created login for {first_name} {last_name} (ID: {user_id})")
@@ -789,11 +789,11 @@ class DatabaseManager:
                 print(f"{user['id']}: {user['first_name']} {user['last_name']} (username: {user['username']})")
             
             # Get logins
-            self.cursor.execute("SELECT user_id, username, passkey FROM logins ORDER BY user_id;")
+            self.cursor.execute("SELECT people_id, username, passkey FROM logins ORDER BY people_id;")
             logins = self.cursor.fetchall()
             print(f"\n=== Logins ({len(logins)}) ===")
             for login in logins:
-                print(f"User ID: {login['user_id']}, Username: {login['username']}, Password: {login['passkey']}")
+                print(f"User ID: {login['people_id']}, Username: {login['username']}, Password: {login['passkey']}")
             
             # Get relationships
             self.cursor.execute("""
@@ -813,6 +813,27 @@ class DatabaseManager:
             print("An error occurred:", e)
             return False
     
+    def update_last_login(self, user_id: int) -> bool:
+        """
+        Update the last_login timestamp for a user.
+        
+        Args:
+            user_id: The ID of the user to update
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            query = """
+                UPDATE logins 
+                SET last_login = NOW() 
+                WHERE people_id = %s
+            """
+            return self.execute_query(query, (user_id,))
+        except Exception as e:
+            print(f"Error updating last login: {e}")
+            return False
+            
     def clean_test_data(self, real_user_id_threshold: int = 5) -> bool:
         """
         Remove test data from the database.
@@ -829,7 +850,7 @@ class DatabaseManager:
             deleted_connections = self.cursor.rowcount
             print(f"Deleted {deleted_connections} test connections")
             
-            self.cursor.execute(f"DELETE FROM logins WHERE user_id > {real_user_id_threshold};")
+            self.cursor.execute(f"DELETE FROM logins WHERE people_id > {real_user_id_threshold};")
             deleted_logins = self.cursor.rowcount
             print(f"Deleted {deleted_logins} test logins")
             
@@ -853,27 +874,6 @@ class DatabaseManager:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit point."""
         self.disconnect()
-    
-    def update_last_login(self, user_id: int) -> bool:
-        """
-        Update the last_login timestamp for a user.
-        
-        Args:
-            user_id: The ID of the user to update
-            
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        try:
-            query = """
-                UPDATE logins 
-                SET last_login = NOW() 
-                WHERE user_id = %s
-            """
-            return self.execute_query(query, (user_id,))
-        except Exception as e:
-            print(f"Error updating last login: {e}")
-            return False
 
 
 # Example usage

@@ -83,19 +83,19 @@ def setup_database(include_sample_data: bool = True, password: str = "password")
             # Create login entries for each user
             for user_id, username in users:
                 # Check if login already exists
-                cursor.execute("SELECT id FROM logins WHERE user_id = %s", (user_id,))
+                cursor.execute("SELECT id FROM logins WHERE people_id = %s", (user_id,))
                 login = cursor.fetchone()
                 
                 if login:
                     # Update existing login
                     cursor.execute(
-                        "UPDATE logins SET passkey = %s WHERE user_id = %s",
+                        "UPDATE logins SET passkey = %s WHERE people_id = %s",
                         (password, user_id)
                     )
                 else:
                     # Create new login
                     cursor.execute(
-                        "INSERT INTO logins (user_id, username, passkey) VALUES (%s, %s, %s)",
+                        "INSERT INTO logins (people_id, username, passkey) VALUES (%s, %s, %s)",
                         (user_id, username, password)
                     )
             

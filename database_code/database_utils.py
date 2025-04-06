@@ -84,11 +84,11 @@ class DatabaseUtils:
                 print(f"{user_id}: {first_name} {last_name} (username: {username})")
             
             # Get logins
-            cursor.execute("SELECT user_id, username, passkey FROM logins ORDER BY user_id;")
+            cursor.execute("SELECT people_id, username, passkey FROM logins ORDER BY people_id;")
             logins = cursor.fetchall()
             print(f"\n=== Logins ({len(logins)}) ===")
-            for user_id, username, passkey in logins:
-                print(f"User ID: {user_id}, Username: {username}, Password: {passkey}")
+            for login in logins:
+                print(f"User ID: {login[0]}, Username: {login[1]}, Password: {login[2]}")
             
             # Get relationships
             cursor.execute("""
@@ -132,7 +132,7 @@ class DatabaseUtils:
             query = """
             SELECT u.id, u.first_name, u.last_name
             FROM people u
-            LEFT JOIN logins l ON u.id = l.user_id
+            LEFT JOIN logins l ON u.id = l.people_id
             WHERE l.id IS NULL AND u.recent_tags IS NOT NULL;
             """
             
@@ -151,8 +151,8 @@ class DatabaseUtils:
                 
                 # Add the login
                 insert_query = """
-                INSERT INTO logins (user_id, username, passkey, last_login)
-                VALUES (%s, %s, %s, NULL);
+                INSERT INTO logins (people_id, username, passkey, last_login)
+                VALUES (%s, %s, %s, NOW());
                 """
                 
                 cur.execute(insert_query, (user_id, username, default_password))
@@ -193,7 +193,7 @@ class DatabaseUtils:
             deleted_connections = cursor.rowcount
             print(f"Deleted {deleted_connections} test connections")
             
-            cursor.execute(f"DELETE FROM logins WHERE user_id > {real_user_id_threshold};")
+            cursor.execute(f"DELETE FROM logins WHERE people_id > {real_user_id_threshold};")
             deleted_logins = cursor.rowcount
             print(f"Deleted {deleted_logins} test logins")
             
@@ -238,19 +238,19 @@ class DatabaseUtils:
             )
             
             # Check if login exists
-            cursor.execute("SELECT id FROM logins WHERE user_id = %s;", (user_id,))
+            cursor.execute("SELECT id FROM logins WHERE people_id = %s;", (user_id,))
             login = cursor.fetchone()
                 
             if login:
                 # Update existing login
                 cursor.execute(
-                    "UPDATE logins SET passkey = %s WHERE user_id = %s;", 
+                    "UPDATE logins SET passkey = %s WHERE people_id = %s;", 
                     (password, user_id)
                 )
             else:
                 # Create new login
                 cursor.execute(
-                    "INSERT INTO logins (user_id, username, passkey) VALUES (%s, %s, %s);",
+                    "INSERT INTO logins (people_id, username, passkey) VALUES (%s, %s, %s);",
                     (user_id, username, password)
                 )
             

@@ -55,11 +55,11 @@ CREATE TABLE users (
 -- Create logins table for authentication
 CREATE TABLE logins (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    people_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     username VARCHAR(50) NOT NULL,
     passkey VARCHAR(100) NOT NULL,
     last_login TIMESTAMP,
-    CONSTRAINT unique_user_id UNIQUE (user_id)
+    CONSTRAINT unique_people_id UNIQUE (people_id)
 );
 
 -- Create relationships table 
