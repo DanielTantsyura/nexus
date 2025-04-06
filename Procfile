@@ -1,0 +1,1 @@
+web: cd database_code && gunicorn api:app 

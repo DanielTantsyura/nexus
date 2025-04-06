@@ -13,20 +13,48 @@ import requests
 import os
 import re
 import time
+import traceback
 from typing import Dict, Any, List, Tuple, Optional
-from openai import OpenAI
+try:
+    # Try importing from newer OpenAI SDK (1.x+)
+    from openai import OpenAI
+    USING_NEW_SDK = True
+except ImportError:
+    # Fall back to older OpenAI SDK (0.28.0)
+    import openai
+    USING_NEW_SDK = False
 from dotenv import load_dotenv
-import openai
-from config import DEFAULT_TAGS, OPENAI_MODEL, API_PORT
+from config import DEFAULT_TAGS, OPENAI_MODEL, API_PORT, OPENAI_AVAILABLE, API_BASE_URL, IS_RAILWAY
 
 # Only load API key from environment variables
 load_dotenv()
 
-# Initialize OpenAI client with API key from environment
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Track if OpenAI is available
+OPENAI_WORKING = False
+
+# Initialize OpenAI client with API key from environment only if API key is available
+if OPENAI_AVAILABLE:
+    try:
+        if USING_NEW_SDK:
+            client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            # Test the client with a simple call
+            client.models.list(limit=1)
+            OPENAI_WORKING = True
+        else:
+            openai.api_key = os.getenv("OPENAI_API_KEY")
+            # Test the API with a simple call
+            openai.Model.list(limit=1)
+            OPENAI_WORKING = True
+        print("OpenAI API initialized successfully")
+    except Exception as e:
+        print(f"OpenAI API initialization failed: {e}")
+        traceback.print_exc()
+else:
+    print("OpenAI API key not found - natural language processing features disabled")
 
 # API endpoints
-API_BASE_URL = f"http://localhost:{API_PORT}"
+API_BASE_URL = API_BASE_URL
+print(f"API_BASE_URL set to: {API_BASE_URL}")
 
 def get_user_fields_from_schema() -> List[str]:
     """
@@ -72,7 +100,7 @@ def get_user_fields_from_schema() -> List[str]:
 # Initialize USER_FIELDS with the fields from the schema
 USER_FIELDS = get_user_fields_from_schema()
 
-def process_contact_text(text: str) -> Tuple[Dict[str, Any], str]:
+def process_contact_text(text: str) -> Tuple[bool, Optional[Dict[str, Any]], str]:
     """
     Process free-form text into a structured user object and additional notes.
     
@@ -91,6 +119,11 @@ def process_contact_text(text: str) -> Tuple[Dict[str, Any], str]:
     
     # Create a filtered list of fields that excludes username and recent_tags
     filtered_fields = [field for field in USER_FIELDS if field not in ['username', 'recent_tags']]
+    
+    # If OpenAI is not available, use basic processing
+    if not OPENAI_AVAILABLE or not OPENAI_WORKING:
+        print("OpenAI API not available, using basic text processing")
+        return basic_text_processing(text, filtered_fields)
     
     try:
         # Create a system prompt that explains what we want the model to do
@@ -118,54 +151,93 @@ def process_contact_text(text: str) -> Tuple[Dict[str, Any], str]:
         Format your response as a valid JSON object with these fields.
         """
         
-        # Send the request to the OpenAI API using the older format (0.28.0)
-        response = openai.ChatCompletion.create(
-            model=OPENAI_MODEL,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": text}
-            ],
-            temperature=0.1,
-            max_tokens=800
-        )
-        
-        # Extract the generated JSON from the response
-        response_content = response.choices[0].message.content
-        extracted_data = json.loads(response_content)
-        
-        # Verify that we have at least first_name and last_name (required fields)
-        if not extracted_data.get("first_name") or not extracted_data.get("last_name"):
-            return False, None, "Could not extract first and last name from the text. Please provide clearer information."
-        
-        # Make sure username and recent_tags are not present
-        if "username" in extracted_data:
-            del extracted_data["username"]
+        # Send the request to the OpenAI API
+        try:
+            if USING_NEW_SDK:
+                # New SDK format (1.x+)
+                response = client.chat.completions.create(
+                    model=OPENAI_MODEL,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": text}
+                    ],
+                    temperature=0.1,
+                    max_tokens=800
+                )
+                # Extract the generated JSON from the response
+                response_content = response.choices[0].message.content
+            else:
+                # Old SDK format (0.28.0)
+                response = openai.ChatCompletion.create(
+                    model=OPENAI_MODEL,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": text}
+                    ],
+                    temperature=0.1,
+                    max_tokens=800
+                )
+                # Extract the generated JSON from the response
+                response_content = response.choices[0].message.content
             
-        if "recent_tags" in extracted_data:
-            del extracted_data["recent_tags"]
+            extracted_data = json.loads(response_content)
+            
+            # Verify that we have at least first_name and last_name (required fields)
+            if not extracted_data.get("first_name") or not extracted_data.get("last_name"):
+                return False, None, "Could not extract first and last name from the text. Please provide clearer information."
+            
+            # Make sure username and recent_tags are not present
+            if "username" in extracted_data:
+                del extracted_data["username"]
+                
+            if "recent_tags" in extracted_data:
+                del extracted_data["recent_tags"]
+            
+            return True, extracted_data, "Successfully extracted user information."
         
-        return True, extracted_data, "Successfully extracted user information."
+        except Exception as e:
+            print(f"Error processing text with OpenAI: {str(e)}")
+            
+            # Fallback to basic processing if API fails
+            words = text.strip().split()
+            if len(words) < 2:
+                return False, None, "At least first and last name are required."
+            
+            # Create a basic user object with just the required fields
+            user_data = {
+                "first_name": words[0],
+                "last_name": words[1]
+            }
+            
+            # Add all other fields as None for filtered fields only
+            for field in filtered_fields:
+                if field not in user_data:
+                    user_data[field] = None
+            
+            return True, user_data, "API processing failed. Used basic extraction instead."
     
     except Exception as e:
-        print(f"Error processing text with OpenAI: {str(e)}")
-        
-        # Fallback to basic processing if API fails
-        words = text.strip().split()
-        if len(words) < 2:
-            return False, None, "At least first and last name are required."
-        
-        # Create a basic user object with just the required fields
-        user_data = {
-            "first_name": words[0],
-            "last_name": words[1]
-        }
-        
-        # Add all other fields as None for filtered fields only
-        for field in filtered_fields:
-            if field not in user_data:
-                user_data[field] = None
-        
-        return True, user_data, "API processing failed. Used basic extraction instead."
+        print(f"Error processing text: {str(e)}")
+        return False, None, "An error occurred while processing the text. Please try again later."
+
+def basic_text_processing(text: str, filtered_fields: List[str]) -> Tuple[bool, Dict[str, Any], str]:
+    """Basic text processing for when OpenAI is not available."""
+    words = text.strip().split()
+    if len(words) < 2:
+        return False, None, "At least first and last name are required."
+    
+    # Create a basic user object with just the required fields
+    user_data = {
+        "first_name": words[0],
+        "last_name": words[1] if len(words) > 1 else ""
+    }
+    
+    # Add all other fields as None for filtered fields only
+    for field in filtered_fields:
+        if field not in user_data:
+            user_data[field] = None
+    
+    return True, user_data, "Basic processing only (OpenAI unavailable)."
 
 def create_new_contact(contact_text: str, user_id: int, relationship_type: str = "contact") -> Dict[str, Any]:
     """
@@ -180,19 +252,20 @@ def create_new_contact(contact_text: str, user_id: int, relationship_type: str =
         Dictionary with success status and new user information
     """
     # Process the contact text
-    user_data, additional_notes = process_contact_text(contact_text)
+    success, user_data, message = process_contact_text(contact_text)
+    
+    if not success or not user_data:
+        return {"success": False, "message": message}
     
     # Set default recent_tags if not provided
     if "recent_tags" not in user_data or not user_data["recent_tags"]:
         user_data["recent_tags"] = DEFAULT_TAGS
     
     try:
-        # Import here to avoid circular imports
-        from config import IOS_SIMULATOR_URL
-        
         # Call the API to create the user
-        api_url = f"{IOS_SIMULATOR_URL}/people"
-        response = requests.post(api_url, json=user_data)
+        api_url = f"{API_BASE_URL}/people"
+        print(f"Creating user at URL: {api_url}")
+        user_response = requests.post(api_url, json=user_data)
         
         if user_response.status_code != 201:
             error_msg = f"Failed to create user: {user_response.json().get('error', 'Unknown error')}"
@@ -206,14 +279,15 @@ def create_new_contact(contact_text: str, user_id: int, relationship_type: str =
         connection_data = {
             "user_id": user_id,
             "contact_id": new_user_id,
-            "description": "Added via contact form",
-            "notes": text,  # Store the original text as a note
-            "tags": tags_str
+            "relationship_type": relationship_type,
+            "note": contact_text,  # Store the original text as a note
+            "tags": DEFAULT_TAGS.split(',')[0]  # Use first default tag
         }
         
         # Call the API to create the relationship
-        relationship_url = f"{IOS_SIMULATOR_URL}/connections"
-        rel_response = requests.post(relationship_url, json=relationship_data)
+        relationship_url = f"{API_BASE_URL}/connections"
+        print(f"Creating connection at URL: {relationship_url}")
+        connection_response = requests.post(relationship_url, json=connection_data)
         
         if connection_response.status_code != 201:
             error_msg = f"User created but failed to establish connection: {connection_response.json().get('error', 'Unknown error')}"
@@ -229,13 +303,10 @@ def create_new_contact(contact_text: str, user_id: int, relationship_type: str =
         result = {
             "success": True,
             "message": "Contact created successfully",
-            "user": new_user,
-            "notes": additional_notes
+            "user": new_user
         }
         
         print(f"Created new contact: {new_user.get('first_name')} {new_user.get('last_name')}")
-        if additional_notes:
-            print(f"Additional notes: {additional_notes}")
         
         return result
         
@@ -255,6 +326,4 @@ if __name__ == "__main__":
     if not result.get('success', False):
         print(f"Error details: {result}")
     else:
-        print(f"User: {result.get('user', {})}")
-        if result.get('notes'):
-            print(f"Additional notes: {result.get('notes')}") 
+        print(f"User: {result.get('user', {})}") 

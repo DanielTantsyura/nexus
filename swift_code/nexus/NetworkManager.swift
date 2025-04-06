@@ -43,26 +43,29 @@ class NetworkManager: ObservableObject {
     
     /// Base URL for the API
     private let baseURL: String = {
-        #if DEBUG
-        // For development/simulator, first try to load from environment or UserDefaults
+        // First check if environment variable is set to use local API
+        let useLocalApi = ProcessInfo.processInfo.environment["USE_LOCAL_API"]?.lowercased() == "true"
+        
+        if useLocalApi {
+            #if targetEnvironment(simulator)
+            return "http://127.0.0.1:8080"
+            #else
+            // Check if a development server is configured in UserDefaults
+            if let devServerIP = UserDefaults.standard.string(forKey: "DevServerIP") {
+                return "http://\(devServerIP):8080"
+            }
+            // Final fallback to localhost via network IP
+            return "http://10.0.0.232:8080"
+            #endif
+        }
+        
+        // For development/simulator, check if a custom URL is configured
         if let configuredURL = ProcessInfo.processInfo.environment["API_BASE_URL"] ?? UserDefaults.standard.string(forKey: "ApiBaseUrl") {
             return configuredURL
         }
-        // Fallback to localhost for simulator
-        #if targetEnvironment(simulator)
-        return "http://127.0.0.1:8080"
-        #else
-        // Check if a development server is configured in UserDefaults
-        if let devServerIP = UserDefaults.standard.string(forKey: "DevServerIP") {
-            return "http://\(devServerIP):8080"
-        }
-        // Final fallback to localhost via network IP (update this before testing on device)
-        return "http://10.0.0.232:8080"
-        #endif
-        #else
-        // Production URL
-        return "https://api.nexusapp.com" // Replace with your actual production API URL
-        #endif
+        
+        // Use the correct Railway URL
+        return "https://nexus-production-6654.up.railway.app"
     }()
     
     /// Default request timeout in seconds
@@ -122,6 +125,27 @@ class NetworkManager: ObservableObject {
     
     /// Initialize the network manager and restore session if available
     init() {
+        let useLocalApi = ProcessInfo.processInfo.environment["USE_LOCAL_API"]?.lowercased() == "true"
+        if useLocalApi {
+            print("API URL: \(baseURL) (using local API via environment variable)")
+        } else {
+            print("API URL: \(baseURL) (using hosted Railway API)")
+            // Test if the API is accessible
+            let testURL = URL(string: "\(baseURL)/diagnostic")
+            if let testURL = testURL {
+                let task = URLSession.shared.dataTask(with: testURL) { data, response, error in
+                    if let error = error {
+                        print("API connection test failed: \(error.localizedDescription)")
+                    } else if let httpResponse = response as? HTTPURLResponse {
+                        print("API connection test status: \(httpResponse.statusCode)")
+                        if let data = data, let responseString = String(data: data, encoding: .utf8) {
+                            print("API diagnostic response: \(responseString)")
+                        }
+                    }
+                }
+                task.resume()
+            }
+        }
         let _ = restoreSession()
     }
     
@@ -194,6 +218,8 @@ class NetworkManager: ObservableObject {
             return
         }
         
+        print("Attempting login to: \(url.absoluteString)")
+        
         let loginData = Login(username: username, password: password)
         
         guard let jsonData = try? JSONEncoder().encode(loginData) else {
@@ -211,7 +237,15 @@ class NetworkManager: ObservableObject {
         URLSession.shared.dataTaskPublisher(for: request)
             .tryMap { data, response -> Data in
                 guard let httpResponse = response as? HTTPURLResponse else {
+                    print("Login error: Not an HTTP response")
                     throw AuthError.networkError
+                }
+                
+                print("Login response status code: \(httpResponse.statusCode)")
+                
+                // Log response body for debugging
+                if let responseString = String(data: data, encoding: .utf8) {
+                    print("Login response body: \(responseString)")
                 }
                 
                 switch httpResponse.statusCode {
@@ -219,9 +253,13 @@ class NetworkManager: ObservableObject {
                     return data
                 case 401:
                     throw AuthError.invalidCredentials
+                case 404:
+                    print("Login error: Endpoint not found (404)")
+                    throw AuthError.networkError
                 case 429:
                     throw AuthError.tooManyAttempts
                 default:
+                    print("Login error: Unexpected status code \(httpResponse.statusCode)")
                     throw AuthError.unknownError
                 }
             }

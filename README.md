@@ -208,6 +208,44 @@ The system leverages OpenAI's API to extract structured data from natural langua
    - Select a device or simulator
    - Run the application (⌘+R)
 
+## Railway Deployment
+
+Follow these steps to deploy the Nexus API to Railway:
+
+1. **Connect to GitHub**
+   - Create a Railway account and connect your GitHub repository
+
+2. **Configure Environment Variables**
+   - Add the following environment variables in Railway dashboard:
+     - `DATABASE_URL`: Railway will automatically provide this if you add a PostgreSQL service
+     - `API_HOST`: Set to `0.0.0.0`
+     - `API_DEBUG`: Set to `False` for production
+     - `OPENAI_API_KEY`: Your OpenAI API key
+     - `DEFAULT_TAGS`: (Optional) Comma-separated list of default tags
+
+3. **Add a PostgreSQL Service**
+   - Add a PostgreSQL service to your project in Railway
+   - Railway will automatically create the necessary DATABASE_URL
+
+4. **Deploy Your Application**
+   - Railway will automatically deploy your application
+   - Monitor the deployment logs for any issues
+
+5. **Access Your API**
+   - Railway will provide a URL for your deployed API
+   - Update your iOS client to use this URL instead of the local development URL
+
+### Troubleshooting Railway Deployment
+
+- **Database Connection Issues**: Make sure the DATABASE_URL is correctly set
+- **Deployment Failures**: Check the logs for specific error messages
+- **API Not Responding**: Ensure API_HOST is set to `0.0.0.0` and the Procfile is correct
+- **Continuous Crashes/Restarts**: If your application keeps crashing and restarting:
+  - Check if gunicorn can find your application (if using `database_code.api:app` format doesn't work, try `cd database_code && gunicorn api:app`)
+  - Ensure your app correctly reads the PORT variable provided by Railway
+  - Verify your database credentials are correct and the database is accessible
+  - Look for any import errors in the logs that might indicate missing dependencies
+
 ## Future Enhancement Opportunities
 
 1. **Backend**
