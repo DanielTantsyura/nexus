@@ -43,26 +43,27 @@ class NetworkManager: ObservableObject {
     
     /// Base URL for the API
     private let baseURL: String = {
-        #if DEBUG
-        // For development/simulator, first try to load from environment or UserDefaults
+        // Check if local API use is explicitly requested for debugging
+        if UserDefaults.standard.bool(forKey: "UseLocalApi") {
+            #if targetEnvironment(simulator)
+            return "http://127.0.0.1:8080"
+            #else
+            // Check if a development server is configured in UserDefaults
+            if let devServerIP = UserDefaults.standard.string(forKey: "DevServerIP") {
+                return "http://\(devServerIP):8080"
+            }
+            // Final fallback to localhost via network IP
+            return "http://10.0.0.232:8080"
+            #endif
+        }
+        
+        // For development/simulator, check if a custom URL is configured
         if let configuredURL = ProcessInfo.processInfo.environment["API_BASE_URL"] ?? UserDefaults.standard.string(forKey: "ApiBaseUrl") {
             return configuredURL
         }
-        // Fallback to localhost for simulator
-        #if targetEnvironment(simulator)
-        return "http://127.0.0.1:8080"
-        #else
-        // Check if a development server is configured in UserDefaults
-        if let devServerIP = UserDefaults.standard.string(forKey: "DevServerIP") {
-            return "http://\(devServerIP):8080"
-        }
-        // Final fallback to localhost via network IP (update this before testing on device)
-        return "http://10.0.0.232:8080"
-        #endif
-        #else
-        // Production URL
-        return "https://api.nexusapp.com" // Replace with your actual production API URL
-        #endif
+        
+        // Always default to Railway URL unless explicitly set to use local
+        return "https://sublime-caring-production.up.railway.app"
     }()
     
     /// Default request timeout in seconds
@@ -122,6 +123,11 @@ class NetworkManager: ObservableObject {
     
     /// Initialize the network manager and restore session if available
     init() {
+        if UserDefaults.standard.bool(forKey: "UseLocalApi") {
+            print("API URL: \(baseURL) (using local API)")
+        } else {
+            print("API URL: \(baseURL) (using Railway API)")
+        }
         let _ = restoreSession()
     }
     
