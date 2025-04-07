@@ -74,48 +74,45 @@ struct AppHeader<TrailingContent: View>: View {
     
     var body: some View {
         VStack(spacing: 0) {
+            // Main header content with logo, title, and trailing content
             ZStack {
+                // Left logo
                 HStack {
-                    // App logo (anchored to the left)
-                    Image("AppLogo")
+                    Image("LogoWithoutText")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(height: 40)
+                        .frame(height: 50)
                     
                     Spacer()
-                    
-                    // Invisible placeholder for trailing content to balance layout
-                    if trailingContent != nil {
-                        Color.clear
-                            .frame(width: 40, height: 40)
-                    }
                 }
                 
-                // App name with user's first name (centered)
-                Text("\(firstName?.isEmpty == false ? "\(firstName!)'s " : "")Nexus")
-                    .font(.title)
-                    .fontWeight(.bold)
-                    .frame(maxWidth: .infinity)
-                
-                HStack {
-                    // Invisible placeholder for logo to balance layout
-                    Color.clear
-                        .frame(width: 40, height: 40)
+                // Center content with title and subtitle
+                VStack(spacing: 2) {
+                    // Title
+                    Text("\(firstName?.isEmpty == false ? "\(firstName!)'s " : "")Nexus")
+                        .font(.title)
+                        .fontWeight(.bold)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .frame(maxWidth: 200)
                     
+                    // Subtitle
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                }
+                
+                // Right content
+                HStack {
                     Spacer()
                     
-                    // Trailing content if provided (anchored to the right)
+                    // Trailing content if provided
                     if let trailingContent = trailingContent {
                         trailingContent
                     }
                 }
             }
-            
-            // App motto/subtitle
-            Text(subtitle)
-                .font(.subheadline)
-                .foregroundColor(.gray)
-                .padding(.top, 2)
+            .frame(height: 50) // Fixed height for the header
         }
         .frame(maxWidth: .infinity)
     }

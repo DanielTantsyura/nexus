@@ -46,7 +46,8 @@ struct CreateContactView: View {
                     }) {
                         Image(systemName: "xmark")
                             .foregroundColor(.red)
-                            .font(.system(size: 18))
+                            .font(.system(size: 24))
+                            .frame(height: 50)
                     }
                 }
                 .padding(.bottom, 10)

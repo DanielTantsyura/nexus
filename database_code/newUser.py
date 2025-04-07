@@ -38,7 +38,8 @@ if OPENAI_AVAILABLE:
         if USING_NEW_SDK:
             client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
             # Test the client with a simple call
-            client.models.list(limit=1)
+            client.models.list()
+
             OPENAI_WORKING = True
         else:
             openai.api_key = os.getenv("OPENAI_API_KEY")
