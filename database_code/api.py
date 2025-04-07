@@ -368,6 +368,7 @@ def create_contact():
                         "success": True,
                         "message": "Contact created successfully",
                         "user": new_user,
+                        "user_id": new_user_id,
                         "connection_error": not connection_success
                     }
                 except Exception as db_error:
