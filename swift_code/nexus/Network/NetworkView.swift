@@ -20,6 +20,12 @@ struct NetworkView: View {
     /// State for managing the tag filter
     @State private var selectedTag: String? = nil
     
+    /// State for managing multiple tag filters
+    @State private var selectedTags: Set<String> = []
+    
+    /// State to control visibility of the tag selection interface
+    @State private var showTagSelector: Bool = false
+    
     /// Toggle to force UI refresh
     @State private var refreshTrigger = false
     
@@ -37,7 +43,7 @@ struct NetworkView: View {
         let connections = coordinator.networkManager.connections
         
         // If no search text or tag filter, return all connections
-        if searchText.isEmpty && selectedTag == nil {
+        if searchText.isEmpty && selectedTags.isEmpty {
             return connections
         }
         
@@ -63,15 +69,22 @@ struct NetworkView: View {
                 matchesSearch = searchableText.contains(searchText.lowercased())
             }
             
-            // Filter by tag
-            let matchesTag: Bool
-            if let selectedTag = selectedTag {
-                matchesTag = connection.tags?.contains(selectedTag) ?? false
+            // Filter by tags (intersection)
+            let matchesTags: Bool
+            if selectedTags.isEmpty {
+                matchesTags = true
             } else {
-                matchesTag = true
+                // Make sure connection has all selected tags (intersection)
+                // Convert array to Set before checking isSuperset
+                if let tags = connection.tags {
+                    let tagsSet = Set(tags)
+                    matchesTags = tagsSet.isSuperset(of: selectedTags)
+                } else {
+                    matchesTags = false
+                }
             }
             
-            return matchesSearch && matchesTag
+            return matchesSearch && matchesTags
         }
     }
     
@@ -123,38 +136,119 @@ struct NetworkView: View {
                     .layoutPriority(3)
                     .frame(minWidth: 0, maxWidth: .infinity)
                     
-                    // Tag dropdown
-                    Menu {
-                        ForEach(tagOptions, id: \.self) { tag in
-                            Button(action: {
-                                selectedTag = tag == "All" ? nil : tag
-                            }) {
-                                HStack {
-                                    Text(tag)
-                                    if tag == (selectedTag ?? "All") {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
+                    // Tag selection toggle button
+                    Button(action: {
+                        withAnimation {
+                            showTagSelector.toggle()
                         }
-                    } label: {
+                    }) {
                         HStack(spacing: 4) {
-                            Text(selectedTag ?? "Tags")
-                            Image(systemName: "chevron.up.chevron.down")
+                            Text(selectedTags.isEmpty ? "Tags" : "\(selectedTags.count) Tags")
+                                .font(.subheadline)
+                            Image(systemName: showTagSelector ? "chevron.up" : "chevron.down")
+                                .font(.caption)
                         }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 8)
-                        .background(Color.green.opacity(0.1))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .background(selectedTags.isEmpty ? Color.green.opacity(0.1) : Color.green.opacity(0.2))
                         .foregroundColor(.green)
                         .cornerRadius(8)
                     }
-                    .layoutPriority(1)
                     .fixedSize()
                 }
                 .padding(.horizontal, 0)
                 
+                // Tag selector
+                if showTagSelector {
+                    // Container for tags
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Select tags (showing connections with ALL selected tags)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.bottom, 2)
+                        
+                        // Scrollable tag grid
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            LazyHGrid(rows: [
+                                GridItem(.adaptive(minimum: 28, maximum: 32), spacing: 8),
+                                GridItem(.adaptive(minimum: 28, maximum: 32), spacing: 8),
+                                GridItem(.adaptive(minimum: 28, maximum: 32), spacing: 8)
+                            ], spacing: 8) {
+                                ForEach(tagOptions.filter { $0 != "All" }, id: \.self) { tag in
+                                    // Individual tag button
+                                    Button(action: {
+                                        if selectedTags.contains(tag) {
+                                            selectedTags.remove(tag)
+                                        } else {
+                                            selectedTags.insert(tag)
+                                        }
+                                    }) {
+                                        Text(tag)
+                                            .font(.system(size: 11))
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 5)
+                                            .background(selectedTags.contains(tag) 
+                                                ? tagColor(for: tag).opacity(0.3)
+                                                : tagColor(for: tag).opacity(0.1))
+                                            .foregroundColor(selectedTags.contains(tag)
+                                                ? tagColor(for: tag)
+                                                : tagColor(for: tag).opacity(0.8))
+                                            .cornerRadius(14)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 14)
+                                                    .stroke(tagColor(for: tag).opacity(selectedTags.contains(tag) ? 0.5 : 0.2), lineWidth: 1)
+                                            )
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                        .frame(height: 100)
+                        
+                        // Action buttons
+                        HStack {
+                            Spacer()
+                            Button(action: {
+                                selectedTags = []
+                            }) {
+                                Text("Clear All")
+                                    .font(.caption)
+                                    .foregroundColor(.blue)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.blue.opacity(0.1))
+                            .cornerRadius(8)
+                            
+                            Button(action: {
+                                withAnimation {
+                                    showTagSelector = false
+                                }
+                            }) {
+                                Text("Done")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.white)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.green)
+                            .cornerRadius(8)
+                        }
+                    }
+                    .padding(12)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(10)
+                    .transition(.opacity)
+                    .onTapGesture {} // Prevent taps from passing through
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onEnded { _ in }
+                    ) // Prevent taps from passing through
+                }
+                
                 // Search results counter
-                if !searchText.isEmpty || selectedTag != nil {
+                if !searchText.isEmpty || !selectedTags.isEmpty {
                     HStack {
                         Text("\(filteredConnections.count) connection\(filteredConnections.count == 1 ? "" : "s") found")
                             .font(.caption)
@@ -163,10 +257,11 @@ struct NetworkView: View {
                         Spacer()
                         
                         // Clear filters button
-                        if !searchText.isEmpty || selectedTag != nil {
+                        if !searchText.isEmpty || !selectedTags.isEmpty {
                             Button(action: {
                                 searchText = ""
-                                selectedTag = nil
+                                selectedTags = []
+                                showTagSelector = false
                             }) {
                                 Text("Clear filters")
                                     .font(.caption)
@@ -231,6 +326,13 @@ struct NetworkView: View {
         } message: {
             Text("Are you sure you want to delete this contact? This action cannot be undone.")
         }
+        .onTapGesture {
+            if showTagSelector {
+                withAnimation {
+                    showTagSelector = false
+                }
+            }
+        }
     }
     
     // MARK: - UI Components
@@ -250,7 +352,8 @@ struct NetworkView: View {
                         buttonTitle: "Clear Filters",
                         action: {
                             searchText = ""
-                            selectedTag = nil
+                            selectedTags = []
+                            showTagSelector = false
                         }
                     )
                 }
@@ -450,16 +553,16 @@ struct NetworkView: View {
                         
                         LazyVGrid(
                             columns: [
-                                GridItem(.adaptive(minimum: 42, maximum: 50), spacing: 2)
+                                GridItem(.adaptive(minimum: 50, maximum: 60), spacing: 2)
                             ],
                             alignment: .trailing,
                             spacing: 2
                         ) {
                             ForEach(displayTags, id: \.self) { tag in
                                 Text(tag)
-                                    .font(.system(size: 8))
-                                    .padding(.horizontal, 4)
-                                    .padding(.vertical, 2)
+                                    .font(.system(size: 10))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
                                     .background(tag == "..." 
                                         ? Color.gray.opacity(0.2) 
                                         : tagColor(for: tag).opacity(0.2))
@@ -471,9 +574,9 @@ struct NetworkView: View {
                                     .minimumScaleFactor(0.8)
                             }
                         }
-                        .frame(width: 100) // Increased width from 90 to 100
+                        .frame(width: 120)
                         .layoutPriority(0)
-                        .padding(.trailing, -4) // Reduced right padding from -2 to -4
+                        .padding(.trailing, -4)
                     }
                 }
             }
