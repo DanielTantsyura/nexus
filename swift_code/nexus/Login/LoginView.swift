@@ -144,10 +144,3 @@ struct LoginView: View {
         }
     }
 }
-
-// MARK: - Previews
-
-#Preview {
-    LoginView()
-        .environmentObject(AppCoordinator())
-}

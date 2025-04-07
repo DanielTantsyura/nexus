@@ -276,9 +276,3 @@ struct CreateAccountView: View {
         }
     }
 }
-
-#Preview {
-    CreateAccountView()
-        .environmentObject(NetworkManager())
-        .environmentObject(AppCoordinator())
-} 

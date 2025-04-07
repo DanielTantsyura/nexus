@@ -753,11 +753,3 @@ extension EnvironmentValues {
         set { self[SwipeNavigationGestureKey.self] = newValue }
     }
 }
-
-// MARK: - Preview
-
-#Preview {
-    NetworkView()
-        .environmentObject(AppCoordinator())
-}
-

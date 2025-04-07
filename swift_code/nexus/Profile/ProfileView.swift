@@ -543,12 +543,3 @@ struct ProfileView: View {
         retryTimer = nil
     }
 }
-
-// MARK: - Preview
-
-#Preview {
-    NavigationView {
-        ProfileView()
-            .environmentObject(AppCoordinator())
-    }
-}
