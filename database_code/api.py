@@ -324,21 +324,59 @@ def create_contact():
                 return jsonify({"error": f"User with ID {user_id} not found"}), 404
             print(f"Creating contact for user: {user.get('first_name')} {user.get('last_name')}")
         
-        # Process the contact text
         try:
-            # Process text into a user profile and create a new contact
-            print("Starting contact creation process...")
+            # Process text into structured user data
+            print("Extracting contact information...")
+            success, user_data, message = process_contact_text(contact_text)
             
-            created_contact = create_new_contact(
-                contact_text=contact_text,
-                user_id=user_id,
-                relationship_type=relationship_type
-            )
+            if not success or not user_data:
+                return jsonify({"error": message}), 400
+                
+            # Add required fields that aren't part of the extraction
+            first = user_data.get("first_name", "").lower().replace(" ", "")
+            last = user_data.get("last_name", "").lower().replace(" ", "")
+            user_data["username"] = f"{first}{last}"
+            user_data["recent_tags"] = DEFAULT_TAGS
             
-            print("Contact creation process completed")
-            return jsonify(created_contact), 201
+            # Directly use database operations to create the user
+            with db_manager:
+                print("Creating user in database...")
+                try:
+                    new_user_id = db_manager.add_user(user_data)
+                    print(f"User created with ID: {new_user_id}")
+                    
+                    # Create connection directly in database
+                    print("Creating connection in database...")
+                    connection_success = db_manager.add_connection(
+                        user_id, 
+                        new_user_id,
+                        relationship_type,
+                        contact_text,  # Use text as note
+                        DEFAULT_TAGS.split(',')[0]  # First default tag
+                    )
+                    
+                    if connection_success:
+                        print("Connection created successfully")
+                    else:
+                        print("Connection creation failed")
+                    
+                    # Get the complete user object
+                    new_user = db_manager.get_user_by_id(new_user_id)
+                    
+                    # Return success with user data
+                    result = {
+                        "success": True,
+                        "message": "Contact created successfully",
+                        "user": new_user,
+                        "connection_error": not connection_success
+                    }
+                except Exception as db_error:
+                    traceback.print_exc()
+                    return jsonify({"error": f"Database error: {str(db_error)}"}), 500
+                    
+            return jsonify(result), 201
         except Exception as e:
-            error_message = f"Error processing contact text: {str(e)}"
+            error_message = f"Error processing contact: {str(e)}"
             print(error_message)
             traceback.print_exc()
             return jsonify({"error": error_message}), 500

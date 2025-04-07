@@ -249,68 +249,70 @@ def create_new_contact(contact_text: str, user_id: int, relationship_type: str =
         api_url = f"{API_BASE_URL}/people"
         print(f"Creating user at URL: {api_url}")
         
-        # Make a more robust API call
+        # Make a more robust API call without timeout
         try:
             user_response = requests.post(api_url, json=user_data)
-            user_response.raise_for_status()  # Raise exception for non-2xx responses
+            
+            if user_response.status_code != 201:
+                error_msg = f"Failed to create user: {user_response.text}"
+                print(error_msg)
+                return {"success": False, "message": error_msg}
+            
+            # Safely parse the response
+            try:
+                new_user = user_response.json()
+            except json.JSONDecodeError:
+                error_msg = "Error parsing API response"
+                print(error_msg)
+                return {"success": False, "message": error_msg}
+            
+            # Validate the response contains a user ID
+            new_user_id = new_user.get("id")
+            if not new_user_id:
+                error_msg = "User created but no ID returned in response"
+                print(error_msg)
+                return {"success": False, "message": error_msg}
         except requests.exceptions.RequestException as e:
             error_msg = f"API call failed: {str(e)}"
-            if hasattr(e, 'response') and e.response is not None:
-                error_msg += f" - Response: {e.response.text}"
             print(error_msg)
             return {"success": False, "message": error_msg}
         
-        # Safely parse the response
-        try:
-            new_user = user_response.json()
-        except json.JSONDecodeError:
-            error_msg = f"Error parsing API response: {user_response.text}"
-            print(error_msg)
-            return {"success": False, "message": error_msg}
-        
-        # Validate the response contains a user ID
-        new_user_id = new_user.get("id")
-        if not new_user_id:
-            error_msg = "User created but no ID returned in response"
-            print(error_msg)
-            return {"success": False, "message": error_msg}
-        
-        # Create the connection with the note containing additional information
-        connection_data = {
-            "user_id": user_id,
-            "contact_id": new_user_id,
-            "relationship_type": relationship_type,
-            "note": contact_text,  # Store the original text as a note
-            "tags": DEFAULT_TAGS.split(',')[0]  # Use first default tag
-        }
-        
-        # Call the API to create the relationship
-        relationship_url = f"{API_BASE_URL}/connections"
-        print(f"Creating connection at URL: {relationship_url}")
-        
-        try:
-            connection_response = requests.post(relationship_url, json=connection_data)
-            connection_response.raise_for_status()  # Raise exception for non-2xx responses
-        except requests.exceptions.RequestException as e:
-            error_msg = f"User created but connection failed: {str(e)}"
-            if hasattr(e, 'response') and e.response is not None:
-                error_msg += f" - Response: {e.response.text}"
-            print(error_msg)
-            return {
-                "success": True,
-                "message": error_msg,
-                "user": new_user,
-                "connection_error": True
-            }
-        
-        # Return success with the new user information
+        # Since the user was created, try to return success even if connection fails
         result = {
             "success": True,
             "message": "Contact created successfully",
             "user": new_user
         }
         
-        print(f"Created new contact: {new_user.get('first_name')} {new_user.get('last_name')}")
+        # Try to create the connection as a separate step (that might fail)
+        try:
+            # Create the connection with the note containing additional information
+            connection_data = {
+                "user_id": user_id,
+                "contact_id": new_user_id,
+                "relationship_type": relationship_type,
+                "note": contact_text,  # Store the original text as a note
+                "tags": DEFAULT_TAGS.split(',')[0]  # Use first default tag
+            }
+            
+            # Call the API to create the relationship
+            relationship_url = f"{API_BASE_URL}/connections"
+            print(f"Creating connection at URL: {relationship_url}")
+            
+            # Call without timeout
+            connection_response = requests.post(relationship_url, json=connection_data)
+            
+            if connection_response.status_code != 201:
+                result["message"] = "User created but connection failed. You can add the connection later."
+                result["connection_error"] = True
+                print(f"Connection creation failed with status {connection_response.status_code}")
+            else:
+                print(f"Created new contact: {new_user.get('first_name')} {new_user.get('last_name')}")
+        except Exception as connection_err:
+            # If connection creation fails, still return success for user creation
+            result["message"] = "User created but connection failed. You can add the connection later."
+            result["connection_error"] = True
+            print(f"Error creating connection: {str(connection_err)}")
         
         return result
         
