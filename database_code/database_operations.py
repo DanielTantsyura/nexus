@@ -297,10 +297,23 @@ class DatabaseManager:
         if 'recent_tags' not in user_data or user_data['recent_tags'] is None:
             user_data['recent_tags'] = DEFAULT_TAGS
         
+        # Ensure all required fields exist in the data
+        for field in ['first_name', 'last_name', 'email', 'phone_number',
+                     'location', 'university', 'field_of_interest', 'high_school',
+                     'gender', 'ethnicity', 'uni_major', 'job_title', 'current_company',
+                     'profile_image_url', 'linkedin_url']:
+            if field not in user_data:
+                user_data[field] = None
+        
         try:
+            print(f"Executing SQL: {query}")
+            print(f"With values: {user_data}")
+            
             self.cursor.execute(query, user_data)
             user_id = self.cursor.fetchone()['id']
-            self.conn.commit()
+            
+            # Fix: Use self.connection.commit() instead of self.conn.commit()
+            self.connection.commit()
             
             # Add login if username and password were provided
             if username and password:
@@ -311,6 +324,7 @@ class DatabaseManager:
         except Exception as e:
             self.connection.rollback()
             print(f"Error adding user: {e}")
+            traceback.print_exc()  # Print the full traceback for debugging
             raise
     
     def update_user(self, user_id: int, user_data: Dict[str, Any]) -> bool:

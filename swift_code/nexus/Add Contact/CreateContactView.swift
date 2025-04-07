@@ -221,11 +221,40 @@ struct CreateContactView: View {
                    
                     // Use fixed height container for proper layout
                     VStack(alignment: .leading) {
-                        ForEach(selectedTags, id: \.self) { tag in
-                            TagBadge(text: tag, showRemoveButton: true) {
-                                removeTag(tag)
+                        LazyVGrid(
+                            columns: [
+                                GridItem(.adaptive(minimum: 80, maximum: 120), spacing: 8)
+                            ],
+                            spacing: 8
+                        ) {
+                            ForEach(selectedTags, id: \.self) { tag in
+                                Button(action: {
+                                    removeTag(tag)
+                                }) {
+                                    HStack {
+                                        Text(tag)
+                                            .font(.system(size: 11))
+                                            .lineLimit(1)
+                                            .truncationMode(.tail)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                        
+                                        Image(systemName: "xmark.circle.fill")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(tagColor(for: tag))
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .frame(maxWidth: .infinity)
+                                    .background(tagColor(for: tag).opacity(0.3))
+                                    .foregroundColor(tagColor(for: tag))
+                                    .cornerRadius(14)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14)
+                                            .stroke(tagColor(for: tag).opacity(0.5), lineWidth: 1)
+                                    )
+                                }
+                                .buttonStyle(PlainButtonStyle())
                             }
-                            .padding(.bottom, 4)
                         }
                     }
                 }
@@ -248,7 +277,7 @@ struct CreateContactView: View {
                         // Use a LazyVGrid for tag layout instead of FlowLayout
                         LazyVGrid(
                             columns: [
-                                GridItem(.adaptive(minimum: 100, maximum: 150), spacing: 8)
+                                GridItem(.adaptive(minimum: 80, maximum: 120), spacing: 8)
                             ],
                             spacing: 8
                         ) {
@@ -257,12 +286,23 @@ struct CreateContactView: View {
                                     addTag(tag)
                                 }) {
                                     Text(tag)
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 6)
-                                        .background(selectedTags.contains(tag) ? Color.blue.opacity(0.2) : Color.gray.opacity(0.2))
-                                        .foregroundColor(selectedTags.contains(tag) ? .blue : .primary)
-                                        .cornerRadius(16)
+                                        .font(.system(size: 11))
+                                        .lineLimit(1)
+                                        .truncationMode(.tail)
                                         .frame(maxWidth: .infinity)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 5)
+                                        .background(selectedTags.contains(tag) 
+                                            ? tagColor(for: tag).opacity(0.3)
+                                            : tagColor(for: tag).opacity(0.1))
+                                        .foregroundColor(selectedTags.contains(tag)
+                                            ? tagColor(for: tag)
+                                            : tagColor(for: tag).opacity(0.8))
+                                        .cornerRadius(14)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 14)
+                                                .stroke(tagColor(for: tag).opacity(selectedTags.contains(tag) ? 0.5 : 0.2), lineWidth: 1)
+                                        )
                                 }
                                 .buttonStyle(PlainButtonStyle())
                             }
@@ -383,6 +423,15 @@ struct CreateContactView: View {
         addTag(trimmedText)
         newTagText = ""
     }
+}
+
+// MARK: - Helper Functions
+
+/// Color for tag based on tag name
+private func tagColor(for tag: String) -> Color {
+    let colors: [Color] = [.blue, .green, .orange, .purple, .pink, .red]
+    let hash = abs(tag.hashValue)
+    return colors[hash % colors.count]
 }
 
 // MARK: - Preview

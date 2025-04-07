@@ -32,7 +32,7 @@ else:
 
 # User tag settings
 DEFAULT_TAGS = os.getenv("DEFAULT_TAGS", "Entrepreneurship,Finance,Student,Close Friend,Recently Met")
-MAX_RECENT_TAGS = int(os.getenv("MAX_RECENT_TAGS", "6"))
+MAX_RECENT_TAGS = int(os.getenv("MAX_RECENT_TAGS", "8"))
 
 # OpenAI model and API key settings
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")

@@ -313,22 +313,29 @@ def create_contact():
     contact_text = data['contact_text']
     relationship_type = data.get('relationship_type', 'contact')
     
+    # Log request info for debugging
+    print(f"Contact creation request: user_id={user_id}, text_length={len(contact_text)}, relationship_type={relationship_type}")
+    
     try:
         # First check if the user exists
         with db_manager:
             user = db_manager.get_user_by_id(user_id)
             if not user:
                 return jsonify({"error": f"User with ID {user_id} not found"}), 404
+            print(f"Creating contact for user: {user.get('first_name')} {user.get('last_name')}")
         
         # Process the contact text
         try:
             # Process text into a user profile and create a new contact
+            print("Starting contact creation process...")
+            
             created_contact = create_new_contact(
                 contact_text=contact_text,
                 user_id=user_id,
                 relationship_type=relationship_type
             )
             
+            print("Contact creation process completed")
             return jsonify(created_contact), 201
         except Exception as e:
             error_message = f"Error processing contact text: {str(e)}"
