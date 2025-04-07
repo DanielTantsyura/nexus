@@ -99,7 +99,7 @@ struct AppHeader<TrailingContent: View>: View {
                     // Subtitle
                     Text(subtitle)
                         .font(.subheadline)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.secondary)
                 }
                 
                 // Right content
@@ -214,9 +214,9 @@ struct SectionCard<Content: View>: View {
             content
         }
         .padding()
-        .background(Color.white)
+        .background(Color(UIColor.systemBackground))
         .cornerRadius(15)
-        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
+        .shadow(color: Color.primary.opacity(0.1), radius: 5, x: 0, y: 2)
     }
 }
 
@@ -234,7 +234,7 @@ struct LoadingView: View {
                 .padding()
             
             Text(message)
-                .foregroundColor(.gray)
+                .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

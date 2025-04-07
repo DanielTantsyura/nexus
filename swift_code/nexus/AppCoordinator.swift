@@ -29,6 +29,9 @@ enum ActiveScreen: Equatable {
     
     /// Create account screen
     case createAccount
+    
+    /// Settings screen
+    case settings
 }
 
 /// Tab selection options for main tab view
@@ -139,6 +142,11 @@ final class AppCoordinator: ObservableObject {
     }
     
     // MARK: - Navigation
+    
+    /// Navigate to the settings screen
+    func navigateToSettings() {
+        profileTabPath.append(ActiveScreen.settings)
+    }
     
     /// Set the active tab
     /// - Parameter tab: The tab to select

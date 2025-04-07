@@ -16,8 +16,9 @@ struct CreateContactView: View {
     /// Collection of tags added to the contact
     @State private var selectedTags: [String] = []
    
-    /// Controls whether the keyboard is active
-    @FocusState private var isTextFieldFocused: Bool
+    /// Controls focus for different text fields
+    @FocusState private var contactTextFieldFocused: Bool
+    @FocusState private var tagTextFieldFocused: Bool
    
     /// Error message to display
     @State private var errorMessage: String? = nil
@@ -93,9 +94,9 @@ struct CreateContactView: View {
         .dismissKeyboardOnTap()
         .navigationBarHidden(true)
         .onAppear {
-            // Auto-focus text field when view appears
+            // Auto-focus the contact text field when view appears
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                isTextFieldFocused = true
+                contactTextFieldFocused = true
             }
             
             // Fetch recent tags when the view appears
@@ -169,12 +170,12 @@ struct CreateContactView: View {
             TextEditor(text: $contactText)
                 .frame(minHeight: 150)
                 .padding(4)
-                .background(Color(.systemGray6))
+                .background(Color(UIColor.secondarySystemBackground))
                 .cornerRadius(8)
-                .focused($isTextFieldFocused)
+                .focused($contactTextFieldFocused)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                        .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
                 )
         }
     }
@@ -283,10 +284,10 @@ struct CreateContactView: View {
                 // Custom tag creation
                 HStack {
                     TextField("Add custom tag...", text: $newTagText)
-                        .focused($isTextFieldFocused)
+                        .focused($tagTextFieldFocused)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
-                        .background(Color.gray.opacity(0.1))
+                        .background(Color(UIColor.secondarySystemBackground))
                         .cornerRadius(8)
                         .onSubmit {
                             addCustomTag()
@@ -302,7 +303,7 @@ struct CreateContactView: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
-                            .background(newTagText.isEmpty ? Color.gray : Color.blue)
+                            .background(newTagText.isEmpty ? Color.secondary : Color.blue)
                             .cornerRadius(8)
                     }
                     .disabled(newTagText.isEmpty)
@@ -408,7 +409,8 @@ struct CreateContactView: View {
     
     /// Helper to explicitly hide the keyboard
     private func hideKeyboard() {
-        isTextFieldFocused = false
+        contactTextFieldFocused = false
+        tagTextFieldFocused = false
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 }

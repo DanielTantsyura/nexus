@@ -551,11 +551,37 @@ struct ContactView: View {
                     .padding(.top, 8)
                 } else {
                     if let email = user.email {
-                        InfoRow(icon: "envelope.fill", title: "Email", value: email)
+                        HStack {
+                            InfoRow(icon: "envelope.fill", title: "Email", value: email)
+                            Spacer()
+                            Image(systemName: "arrow.up.forward.app")
+                                .font(.system(size: 12))
+                                .foregroundColor(.blue)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            if let url = URL(string: "mailto:\(email)") {
+                                UIApplication.shared.open(url)
+                            }
+                        }
+                        .padding(.vertical, 4)
                     }
                 
                     if let phone = user.phoneNumber {
-                        InfoRow(icon: "phone.fill", title: "Phone", value: phone)
+                        HStack {
+                            InfoRow(icon: "phone.fill", title: "Phone", value: phone)
+                            Spacer()
+                            Image(systemName: "arrow.up.forward.app")
+                                .font(.system(size: 12))
+                                .foregroundColor(.green)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            if let url = URL(string: "tel:\(phone.replacingOccurrences(of: " ", with: ""))") {
+                                UIApplication.shared.open(url)
+                            }
+                        }
+                        .padding(.vertical, 4)
                     }
                 
                     // Add edit button at the bottom of the section
