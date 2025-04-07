@@ -123,42 +123,59 @@ struct NetworkView: View {
                 
                 // Search bar with tag filter
                 HStack(spacing: 8) {
-                    // Search field
+                    // Search field that stretches
                     HStack {
                         Image(systemName: "magnifyingglass")
                             .foregroundColor(.gray)
                             .padding(.leading, 4)
-                        TextField("Search connections...", text: $searchText)
-                            .onChange(of: searchText) { oldValue, newValue in
-                                // No additional action needed - the filteredConnections 
-                                // computed property will update automatically
-                            }
+                        TextField("Search", text: $searchText)
+                            .lineLimit(1)
                     }
                     .padding(8)
                     .background(Color(.systemGray6))
                     .cornerRadius(8)
-                    .layoutPriority(3)
-                    .frame(minWidth: 0, maxWidth: .infinity)
-                    
-                    // Tag selection toggle button
-                    Button(action: {
-                        withAnimation {
-                            showTagSelector.toggle()
+                    .frame(maxWidth: .infinity)
+                
+                    // Right-side buttons with fixed widths
+                    HStack(spacing: 8) {
+                        // Tags button with fixed width
+                        Button(action: {
+                            withAnimation {
+                                showTagSelector.toggle()
+                            }
+                        }) {
+                            HStack(spacing: 4) {
+                                Text(selectedTags.isEmpty ? "Tags" : "\(selectedTags.count)")
+                                    .font(.subheadline)
+                                Image(systemName: showTagSelector ? "chevron.up" : "chevron.down")
+                                    .font(.caption)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 6)
+                            .background(selectedTags.isEmpty ? Color.green.opacity(0.1) : Color.green.opacity(0.2))
+                            .foregroundColor(.green)
+                            .cornerRadius(8)
                         }
-                    }) {
-                        HStack(spacing: 4) {
-                            Text(selectedTags.isEmpty ? "Tags" : "\(selectedTags.count) Tags")
-                                .font(.subheadline)
-                            Image(systemName: showTagSelector ? "chevron.up" : "chevron.down")
-                                .font(.caption)
+                        .fixedSize()
+                        
+                        // Clear button with fixed width
+                        if !searchText.isEmpty || !selectedTags.isEmpty {
+                            Button(action: {
+                                searchText = ""
+                                selectedTags = []
+                                showTagSelector = false
+                            }) {
+                                Text("Clear")
+                                    .font(.subheadline)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 6)
+                                    .background(Color.blue.opacity(0.1))
+                                    .foregroundColor(.blue)
+                                    .cornerRadius(8)
+                            }
+                            .fixedSize()
                         }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 6)
-                        .background(selectedTags.isEmpty ? Color.green.opacity(0.1) : Color.green.opacity(0.2))
-                        .foregroundColor(.green)
-                        .cornerRadius(8)
                     }
-                    .fixedSize()
                 }
                 .padding(.horizontal, 0)
                 
@@ -208,37 +225,6 @@ struct NetworkView: View {
                             .padding(.vertical, 4)
                         }
                         .frame(height: 100)
-                        
-                        // Action buttons
-                        HStack {
-                            Spacer()
-                            Button(action: {
-                                selectedTags = []
-                            }) {
-                                Text("Clear All")
-                                    .font(.caption)
-                                    .foregroundColor(.blue)
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(Color.blue.opacity(0.1))
-                            .cornerRadius(8)
-                            
-                            Button(action: {
-                                withAnimation {
-                                    showTagSelector = false
-                                }
-                            }) {
-                                Text("Done")
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.white)
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(Color.green)
-                            .cornerRadius(8)
-                        }
                     }
                     .padding(12)
                     .background(Color(.systemGray6))
@@ -259,19 +245,6 @@ struct NetworkView: View {
                             .foregroundColor(.secondary)
                         
                         Spacer()
-                        
-                        // Clear filters button
-                        if !searchText.isEmpty || !selectedTags.isEmpty {
-                            Button(action: {
-                                searchText = ""
-                                selectedTags = []
-                                showTagSelector = false
-                            }) {
-                                Text("Clear filters")
-                                    .font(.caption)
-                                    .foregroundColor(.blue)
-                            }
-                        }
                     }
                     .padding(.top, 4)
                 }
@@ -419,22 +392,6 @@ struct NetworkView: View {
     /// Content displayed when connections exist
     private var connectionListContent: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Show loading indicator inline
-            if coordinator.networkManager.isLoading {
-                HStack {
-                    Spacer()
-                    VStack {
-                        ProgressView()
-                        Text("Loading connections...")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                            .padding(.top, 8)
-                    }
-                    Spacer()
-                }
-                .padding(.vertical, 20)
-            }
-            
             // Show connections
             ForEach(filteredConnections) { connection in
                 connectionCard(for: connection)

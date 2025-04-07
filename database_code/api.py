@@ -204,6 +204,19 @@ def add_connection():
             
             # Add the connection
             success = db_manager.add_connection(user_id, contact_id, relationship_description, custom_note, tags)
+            
+            # Update the user's recent tags if tags were provided
+            if success and tags:
+                if isinstance(tags, str):
+                    tag_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
+                elif isinstance(tags, list):
+                    tag_list = [tag for tag in tags if tag]
+                else:
+                    tag_list = []
+                
+                if tag_list:
+                    print(f"Updating recent tags for user {user_id} with: {tag_list}")
+                    db_manager.update_user_recent_tags(user_id, tag_list)
         
         if success:
             return jsonify({"message": "Connection added successfully"}), 201
@@ -231,6 +244,9 @@ def update_connection():
     # Remove the ID fields from the data
     update_data = {k: v for k, v in data.items() if k not in ['user_id', 'contact_id']}
     
+    # Extract tags before mapping field names
+    tags = update_data.get('tags')
+    
     # Map field names from API to database schema
     if 'relationship_type' in update_data:
         update_data['relationship_description'] = update_data.pop('relationship_type')
@@ -245,6 +261,13 @@ def update_connection():
         with db_manager:
             # Update the connection
             success = db_manager.update_connection(user_id, contact_id, update_data)
+            
+            # Update the user's recent tags if tags were updated
+            if success and tags and isinstance(tags, str):
+                tag_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
+                if tag_list:
+                    print(f"Updating recent tags for user {user_id} with: {tag_list}")
+                    db_manager.update_user_recent_tags(user_id, tag_list)
         
         if success:
             return jsonify({"message": "Connection updated successfully"})
@@ -313,8 +336,19 @@ def create_contact():
     contact_text = data['contact_text']
     relationship_type = data.get('relationship_type', 'contact')
     
+    # Get custom tags if provided in the request
+    custom_tags = data.get('tags', [])
+    if custom_tags and isinstance(custom_tags, list) and len(custom_tags) > 0:
+        print(f"Custom tags provided: {custom_tags}")
+        # Use the first tag for the connection
+        connection_tag = custom_tags[0]
+    else:
+        print("No custom tags provided, using default tag")
+        # Use default tag if no custom tags provided
+        connection_tag = DEFAULT_TAGS.split(',')[0]
+    
     # Log request info for debugging
-    print(f"Contact creation request: user_id={user_id}, text_length={len(contact_text)}, relationship_type={relationship_type}")
+    print(f"Contact creation request: user_id={user_id}, text_length={len(contact_text)}, relationship_type={relationship_type}, tags={custom_tags}")
     
     try:
         # First check if the user exists
@@ -352,19 +386,25 @@ def create_contact():
                     note = user_data.get("note", "")
                     print(f"Using note: {note}")
                     
-                    # Create the connection with the note
+                    # Create the connection with the note and the custom tag (or default tag)
                     connection_success = db_manager.add_connection(
                         user_id, 
                         new_user_id,
                         relationship_type,
                         note,  # Use the LLM-extracted note
-                        DEFAULT_TAGS.split(',')[0]  # First default tag
+                        connection_tag  # Use custom tag or default tag
                     )
                     
                     if connection_success:
                         print("Connection created successfully")
                     else:
                         print("Connection creation failed")
+                    
+                    # Update the user's recent tags if custom tags were provided
+                    if custom_tags and isinstance(custom_tags, list) and len(custom_tags) > 0:
+                        print(f"Updating recent tags for user {user_id} with: {custom_tags}")
+                        # Update the user's recent tags with the new custom tags
+                        db_manager.update_user_recent_tags(user_id, custom_tags)
                     
                     # Get the complete user object
                     new_user = db_manager.get_user_by_id(new_user_id)

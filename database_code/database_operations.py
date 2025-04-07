@@ -628,12 +628,12 @@ class DatabaseManager:
         # Create a unique list of tags with new tags at the front
         updated_tags = []
         
-        # Add new tags first (if they're not already in the current tags)
+        # Add new tags first (regardless of whether they're already in current_tags)
         for tag in new_tags:
-            if tag and tag not in updated_tags and tag not in current_tags:
+            if tag and tag not in updated_tags:  # Only check for duplicates within new_tags
                 updated_tags.append(tag)
         
-        # Then add existing tags
+        # Then add existing tags (avoiding duplicates)
         for tag in current_tags:
             if tag and tag not in updated_tags:
                 updated_tags.append(tag)
