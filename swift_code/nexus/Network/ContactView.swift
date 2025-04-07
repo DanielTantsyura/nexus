@@ -3,13 +3,20 @@ import SwiftUI
 /// Displays detailed information about a user including their profile and relationship data
 struct ContactView: View {
     @EnvironmentObject private var coordinator: AppCoordinator
-    let user: User
     
     // MARK: - State
+    
+    // Keep the incoming user around just in case
+    let initialUser: User
+    
+    // Actual mutable copy SwiftUI will watch
+    @State private var user: User
+    
     @State private var isEditing = false
     @State private var relationship: Connection?
     @State private var isLoadingRelationship = true
     @State private var relationshipError: String?
+    @State private var refreshTrigger = false
     
     // Editing state variables
     @State private var editFirstName = ""
@@ -30,22 +37,32 @@ struct ContactView: View {
     // Add state for confirmation dialog
     @State private var showDeleteConfirmation = false
     
+    // init lets us set up that @State copy
+    init(user: User) {
+        self.initialUser = user
+        self._user = State(initialValue: user)
+    }
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 // User info section with tags
                 userInfoSection
+                    .id("info-section-\(refreshTrigger)")
                 
                 // Notes section (if any)
                 if let relationship = relationship, let notes = relationship.notes {
                     notesSection(notes: notes)
+                        .id("notes-section-\(refreshTrigger)")
                 }
                 
                 // Combined relationship description and contact information
                 combinedInfoSection
+                    .id("combined-section-\(refreshTrigger)")
             }
             .padding()
         }
+        .id("contact-view-\(refreshTrigger)") // Force entire view to refresh when data changes
         .navigationTitle(user.fullName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -372,7 +389,7 @@ struct ContactView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             // Find the connection to this user if it exists
             // In the API response, the id field is actually the contact's ID
-            self.relationship = coordinator.networkManager.connections.first { connection in
+            self.relationship = self.coordinator.networkManager.connections.first { connection in
                 return connection.id == self.user.id
             }
             
@@ -383,6 +400,7 @@ struct ContactView: View {
             }
             
             self.isLoadingRelationship = false
+            self.refreshTrigger.toggle() // Force UI refresh when relationship data loads
         }
     }
     
@@ -598,33 +616,57 @@ struct ContactView: View {
         userData["field_of_interest"] = editInterests
         userData["high_school"] = editHighSchool
         
+        // Store local reference to the relationship for use in closures
+        let currentRelationship = relationship
+        
         // Update the contact through coordinator
         coordinator.networkManager.updateUser(userId: user.id, userData: userData) { success in
-            // Update the relationship with the new notes if we have a relationship
-            if let relationship = self.relationship {
-                self.coordinator.networkManager.updateConnection(
-                    contactId: self.user.id,
-                    description: relationship.relationshipDescription,
-                    notes: self.editNotes,
-                    tags: relationship.tags
-                ) { success in
-                    if success {
-                        // Refresh data after updating
-                        self.coordinator.networkManager.fetchConnections(forUserId: self.coordinator.networkManager.userId ?? 0)
+            if success {
+                // Fetch the updated user and update our @State variable
+                self.coordinator.networkManager.fetchUser(withId: self.user.id) { result in
+                    DispatchQueue.main.async {
+                        if case .success(let updatedUser) = result {
+                            // Overwrite the local @State user
+                            self.user = updatedUser
+                        }
                         
-                        // Reload the specific relationship data
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            // Update the relationship in our local state
-                            self.relationship = self.coordinator.networkManager.connections.first { connection in
-                                return connection.id == self.user.id
+                        // Reset editing state
+                        self.isEditing = false
+                        
+                        // Update the relationship with the new notes if we have a relationship
+                        if let relationship = currentRelationship {
+                            self.coordinator.networkManager.updateConnection(
+                                contactId: self.user.id,
+                                description: relationship.relationshipDescription,
+                                notes: self.editNotes,
+                                tags: relationship.tags
+                            ) { success in
+                                if success {
+                                    // Refresh data after updating
+                                    self.coordinator.networkManager.fetchConnections(forUserId: self.coordinator.networkManager.userId ?? 0)
+                                    
+                                    // Reload the specific relationship data
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                        // Refresh the relationship in our local state
+                                        self.relationship = self.coordinator.networkManager.connections.first { connection in
+                                            return connection.id == self.user.id
+                                        }
+                                        
+                                        // Force UI refresh
+                                        self.refreshTrigger.toggle()
+                                    }
+                                }
                             }
+                        } else {
+                            // If no relationship to update, still force refresh the UI to show user data changes
+                            self.refreshTrigger.toggle()
                         }
                     }
                 }
+            } else {
+                // Reset editing state if the update failed
+                self.isEditing = false
             }
-            
-            // Reset editing state
-            self.isEditing = false
         }
     }
     
@@ -655,6 +697,7 @@ struct ContactView: View {
 }
 
 // MARK: - Preview
+
 
 #Preview {
     NavigationView {

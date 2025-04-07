@@ -33,6 +33,15 @@ class NetworkManager: ObservableObject {
     /// Recent tags for the current user
     @Published var recentTags: [String] = []
     
+    /// Signals when significant data changes occur
+    @Published var refreshSignal = UUID()
+    
+    /// Tracks if the current user data has been successfully loaded
+    @Published var currentUserLoaded = false
+    
+    /// Type of data that was refreshed (for more specific refresh handling)
+    @Published var lastRefreshType: RefreshType = .none
+    
     // MARK: - Private Properties
     
     /// Queue for synchronized access to shared properties
@@ -118,6 +127,12 @@ class NetworkManager: ObservableObject {
     private func setRecentTags(_ value: [String]) {
         DispatchQueue.main.async {
             self.recentTags = value
+        }
+    }
+    
+    private func setCurrentUserLoaded(_ value: Bool) {
+        DispatchQueue.main.async {
+            self.currentUserLoaded = value
         }
     }
     
@@ -476,6 +491,42 @@ class NetworkManager: ObservableObject {
                     
                     // Once we have the user, fetch connections
                     self?.fetchUserConnections()
+                }
+            )
+            .store(in: &cancellables)
+
+        userPublisher
+            .sink(
+                receiveCompletion: { [weak self] completion in
+                    if case .failure(let error) = completion {
+                        print("Failed to fetch user: \(error.localizedDescription)")
+                        
+                        // For 401 errors, handle session expiration
+                        if let nsError = error as NSError?, nsError.domain == "AuthError" && nsError.code == 401 {
+                            self?.handleSessionExpiration()
+                            return
+                        }
+                        
+                        // For 404 errors, try a second approach using the /people endpoint
+                        if let nsError = error as NSError?, nsError.code == 404 {
+                            print("User not found by ID, trying to find in all users list")
+                            self?.findUserInAllUsers(userId)
+                        }
+                    }
+                },
+                receiveValue: { [weak self] user in
+                    guard let self = self else { return }
+                    print("Successfully fetched user: \(user.id)")
+                    self.setCurrentUser(user)
+                    
+                    // Mark that we've successfully loaded the current user
+                    self.setCurrentUserLoaded(true)
+                    
+                    // Signal a refresh for the UI to update
+                    self.signalRefresh(type: .currentUser)
+                    
+                    // Once we have the user, fetch connections
+                    self.fetchUserConnections()
                 }
             )
             .store(in: &cancellables)
@@ -994,6 +1045,7 @@ class NetworkManager: ObservableObject {
                     
                     self.setConnections(sortedConnections)
                     print("Fetched \(sortedConnections.count) connections")
+                    self.signalRefresh(type: .connections)
                 }
             )
             .store(in: &cancellables)
@@ -1883,6 +1935,12 @@ class NetworkManager: ObservableObject {
     
     /// Refreshes all data from the server
     func refreshAll() {
+        // Reset loading state and flags
+        setLoading(true)
+        setErrorMessage(nil)
+        setCurrentUserLoaded(false)
+        
+        // Fetch all required data
         if let userId = self.userId {
             fetchCurrentUser()
             fetchConnections(forUserId: userId)
@@ -1890,6 +1948,9 @@ class NetworkManager: ObservableObject {
             updateLastLogin()
         }
         fetchAllUsers()
+        
+        // Schedule a delayed refresh signal to ensure data has loaded
+        scheduleRefreshSignal(type: .profile, delay: 0.5)
     }
     
     /// Updates a user with the given data dictionary
@@ -1936,6 +1997,8 @@ class NetworkManager: ObservableObject {
                         // If we're updating the current user, refresh the data
                         if userId == self.userId {
                             self.fetchCurrentUser()
+                            // Signal that user profile has been updated
+                            self.signalRefresh(type: .profile)
                         }
                         completion(true)
                     } else {
@@ -2134,5 +2197,36 @@ class NetworkManager: ObservableObject {
             .retry(maxRetries)
             .receive(on: DispatchQueue.main)
             .eraseToAnyPublisher()
+    }
+    
+    // MARK: - Refresh Management
+
+    /// Types of data that can be refreshed
+    enum RefreshType {
+        case none
+        case currentUser
+        case connections
+        case profile
+        case allUsers
+    }
+
+    /// Sends a refresh signal to notify all observers that data has changed
+    /// - Parameter type: The type of data that was refreshed
+    func signalRefresh(type: RefreshType) {
+        DispatchQueue.main.async {
+            self.lastRefreshType = type
+            self.refreshSignal = UUID()
+        }
+    }
+
+    /// Schedules a refresh signal with a delay, to ensure data has finished loading
+    /// - Parameters:
+    ///   - type: The type of data that was refreshed
+    ///   - delay: The delay in seconds before sending the refresh signal
+    func scheduleRefreshSignal(type: RefreshType, delay: TimeInterval = 0.3) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self = self else { return }
+            self.signalRefresh(type: type)
+        }
     }
 }
