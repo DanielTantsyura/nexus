@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 /// Main profile dashboard view displaying user profile and navigation options
 struct ProfileView: View {
@@ -20,6 +21,12 @@ struct ProfileView: View {
     
     /// Toggle to force UI refresh
     @State private var refreshTrigger = false
+    
+    /// Cancellable store for the refresh signal subscription
+    @State private var refreshCancellable: AnyCancellable?
+    
+    /// Cancellable store for the refresh signal subscription
+    @State private var cancellables = Set<AnyCancellable>()
     
     // Editing state variables
     @State private var editFirstName = ""
@@ -61,6 +68,7 @@ struct ProfileView: View {
             }
             .padding()
         }
+        .id("profile-view-\(refreshTrigger)") // Force entire view to refresh when data changes
         .navigationBarHidden(true)
         .alert(isPresented: $showLogoutConfirmation) {
             logoutAlert
@@ -68,13 +76,47 @@ struct ProfileView: View {
         .onAppear {
             // Refresh current user data when view appears, but only if needed
             coordinator.activeScreen = .profile
-            if coordinator.networkManager.currentUser == nil && !coordinator.networkManager.isLoading {
+            
+            // Force an immediate refresh if data is already loaded
+            if coordinator.networkManager.currentUser != nil {
+                // Data is already loaded, force refresh UI
+                refreshTrigger.toggle()
+            } else if !coordinator.networkManager.isLoading {
+                // Need to load data
                 loadUserData()
             }
+            
+            // Listen for refresh signals from the NetworkManager
+            refreshCancellable = coordinator.networkManager.$refreshSignal
+                .receive(on: DispatchQueue.main)
+                .sink { _ in
+                    // Check which type of refresh occurred
+                    let refreshType = coordinator.networkManager.lastRefreshType
+                    
+                    // Only refresh UI if it's a profile or current user refresh
+                    if refreshType == .profile || refreshType == .currentUser {
+                        // Force UI refresh
+                        refreshTrigger.toggle()
+                        
+                        // Cancel any ongoing retry timer
+                        invalidateRetryTimer()
+                    }
+                }
+            
+            // Also directly observe the currentUser property for immediate updates
+            // This ensures UI updates even without explicit refresh signals
+            coordinator.networkManager.$currentUser
+                .receive(on: DispatchQueue.main)
+                .sink { _ in
+                    refreshTrigger.toggle()
+                }
+                .store(in: &cancellables)
         }
         .onDisappear {
             // Invalidate timer when view disappears
             invalidateRetryTimer()
+            refreshCancellable?.cancel()
+            cancellables.forEach { $0.cancel() }
         }
     }
     
@@ -95,14 +137,17 @@ struct ProfileView: View {
     /// Section displaying current user profile information
     private var currentUserSection: some View {
         Group {
-            if coordinator.networkManager.isLoading && coordinator.networkManager.currentUser == nil {
-                LoadingView(message: "Loading profile...")
-            } else if let currentUser = coordinator.networkManager.currentUser {
+            // Prioritize showing the profile if it's available
+            if let currentUser = coordinator.networkManager.currentUser {
                 userProfileCard(user: currentUser)
+                    .id(refreshTrigger) // Force rebuild when refresh happens
+            } else if coordinator.networkManager.isLoading {
+                LoadingView(message: "Loading profile...")
             } else {
                 userProfileUnavailableCard
             }
         }
+        .id("profile-section-\(refreshTrigger)") // Ensure section refreshes when data changes
     }
     
     /// Card displaying detailed user profile information
@@ -496,14 +541,5 @@ struct ProfileView: View {
     private func invalidateRetryTimer() {
         retryTimer?.invalidate()
         retryTimer = nil
-    }
-}
-
-// MARK: - Preview
-
-#Preview {
-    NavigationView {
-        ProfileView()
-            .environmentObject(AppCoordinator())
     }
 }

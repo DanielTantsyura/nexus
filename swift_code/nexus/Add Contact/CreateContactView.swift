@@ -394,12 +394,3 @@ private func tagColor(for tag: String) -> Color {
     let hash = abs(tag.hashValue)
     return colors[hash % colors.count]
 }
-
-// MARK: - Preview
-
-#Preview {
-    NavigationView {
-        CreateContactView()
-            .environmentObject(AppCoordinator())
-    }
-}

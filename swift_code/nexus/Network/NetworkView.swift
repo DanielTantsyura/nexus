@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import Combine
 
 /// A view displaying the user's network connections
 struct NetworkView: View {
@@ -37,6 +38,9 @@ struct NetworkView: View {
     
     /// The connection being considered for deletion
     @State private var connectionToDelete: Connection? = nil
+    
+    /// Cancellable for refresh signal subscription
+    @State private var refreshCancellable: AnyCancellable?
     
     /// Computed property for filtered connections based on search text and selected tag
     private var filteredConnections: [Connection] {
@@ -289,6 +293,23 @@ struct NetworkView: View {
                     refreshTrigger.toggle()
                 }
             }
+            
+            // Listen for refresh signals from the NetworkManager
+            refreshCancellable = coordinator.networkManager.$refreshSignal
+                .receive(on: DispatchQueue.main)
+                .sink { _ in
+                    // Check which type of refresh occurred
+                    let refreshType = coordinator.networkManager.lastRefreshType
+                    
+                    // Only refresh UI if it's relevant to connections
+                    if refreshType == .connections || refreshType == .profile {
+                        // If we have connections data but haven't shown it yet, update the UI
+                        if !coordinator.networkManager.connections.isEmpty && !hasShownConnections {
+                            hasShownConnections = true
+                            refreshTrigger.toggle()
+                        }
+                    }
+                }
         }
         .refreshable {
             await refreshConnectionsAsync()
@@ -324,6 +345,9 @@ struct NetworkView: View {
                     showTagSelector = false
                 }
             }
+        }
+        .onDisappear {
+            refreshCancellable?.cancel()
         }
     }
     
@@ -729,11 +753,3 @@ extension EnvironmentValues {
         set { self[SwipeNavigationGestureKey.self] = newValue }
     }
 }
-
-// MARK: - Preview
-
-#Preview {
-    NetworkView()
-        .environmentObject(AppCoordinator())
-}
-

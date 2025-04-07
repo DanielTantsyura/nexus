@@ -180,6 +180,9 @@ final class AppCoordinator: ObservableObject {
         networkTabPath.append(user)
         navigationPath = networkTabPath
         activeScreen = .contact
+        
+        // Schedule a refresh signal to ensure profile data is displayed correctly
+        networkManager.scheduleRefreshSignal(type: .profile, delay: 0.2)
     }
     
     /// Navigate back from user detail to user list
@@ -237,6 +240,9 @@ final class AppCoordinator: ObservableObject {
     func backFromCreateContact() {
         // Return to the network tab
         selectTab(.network)
+        
+        // Refresh connections data when returning from contact creation
+        refreshWithDelay()
     }
     
     /// Navigate back from edit profile to home
@@ -250,6 +256,8 @@ final class AppCoordinator: ObservableObject {
         // Ensure user data is refreshed
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             self?.networkManager.fetchCurrentUser()
+            // Schedule a refresh signal after a delay to ensure data has loaded
+            self?.networkManager.scheduleRefreshSignal(type: .profile, delay: 0.3)
         }
     }
     

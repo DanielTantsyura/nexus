@@ -151,10 +151,3 @@ extension View {
             }
     }
 }
-
-// MARK: - Preview
-
-#Preview {
-    MainView()
-        .environmentObject(AppCoordinator())
-} 

@@ -77,32 +77,3 @@ struct UserListRow: View {
         }
     }
 }
-
-// MARK: - Preview
-
-#Preview {
-    UserListRow(user: User(
-        id: 1,
-        username: "johndoe",
-        firstName: "John",
-        lastName: "Doe",
-        email: "john@example.com",
-        phoneNumber: "555-1234",
-        location: "New York",
-        university: "NYU",
-        fieldOfInterest: "Computer Science",
-        highSchool: nil,
-        birthday: nil,
-        createdAt: nil,
-        currentCompany: "Apple Inc.",
-        gender: nil,
-        ethnicity: nil,
-        uniMajor: "Computer Science",
-        jobTitle: "iOS Developer",
-        lastLogin: nil,
-        profileImageUrl: nil,
-        linkedinUrl: nil,
-        recentTags: nil
-    ))
-    .padding()
-} 
