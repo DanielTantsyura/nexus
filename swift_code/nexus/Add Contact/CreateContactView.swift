@@ -42,6 +42,7 @@ struct CreateContactView: View {
                     subtitle: "Your personal network tracker"
                 ) {
                     Button(action: {
+                        clearForm()
                         coordinator.backFromCreateContact()
                     }) {
                         Image(systemName: "xmark")
@@ -80,42 +81,6 @@ struct CreateContactView: View {
                
                 // Buttons
                 buttonSection
-               
-                // Success state - show a success message and redirect options
-                if let user = createdUser {
-                    VStack(spacing: 20) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(.green)
-                        
-                        Text("Contact Created Successfully!")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                        
-                        Text("You've successfully added \(user.firstName ?? "") to your network!")
-                            .multilineTextAlignment(.center)
-                        
-                        HStack(spacing: 16) {
-                            Button(action: {
-                                coordinator.showContact(user)
-                            }) {
-                                Text("View Contact")
-                                    .padding()
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(PrimaryButtonStyle())
-                            
-                            Button(action: {
-                                clearForm()
-                            }) {
-                                Text("Add Another")
-                                    .padding()
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(SecondaryButtonStyle())
-                        }
-                    }
-                }
                
                 Spacer()
             }
@@ -387,19 +352,15 @@ struct CreateContactView: View {
             switch result {
             case .success(let userId):
                 successMessage = "Contact created successfully!"
-                // Wait a moment so the user sees the success message
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    // Navigate to the user detail view for the new contact
-                    coordinator.networkManager.fetchUser(withId: userId) { userResult in
-                        switch userResult {
-                        case .success(let user):
-                            createdUser = user
-                        case .failure:
-                            // If we can't fetch the user, just go back
-                            coordinator.backFromCreateContact()
-                        }
+                // Automatically hide success message after a few seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                    withAnimation {
+                        successMessage = nil
                     }
                 }
+                // Clear the form after successful creation
+                clearForm()
+                
             case .failure(let error):
                 errorMessage = "Failed to create contact: \(error.localizedDescription)"
             }

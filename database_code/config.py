@@ -31,8 +31,8 @@ else:
     IOS_DEVICE_URL = os.getenv("IOS_DEVICE_URL", f"http://10.0.0.232:{API_PORT}")
 
 # User tag settings
-DEFAULT_TAGS = os.getenv("DEFAULT_TAGS", "Entrepreneurship,Finance,Student,Close Friend,Recently Met")
-MAX_RECENT_TAGS = int(os.getenv("MAX_RECENT_TAGS", "8"))
+DEFAULT_TAGS = os.getenv("DEFAULT_TAGS", "Close Friend,Recently Met,VIP,Leader,Entrepreneur,Finance,Student,International,Research")
+MAX_RECENT_TAGS = int(os.getenv("MAX_RECENT_TAGS", "9"))
 
 # OpenAI model and API key settings
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")

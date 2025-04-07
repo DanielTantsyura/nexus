@@ -107,6 +107,11 @@ def process_contact_text(text: str) -> Tuple[bool, Optional[Dict[str, Any]], str
         The database has the following fields:
         {', '.join(USER_FIELDS)}
         
+        ADDITIONALLY, you need to extract a "note" field that contains any relationship context, 
+        descriptive details, or other information that doesn't fit into the structured fields above.
+        For example, if the text includes phrases like "close friend", "met at conference", or other context,
+        these should go into the note field.
+        
         IMPORTANT GUIDELINES:
         1. The input might be a formal paragraph or a shorthand note with brief biographical information.
         2. For shorthand notes like "Daniel Tantsyura CMU interested in real estate and entrepreneurship white male":
@@ -120,8 +125,11 @@ def process_contact_text(text: str) -> Tuple[bool, Optional[Dict[str, Any]], str
         6. If the information for a field is not provided, return null for that field
         7. Only extract first_name and last_name if they're clearly identifiable
         8. Don't guess or make up information that isn't in the text
+        9. For the note field, include only contextual information or descriptive details that don't fit the structured fields.
+           This might include relationship descriptions ("close friend"), how you met them, or personal observations.
+           If there is no such information, leave note as an empty string.
         
-        Format your response as a valid JSON object with these fields.
+        Format your response as a valid JSON object with all these fields including note.
         """
         
         # Send the request to the OpenAI API
@@ -171,6 +179,12 @@ def process_contact_text(text: str) -> Tuple[bool, Optional[Dict[str, Any]], str
                 elif extracted_data[field] == "":
                     extracted_data[field] = None
             
+            # Ensure note field exists (may be None or empty string)
+            if "note" not in extracted_data:
+                extracted_data["note"] = ""
+                
+            print(f"Extracted note: {extracted_data.get('note', '')}")
+            
             return True, extracted_data, "Successfully extracted user information."
         
         except Exception as e:
@@ -210,6 +224,12 @@ def basic_text_processing(text: str, fields: List[str]) -> Tuple[bool, Dict[str,
     for field in fields:
         if field not in user_data:
             user_data[field] = None
+    
+    # If there are more than just first and last name, use the rest as a note
+    if len(words) > 2:
+        user_data["note"] = " ".join(words[2:])
+    else:
+        user_data["note"] = ""
     
     return True, user_data, "Basic processing only (OpenAI unavailable)."
 
@@ -291,7 +311,7 @@ def create_new_contact(contact_text: str, user_id: int, relationship_type: str =
                 "user_id": user_id,
                 "contact_id": new_user_id,
                 "relationship_type": relationship_type,
-                "note": contact_text,  # Store the original text as a note
+                "note": user_data.get("note", ""),  # Use the extracted note instead of full text
                 "tags": DEFAULT_TAGS.split(',')[0]  # Use first default tag
             }
             

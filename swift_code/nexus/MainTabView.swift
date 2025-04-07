@@ -24,13 +24,13 @@ struct MainTabView: View {
                 }
                 .tag(TabSelection.network)
                 
-                // Add New Tab (now a rounded rectangle button)
+                // Add New Tab - hidden empty view
                 NavigationStack {
+                    // Still show the CreateContactView when this tab is selected
                     CreateContactView()
                 }
-                .tabItem {
-                    // Use a placeholder icon that will be visually replaced by our custom button
-                   Label("Add", systemImage: "plus.circle")
+                .tabItem { 
+                    // Completely empty tab item
                 }
                 .tag(TabSelection.addNew)
                 
@@ -56,16 +56,16 @@ struct MainTabView: View {
             }) {
                 VStack(spacing: 4) {
                     Image(systemName: "plus")
-                        .font(.system(size: 30, weight: .bold))
+                        .font(.system(size: coordinator.selectedTab == .addNew ? 20 : 30, weight: .bold))
                     Text("Add")
                         .font(.caption2)
                 }
                 .foregroundColor(.white)
-                .frame(width: 100, height: 100)
-                .background(Color.green)
+                .frame(width: coordinator.selectedTab == .addNew ? 70 : 100, height: coordinator.selectedTab == .addNew ? 70 : 100)
+                .background(coordinator.selectedTab == .addNew ? Color.gray : Color.green)
                 .clipShape(Capsule())
             }
-            .offset(y: 8) // Moved 5 pixels lower (from -4 to 1)
+            .offset(y: 8)
             .shadow(radius: 2)
         }
         .onChange(of: coordinator.selectedTab) { oldValue, newValue in

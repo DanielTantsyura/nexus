@@ -347,11 +347,17 @@ def create_contact():
                     
                     # Create connection directly in database
                     print("Creating connection in database...")
+                    
+                    # Get the note from the processed user data
+                    note = user_data.get("note", "")
+                    print(f"Using note: {note}")
+                    
+                    # Create the connection with the note
                     connection_success = db_manager.add_connection(
                         user_id, 
                         new_user_id,
                         relationship_type,
-                        contact_text,  # Use text as note
+                        note,  # Use the LLM-extracted note
                         DEFAULT_TAGS.split(',')[0]  # First default tag
                     )
                     

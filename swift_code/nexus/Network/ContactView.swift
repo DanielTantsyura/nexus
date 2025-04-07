@@ -410,7 +410,7 @@ struct ContactView: View {
     }
     
     private func notesSection(notes: String) -> some View {
-        SectionCard(title: "Custom Notes") {
+        SectionCard(title: "Notes") {
             if isEditing {
                 VStack(alignment: .leading) {
                     Text("Notes about this contact")
