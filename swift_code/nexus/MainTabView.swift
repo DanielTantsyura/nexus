@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 /// Main tab view containing the primary application screens
 struct MainTabView: View {
@@ -6,6 +7,10 @@ struct MainTabView: View {
     
     /// Reference to the app coordinator
     @EnvironmentObject var coordinator: AppCoordinator
+    
+    // MARK: - Properties
+    
+    @StateObject private var keyboardHandler = KeyboardHandler()
     
     // MARK: - View
     
@@ -24,13 +29,13 @@ struct MainTabView: View {
                 }
                 .tag(TabSelection.network)
                 
-                // Add New Tab - hidden empty view
+                // Add New Tab - hidden tab item but visible when selected
                 NavigationStack {
-                    // Still show the CreateContactView when this tab is selected
                     CreateContactView()
                 }
                 .tabItem { 
-                    // Completely empty tab item
+                    // Empty tab item that will be replaced by the floating button
+                    Label("", systemImage: "")
                 }
                 .tag(TabSelection.addNew)
                 
@@ -50,38 +55,75 @@ struct MainTabView: View {
                 .tag(TabSelection.profile)
             }
             
-            // Custom Add Button
-            Button(action: {
-                coordinator.selectedTab = .addNew
-            }) {
-                VStack(spacing: 4) {
-                    Image(systemName: "plus")
-                        .font(.system(size: coordinator.selectedTab == .addNew ? 20 : 30, weight: .bold))
-                    Text("Add")
-                        .font(.caption2)
-                }
-                .foregroundColor(.white)
-                .frame(width: coordinator.selectedTab == .addNew ? 70 : 100, height: coordinator.selectedTab == .addNew ? 70 : 100)
-                .background(coordinator.selectedTab == .addNew ? Color.gray : Color.green)
-                .clipShape(Capsule())
+            // Only show add button if keyboard is not visible
+            if !keyboardHandler.isVisible {
+                AddButton(action: {
+                    // Hide keyboard when switching tabs
+                    hideKeyboard()
+                    coordinator.selectedTab = .addNew
+                })
+                .offset(y: 8)
             }
-            .offset(y: 8)
-            .shadow(radius: 2)
         }
         .onChange(of: coordinator.selectedTab) { oldValue, newValue in
             coordinator.selectTab(newValue)
         }
     }
+    
+    /// Hides the keyboard
+    private func hideKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
 }
 
-/// View that serves as the entry point for the application
-struct MainView: View {
-    // MARK: - Environment
-    
-    /// Reference to the app coordinator
+/// A reusable add button component that can be used throughout the app
+struct AddButton: View {
+    var action: () -> Void
     @EnvironmentObject var coordinator: AppCoordinator
     
-    // MARK: - View
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Image(systemName: "plus")
+                    .font(.system(size: coordinator.selectedTab == .addNew ? 20 : 30, weight: .bold))
+                Text("Add")
+                    .font(.caption2)
+            }
+            .foregroundColor(.white)
+            .frame(width: coordinator.selectedTab == .addNew ? 70 : 100, height: coordinator.selectedTab == .addNew ? 70 : 100)
+            .background(coordinator.selectedTab == .addNew ? Color.gray : Color.green)
+            .clipShape(Capsule())
+            .shadow(radius: 2)
+        }
+        .accessibilityLabel("Add new contact")
+    }
+}
+
+/// A keyboard handler that can be reused across the app
+class KeyboardHandler: ObservableObject {
+    @Published var isVisible = false
+    private var cancellables = Set<AnyCancellable>()
+    
+    init() {
+        // Listen to keyboard notifications
+        NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)
+            .sink { [weak self] _ in
+                self?.isVisible = true
+            }
+            .store(in: &cancellables)
+        
+        NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)
+            .sink { [weak self] _ in
+                self?.isVisible = false
+            }
+            .store(in: &cancellables)
+    }
+}
+
+/// Main view model that serves as the entry point for the application
+struct MainView: View {
+    /// Reference to the app coordinator
+    @EnvironmentObject var coordinator: AppCoordinator
     
     var body: some View {
         Group {
@@ -91,6 +133,7 @@ struct MainView: View {
                 LoginView()
             }
         }
+        .environment(\.keyboardDismissMode, .automatic)
     }
 }
 
@@ -118,6 +161,46 @@ struct LoadingOverlayView: View {
                     .fill(Color.gray.opacity(0.8))
             )
         }
+    }
+}
+
+// MARK: - Extension for keyboard handling
+
+extension View {
+    /// Adds automatic keyboard dismissal when tapping outside input fields
+    func dismissKeyboardOnTap() -> some View {
+        self.modifier(DismissKeyboardOnTap())
+    }
+}
+
+/// View modifier that dismisses the keyboard when tapping outside input fields
+struct DismissKeyboardOnTap: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .onTapGesture {
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+            }
+    }
+}
+
+// MARK: - Environment Values
+
+/// Environment key for controlling keyboard dismiss behavior
+struct KeyboardDismissModeKey: EnvironmentKey {
+    static let defaultValue: KeyboardDismissMode = .automatic
+}
+
+/// Mode for keyboard dismiss behavior
+enum KeyboardDismissMode {
+    case automatic
+    case manual
+}
+
+extension EnvironmentValues {
+    /// Controls how the keyboard is dismissed
+    var keyboardDismissMode: KeyboardDismissMode {
+        get { self[KeyboardDismissModeKey.self] }
+        set { self[KeyboardDismissModeKey.self] = newValue }
     }
 }
 

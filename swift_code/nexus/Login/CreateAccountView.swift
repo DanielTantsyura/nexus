@@ -230,10 +230,11 @@ struct CreateAccountView: View {
         // Clear previous errors
         errorMessage = nil
         
-        // Create user data dictionary for the people table - NOT including username field
-        let userData: [String: Any] = [
+        // Create user data dictionary for the people table
+        var userData: [String: Any] = [
             "first_name": firstName,
             "last_name": lastName,
+            "username": username,
             "email": "",
             "phone_number": "",
             "gender": "",

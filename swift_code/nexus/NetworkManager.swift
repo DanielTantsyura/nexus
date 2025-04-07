@@ -1813,8 +1813,10 @@ class NetworkManager: ObservableObject {
         // Add password for login creation
         completeUserData["password"] = password
         
-        // Important: DON'T add username to the people table fields
-        // Instead send it as a query parameter to handle separately
+        // Ensure username is in request body
+        completeUserData["username"] = username
+        
+        // Also send username as a query parameter to handle separately
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
         components?.queryItems = [URLQueryItem(name: "username", value: username)]
         

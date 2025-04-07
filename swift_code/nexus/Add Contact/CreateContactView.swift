@@ -17,7 +17,7 @@ struct CreateContactView: View {
     @State private var selectedTags: [String] = []
    
     /// Controls whether the keyboard is active
-    @FocusState private var isContactTextFieldFocused: Bool
+    @FocusState private var isTextFieldFocused: Bool
    
     /// Error message to display
     @State private var errorMessage: String? = nil
@@ -30,6 +30,9 @@ struct CreateContactView: View {
    
     /// User created after submitting the form
     @State private var createdUser: User? = nil
+    
+    /// Environment access to keyboard dismiss mode
+    @Environment(\.keyboardDismissMode) private var keyboardDismissMode
    
     // MARK: - View Body
    
@@ -43,6 +46,7 @@ struct CreateContactView: View {
                 ) {
                     Button(action: {
                         clearForm()
+                        hideKeyboard()
                         coordinator.backFromCreateContact()
                     }) {
                         Image(systemName: "xmark")
@@ -86,24 +90,23 @@ struct CreateContactView: View {
             }
             .padding()
         }
+        .dismissKeyboardOnTap()
         .navigationBarHidden(true)
         .onAppear {
             // Auto-focus text field when view appears
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                isContactTextFieldFocused = true
+                isTextFieldFocused = true
             }
             
             // Fetch recent tags when the view appears
             coordinator.networkManager.fetchRecentTags()
         }
         .disabled(isSubmitting)
-        .overlay(
-            Group {
-                if isSubmitting {
-                    LoadingView(message: "Creating contact...")
-                }
+        .overlay {
+            if isSubmitting {
+                LoadingView(message: "Creating contact...")
             }
-        )
+        }
     }
    
     // MARK: - UI Components
@@ -168,7 +171,7 @@ struct CreateContactView: View {
                 .padding(4)
                 .background(Color(.systemGray6))
                 .cornerRadius(8)
-                .focused($isContactTextFieldFocused)
+                .focused($isTextFieldFocused)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
                         .stroke(Color.gray.opacity(0.3), lineWidth: 1)
@@ -195,6 +198,7 @@ struct CreateContactView: View {
                             ForEach(selectedTags, id: \.self) { tag in
                                 Button(action: {
                                     removeTag(tag)
+                                    hideKeyboard()
                                 }) {
                                     HStack {
                                         Text(tag)
@@ -249,6 +253,7 @@ struct CreateContactView: View {
                             ForEach(coordinator.networkManager.recentTags, id: \.self) { tag in
                                 Button(action: {
                                     addTag(tag)
+                                    hideKeyboard()
                                 }) {
                                     Text(tag)
                                         .font(.system(size: 11))
@@ -278,12 +283,20 @@ struct CreateContactView: View {
                 // Custom tag creation
                 HStack {
                     TextField("Add custom tag...", text: $newTagText)
+                        .focused($isTextFieldFocused)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .background(Color.gray.opacity(0.1))
                         .cornerRadius(8)
+                        .onSubmit {
+                            addCustomTag()
+                            hideKeyboard()
+                        }
                    
-                    Button(action: addCustomTag) {
+                    Button(action: {
+                        addCustomTag()
+                        hideKeyboard()
+                    }) {
                         Text("Add")
                             .fontWeight(.medium)
                             .foregroundColor(.white)
@@ -301,7 +314,10 @@ struct CreateContactView: View {
     /// Buttons for submitting or canceling the form
     private var buttonSection: some View {
         HStack(spacing: 16) {
-            Button(action: clearForm) {
+            Button(action: {
+                clearForm()
+                hideKeyboard()
+            }) {
                 Text("Clear")
                     .fontWeight(.medium)
                     .foregroundColor(.blue)
@@ -311,7 +327,10 @@ struct CreateContactView: View {
                     .cornerRadius(10)
             }
            
-            Button(action: submitContact) {
+            Button(action: {
+                submitContact()
+                hideKeyboard()
+            }) {
                 Text("Submit")
                     .fontWeight(.medium)
                     .foregroundColor(.white)
@@ -324,6 +343,8 @@ struct CreateContactView: View {
         }
     }
    
+    // MARK: - Methods
+    
     /// Removes a tag from the selected tags array
     private func removeTag(_ tag: String) {
         selectedTags.removeAll { $0 == tag }
@@ -383,6 +404,12 @@ struct CreateContactView: View {
        
         addTag(trimmedText)
         newTagText = ""
+    }
+    
+    /// Helper to explicitly hide the keyboard
+    private func hideKeyboard() {
+        isTextFieldFocused = false
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 }
 
