@@ -1,62 +1,90 @@
 # Nexus iOS Client
 
-The iOS client for the Nexus networking application.
+The iOS client for the Nexus networking application, a platform for managing professional connections and contacts.
 
 ## Project Structure
 
-- **Models/**: Data models used throughout the app
-  - `User.swift`: Model for user data
-  - `Connection.swift`: Model for user connections
+- **Nexus/**: Main application code
+  - **Login/**: Authentication-related views
+    - `LoginView.swift`: Login interface
+    - `CreateAccountView.swift`: Account creation interface
+  - **Network/**: Network management views
+    - `NetworkView.swift`: Main connections view with search functionality
+    - `ContactView.swift`: Detailed view for contacts
+    - `UserListRow.swift`: Reusable component for user listings
+  - **Profile/**: User profile
+    - `ProfileView.swift`: User profile management
+  - **Add Contact/**: Contact creation
+    - `CreateContactView.swift`: Interface for adding new contacts
+  - `NetworkManager.swift`: API communication service
+  - `Models.swift`: Data models
+  - `KeychainHelper.swift`: Secure storage for credentials
 
-- **App/**: Application core
-  - `AppCoordinator.swift`: Central coordinator for app state and navigation
-  - `NexusApp.swift`: SwiftUI application entry point
+## Architecture
 
-- **Views/**: User interface components
-  - `ContentView.swift`: Main user interface
+The application uses SwiftUI for its user interface and follows a coordinator-based navigation pattern. The NetworkManager class provides a centralized service for API communication, handling authentication, data fetching, and error handling.
 
-- **NetworkManager.swift**: Handles API communication
+Key architectural points:
+- **MVVM pattern**: Views are kept simple with separate model and view logic
+- **Publisher-based networking**: Combine framework for asynchronous operations
+- **Centralized API communication**: Single class manages all network requests
+- **Secure credential storage**: Keychain integration for sensitive data
 
-## Project Setup
+## Getting Started
 
 1. **Prerequisites**:
-   - Xcode 13.0 or later
-   - macOS Monterey or later
-   - Running Nexus API (on port 8080)
+   - Xcode 14.0 or later
+   - macOS Ventura or later
+   - Nexus API running (local or remote)
 
-2. **Opening the Project**:
-   - Open `nexus.xcodeproj` in Xcode
-   - Wait for Xcode to index the project
+2. **Environment Setup**:
+   - By default, the app connects to the remote Nexus API
+   - To use a local API, set the `USE_LOCAL_API` environment variable to `true` in the run scheme
 
 3. **Running the App**:
+   - Open `nexus.xcodeproj` in Xcode
    - Select a simulator or connected device
    - Press the Play button (⌘+R)
 
-## Testing on a Physical Device
+## API Integration
 
-When testing on a physical device, you'll need to update the device IP address in `NetworkManager.swift`:
+The application interacts with the Nexus API through the NetworkManager class. The base URL automatically adjusts based on:
+- Environment variable settings for local development
+- Production configuration for deployed instances
 
-```swift
-#if targetEnvironment(simulator)
-private let baseURL = "http://127.0.0.1:8080"  // For simulator
-#else
-private let baseURL = "http://YOUR.IP.ADDRESS:8080"  // For physical device
-#endif
-```
+## Authentication Flow
 
-Replace `YOUR.IP.ADDRESS` with your Mac's IP address.
+1. User logs in with username/password or creates a new account
+2. Credentials are securely stored in the Keychain
+3. Session is automatically restored on app launch when available
+4. Token expiration is handled gracefully with automatic logout
+
+## Features
+
+- **User Authentication**: Login, registration, session management
+- **Profile Management**: View and edit user profiles
+- **Connection Management**: Add, view, filter, and search connections
+- **Contact Creation**: Add new contacts to your network
+- **Real-time Search**: Filter connections as you type
+- **Tag-based Filtering**: Categorize and filter connections by tags
 
 ## Troubleshooting
 
-If you encounter connection issues:
+- **Connection Issues**: Verify API accessibility and network connectivity
+- **Authentication Failures**: Check credentials and API status
+- **Data Not Loading**: Ensure the user is properly authenticated
+- **Search Not Working**: Verify the search endpoint is operational
 
-1. Make sure the API is running on port 8080
-2. Check that App Transport Security settings allow unencrypted HTTP connections
-3. If running on a physical device, ensure it's on the same network as your Mac
-4. Use the verbose logging in the app to diagnose connection issues
+## Performance Considerations
 
-## Common Issues
+- The app uses efficient in-memory filtering for real-time search
+- Network requests implement retry logic with exponential backoff
+- Images are cached to improve scrolling performance
+- API responses are parsed on background threads
 
-- **"Cannot connect to API"**: Check that API is running and accessible
-- **"No data found"**: Verify the database has been set up with sample data
-- **"JSON parsing error"**: The API response format may have changed, check model compatibility 
+## Security Notes
+
+- Credentials are stored securely in the Keychain
+- Network requests use HTTPS in production
+- Sensitive operations validate user authentication
+- Session tokens are managed securely 
