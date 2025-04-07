@@ -278,14 +278,6 @@ struct NetworkView: View {
             .padding()
         }
         .navigationBarHidden(true)
-        .overlay(
-            Group {
-                // Only show loading overlay if there are no connections AND we're loading
-                if coordinator.networkManager.isLoading && coordinator.networkManager.connections.isEmpty {
-                    LoadingView(message: "Loading connections...")
-                }
-            }
-        )
         .onAppear {
             // Always load connections when the view appears, but avoid duplicate loads
             if !coordinator.networkManager.isLoading {
