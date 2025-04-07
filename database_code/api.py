@@ -236,7 +236,7 @@ def update_connection():
         update_data['relationship_description'] = update_data.pop('relationship_type')
     
     if 'note' in update_data:
-        update_data['custom_note'] = update_data.pop('note')
+        update_data['notes'] = update_data.pop('note')
     
     if not update_data:
         return jsonify({"error": "No fields to update"}), 400
