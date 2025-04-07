@@ -29,8 +29,8 @@ struct MainTabView: View {
                     CreateContactView()
                 }
                 .tabItem {
-                    // Empty label to reserve space
-                    Label("", systemImage: "")
+                    // Use a placeholder icon that will be visually replaced by our custom button
+                   Label("Add", systemImage: "plus.circle")
                 }
                 .tag(TabSelection.addNew)
                 

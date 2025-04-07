@@ -55,7 +55,8 @@ struct ProfileView: View {
                     }) {
                         Image(systemName: "rectangle.portrait.and.arrow.right")
                             .foregroundColor(.red)
-                            .font(.system(size: 18))
+                            .font(.system(size: 24))
+                            .frame(height: 50)
                     }
                 }
                 .padding(.bottom, 5)

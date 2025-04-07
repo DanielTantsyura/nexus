@@ -32,10 +32,10 @@ struct LoginView: View {
     var body: some View {
         VStack(spacing: 20) {
             // App logo
-            Image("AppLogo")
+            Image("LogoWithText")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 120, height: 120)
+                .frame(width: 220, height: 120)
                 .padding(.bottom, 20)
             
             VStack(alignment: .leading, spacing: 4) {

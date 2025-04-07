@@ -297,10 +297,23 @@ class DatabaseManager:
         if 'recent_tags' not in user_data or user_data['recent_tags'] is None:
             user_data['recent_tags'] = DEFAULT_TAGS
         
+        # Ensure all required fields exist in the data
+        for field in ['first_name', 'last_name', 'email', 'phone_number',
+                     'location', 'university', 'field_of_interest', 'high_school',
+                     'gender', 'ethnicity', 'uni_major', 'job_title', 'current_company',
+                     'profile_image_url', 'linkedin_url']:
+            if field not in user_data:
+                user_data[field] = None
+        
         try:
+            print(f"Executing SQL: {query}")
+            print(f"With values: {user_data}")
+            
             self.cursor.execute(query, user_data)
             user_id = self.cursor.fetchone()['id']
-            self.conn.commit()
+            
+            # Fix: Use self.connection.commit() instead of self.conn.commit()
+            self.connection.commit()
             
             # Add login if username and password were provided
             if username and password:
@@ -311,6 +324,7 @@ class DatabaseManager:
         except Exception as e:
             self.connection.rollback()
             print(f"Error adding user: {e}")
+            traceback.print_exc()  # Print the full traceback for debugging
             raise
     
     def update_user(self, user_id: int, user_data: Dict[str, Any]) -> bool:
@@ -416,30 +430,30 @@ class DatabaseManager:
             return []
     
     def add_connection(self, user_id: int, contact_id: int, relationship_description: str, 
-                       custom_note: str = None, tags: str = None) -> bool:
+                       notes: str = None, tags: str = None) -> bool:
         """
         Add a new connection between two users.
         relationship_description is bidirectional (shared in both directions)
-        custom_note, tags, and last_viewed are unidirectional (specific to each direction)
+        notes, tags, and last_viewed are unidirectional (specific to each direction)
         
         Args:
             user_id: ID of the first user
             contact_id: ID of the second user
             relationship_description: Type of the relationship
-            custom_note: Optional detailed note about the connection (one-way)
+            notes: Optional detailed note about the connection (one-way)
             tags: Optional comma-separated tags for the connection (one-way)
             
         Returns:
             True if successful, False otherwise
         """
         query = """
-        INSERT INTO relationships (user_id, contact_id, relationship_description, custom_note, tags, last_viewed)
+        INSERT INTO relationships (user_id, contact_id, relationship_description, notes, tags, last_viewed)
         VALUES (%s, %s, %s, %s, %s, NOW());
         """
         
         try:
             # First direction: user_id -> contact_id (with full data)
-            self.cursor.execute(query, (user_id, contact_id, relationship_description, custom_note, tags))
+            self.cursor.execute(query, (user_id, contact_id, relationship_description, notes, tags))
             
             # Second direction: contact_id -> user_id (with shared relationship_description only)
             self.cursor.execute(query, (contact_id, user_id, relationship_description, None, None))
@@ -479,14 +493,14 @@ class DatabaseManager:
     
     def update_connection(self, user_id: int, contact_id: int, data: Dict[str, Any]) -> bool:
         """
-        Update a connection with custom_note, tags, or other metadata.
+        Update a connection with notes, tags, or other metadata.
         Only updates the one-way relationship (from user_id to contact_id).
         If relationship_description is updated, it updates both directions.
         
         Args:
             user_id: ID of the user
             contact_id: ID of the contact
-            data: Dictionary of fields to update (relationship_description, custom_note, tags)
+            data: Dictionary of fields to update (relationship_description, notes, tags)
             
         Returns:
             True if successful, False otherwise
@@ -495,9 +509,9 @@ class DatabaseManager:
         one_way_fields = []
         one_way_params = []
         
-        # Handle one-way fields (custom_note, tags)
+        # Handle one-way fields (notes, tags)
         for key, value in data.items():
-            if key in ['custom_note', 'tags']:
+            if key in ['notes', 'tags']:
                 one_way_fields.append(f"{key} = %s")
                 one_way_params.append(value)
         

@@ -38,7 +38,8 @@ if OPENAI_AVAILABLE:
         if USING_NEW_SDK:
             client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
             # Test the client with a simple call
-            client.models.list(limit=1)
+            client.models.list()
+
             OPENAI_WORKING = True
         else:
             openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -58,44 +59,19 @@ print(f"API_BASE_URL set to: {API_BASE_URL}")
 
 def get_user_fields_from_schema() -> List[str]:
     """
-    Dynamically extract user fields from the database schema in setupFiles/createDatabase.py.
-    This ensures that the fields used in the API call always match the actual database schema.
+    Return the specific user fields needed for contact creation.
     
     Returns:
         List of user field names
     """
-    try:
-        # Read the createDatabase.py file from setupFiles directory
-        with open(os.path.join(os.path.dirname(__file__), 'setupFiles', 'createDatabase.py'), 'r') as file:
-            schema_content = file.read()
-        
-        # Extract the CREATE TABLE people section
-        users_table_match = re.search(r'CREATE TABLE people \(\s*(.*?)\s*\);', schema_content, re.DOTALL)
-        if not users_table_match:
-            raise ValueError("Could not find people table definition in createDatabase.py")
-        
-        users_table_def = users_table_match.group(1)
-        
-        # Extract field names using regex, excluding system fields like id and created_at
-        field_matches = re.findall(r'^\s*(\w+)\s+', users_table_def, re.MULTILINE)
-        
-        # Filter out system fields that should not be exposed for user input
-        excluded_fields = ['id', 'created_at']
-        fields = [field for field in field_matches if field not in excluded_fields]
-        
-        if not fields:
-            raise ValueError("No fields found in people table definition")
-        
-        return fields
-    except Exception as e:
-        print(f"Error extracting user fields from schema: {e}")
-        # Fallback to a hardcoded list of fields
-        return [
-            "username", "first_name", "last_name", "email", "phone_number",
-            "location", "university", "field_of_interest", "high_school",
-            "gender", "ethnicity", "uni_major", "job_title", "current_company",
-            "profile_image_url", "linkedin_url", "recent_tags"
-        ]
+    # Return the exact fields we need
+    return [
+        "first_name", "last_name", "email", "phone_number", 
+        "gender", "ethnicity", "birthday", "location", 
+        "high_school", "university", "uni_major", 
+        "job_title", "current_company", "field_of_interest", 
+        "profile_image_url", "linkedin_url"
+    ]
 
 # Initialize USER_FIELDS with the fields from the schema
 USER_FIELDS = get_user_fields_from_schema()
@@ -117,22 +93,19 @@ def process_contact_text(text: str) -> Tuple[bool, Optional[Dict[str, Any]], str
     if not text or len(text.strip()) < 5:
         return False, None, "Not enough information provided. Please provide more details."
     
-    # Create a filtered list of fields that excludes username and recent_tags
-    filtered_fields = [field for field in USER_FIELDS if field not in ['username', 'recent_tags']]
-    
     # If OpenAI is not available, use basic processing
     if not OPENAI_AVAILABLE or not OPENAI_WORKING:
         print("OpenAI API not available, using basic text processing")
-        return basic_text_processing(text, filtered_fields)
+        return basic_text_processing(text, USER_FIELDS)
     
     try:
-        # Create a system prompt that explains what we want the model to do
+        # Create a focused system prompt that explains what we want the model to do
         system_prompt = f"""
         Extract structured information from the provided text input.
         The text contains details about a person, and you need to extract specific fields to populate a user database.
         
         The database has the following fields:
-        {', '.join(filtered_fields)}
+        {', '.join(USER_FIELDS)}
         
         IMPORTANT GUIDELINES:
         1. The input might be a formal paragraph or a shorthand note with brief biographical information.
@@ -180,18 +153,23 @@ def process_contact_text(text: str) -> Tuple[bool, Optional[Dict[str, Any]], str
                 # Extract the generated JSON from the response
                 response_content = response.choices[0].message.content
             
-            extracted_data = json.loads(response_content)
+            # Safely parse JSON
+            try:
+                extracted_data = json.loads(response_content)
+            except json.JSONDecodeError as e:
+                print(f"Invalid JSON from OpenAI: {response_content}")
+                return basic_text_processing(text, USER_FIELDS)
             
             # Verify that we have at least first_name and last_name (required fields)
             if not extracted_data.get("first_name") or not extracted_data.get("last_name"):
                 return False, None, "Could not extract first and last name from the text. Please provide clearer information."
             
-            # Make sure username and recent_tags are not present
-            if "username" in extracted_data:
-                del extracted_data["username"]
-                
-            if "recent_tags" in extracted_data:
-                del extracted_data["recent_tags"]
+            # Sanitize the data to ensure all fields are present
+            for field in USER_FIELDS:
+                if field not in extracted_data:
+                    extracted_data[field] = None
+                elif extracted_data[field] == "":
+                    extracted_data[field] = None
             
             return True, extracted_data, "Successfully extracted user information."
         
@@ -199,41 +177,37 @@ def process_contact_text(text: str) -> Tuple[bool, Optional[Dict[str, Any]], str
             print(f"Error processing text with OpenAI: {str(e)}")
             
             # Fallback to basic processing if API fails
-            words = text.strip().split()
-            if len(words) < 2:
-                return False, None, "At least first and last name are required."
-            
-            # Create a basic user object with just the required fields
-            user_data = {
-                "first_name": words[0],
-                "last_name": words[1]
-            }
-            
-            # Add all other fields as None for filtered fields only
-            for field in filtered_fields:
-                if field not in user_data:
-                    user_data[field] = None
-            
-            return True, user_data, "API processing failed. Used basic extraction instead."
+            return basic_text_processing(text, USER_FIELDS)
     
     except Exception as e:
         print(f"Error processing text: {str(e)}")
         return False, None, "An error occurred while processing the text. Please try again later."
 
-def basic_text_processing(text: str, filtered_fields: List[str]) -> Tuple[bool, Dict[str, Any], str]:
-    """Basic text processing for when OpenAI is not available."""
+def basic_text_processing(text: str, fields: List[str]) -> Tuple[bool, Dict[str, Any], str]:
+    """
+    Basic text processing for when OpenAI is not available.
+    
+    Extract first and last name from text and set all other fields to None.
+    
+    Args:
+        text: Free-form text containing user information
+        fields: List of fields to include in user data
+        
+    Returns:
+        Tuple containing success flag, user data, and message
+    """
     words = text.strip().split()
     if len(words) < 2:
         return False, None, "At least first and last name are required."
     
-    # Create a basic user object with just the required fields
+    # Create a basic user object with just the first and last name
     user_data = {
         "first_name": words[0],
         "last_name": words[1] if len(words) > 1 else ""
     }
     
-    # Add all other fields as None for filtered fields only
-    for field in filtered_fields:
+    # Add all other fields as None
+    for field in fields:
         if field not in user_data:
             user_data[field] = None
     
@@ -257,62 +231,95 @@ def create_new_contact(contact_text: str, user_id: int, relationship_type: str =
     if not success or not user_data:
         return {"success": False, "message": message}
     
-    # Set default recent_tags if not provided
-    if "recent_tags" not in user_data or not user_data["recent_tags"]:
-        user_data["recent_tags"] = DEFAULT_TAGS
+    # Add username and recent_tags which are not part of USER_FIELDS
+    # Generate username from first and last name
+    first = user_data.get("first_name", "").lower().replace(" ", "")
+    last = user_data.get("last_name", "").lower().replace(" ", "")
+    user_data["username"] = f"{first}{last}"
+    
+    # Always set recent_tags to default
+    user_data["recent_tags"] = DEFAULT_TAGS
+    
+    # Ensure birthday is properly formatted
+    if user_data.get("birthday") and not isinstance(user_data["birthday"], str):
+        user_data["birthday"] = str(user_data["birthday"])
     
     try:
         # Call the API to create the user
         api_url = f"{API_BASE_URL}/people"
         print(f"Creating user at URL: {api_url}")
-        user_response = requests.post(api_url, json=user_data)
         
-        if user_response.status_code != 201:
-            error_msg = f"Failed to create user: {user_response.json().get('error', 'Unknown error')}"
+        # Make a more robust API call without timeout
+        try:
+            user_response = requests.post(api_url, json=user_data)
+            
+            if user_response.status_code != 201:
+                error_msg = f"Failed to create user: {user_response.text}"
+                print(error_msg)
+                return {"success": False, "message": error_msg}
+            
+            # Safely parse the response
+            try:
+                new_user = user_response.json()
+            except json.JSONDecodeError:
+                error_msg = "Error parsing API response"
+                print(error_msg)
+                return {"success": False, "message": error_msg}
+            
+            # Validate the response contains a user ID
+            new_user_id = new_user.get("id")
+            if not new_user_id:
+                error_msg = "User created but no ID returned in response"
+                print(error_msg)
+                return {"success": False, "message": error_msg}
+        except requests.exceptions.RequestException as e:
+            error_msg = f"API call failed: {str(e)}"
             print(error_msg)
             return {"success": False, "message": error_msg}
         
-        new_user = user_response.json()
-        new_user_id = new_user.get("id")
-        
-        # Create the connection with the note containing additional information
-        connection_data = {
-            "user_id": user_id,
-            "contact_id": new_user_id,
-            "relationship_type": relationship_type,
-            "note": contact_text,  # Store the original text as a note
-            "tags": DEFAULT_TAGS.split(',')[0]  # Use first default tag
-        }
-        
-        # Call the API to create the relationship
-        relationship_url = f"{API_BASE_URL}/connections"
-        print(f"Creating connection at URL: {relationship_url}")
-        connection_response = requests.post(relationship_url, json=connection_data)
-        
-        if connection_response.status_code != 201:
-            error_msg = f"User created but failed to establish connection: {connection_response.json().get('error', 'Unknown error')}"
-            print(error_msg)
-            return {
-                "success": True,
-                "message": error_msg,
-                "user": new_user,
-                "connection_error": True
-            }
-        
-        # Return success with the new user information
+        # Since the user was created, try to return success even if connection fails
         result = {
             "success": True,
             "message": "Contact created successfully",
             "user": new_user
         }
         
-        print(f"Created new contact: {new_user.get('first_name')} {new_user.get('last_name')}")
+        # Try to create the connection as a separate step (that might fail)
+        try:
+            # Create the connection with the note containing additional information
+            connection_data = {
+                "user_id": user_id,
+                "contact_id": new_user_id,
+                "relationship_type": relationship_type,
+                "note": contact_text,  # Store the original text as a note
+                "tags": DEFAULT_TAGS.split(',')[0]  # Use first default tag
+            }
+            
+            # Call the API to create the relationship
+            relationship_url = f"{API_BASE_URL}/connections"
+            print(f"Creating connection at URL: {relationship_url}")
+            
+            # Call without timeout
+            connection_response = requests.post(relationship_url, json=connection_data)
+            
+            if connection_response.status_code != 201:
+                result["message"] = "User created but connection failed. You can add the connection later."
+                result["connection_error"] = True
+                print(f"Connection creation failed with status {connection_response.status_code}")
+            else:
+                print(f"Created new contact: {new_user.get('first_name')} {new_user.get('last_name')}")
+        except Exception as connection_err:
+            # If connection creation fails, still return success for user creation
+            result["message"] = "User created but connection failed. You can add the connection later."
+            result["connection_error"] = True
+            print(f"Error creating connection: {str(connection_err)}")
         
         return result
         
     except Exception as e:
         error_msg = f"Error creating contact: {str(e)}"
         print(error_msg)
+        traceback.print_exc()  # Print full traceback for debugging
         return {"success": False, "message": error_msg}
 
 if __name__ == "__main__":
