@@ -9,14 +9,14 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import DATABASE_URL
 
 def insert_sample_relationships():
-    """Insert sample relationships between users in the database."""
+    """Insert sample relationships between people in the database."""
     try:
         # Connect to the database
         conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
         
         # First, query to get the user IDs by name
-        get_user_id_sql = "SELECT id, first_name, last_name FROM users;"
+        get_user_id_sql = "SELECT id, first_name, last_name FROM people;"
         cursor.execute(get_user_id_sql)
         
         user_ids = {}
@@ -25,7 +25,7 @@ def insert_sample_relationships():
             user_ids[first_name.lower()] = id
             user_full_names[f"{first_name.lower()} {last_name.lower()}"] = id
         
-        print(f"Found {len(user_ids)} users in the database")
+        print(f"Found {len(user_ids)} people in the database")
         
         # Define the relationships to add - no longer need to define both directions
         # since the add_connection function now handles bidirectional connections
@@ -234,22 +234,11 @@ def insert_sample_relationships():
         print("Cleared existing relationships")
         
         for rel in relationships:
-            # Insert in one direction
+            # Insert one-way relationships only
             cursor.execute(relationship_sql, rel)
-            
-            # Create the reverse direction data
-            reverse_rel = {
-                'user_id': rel['contact_id'],
-                'contact_id': rel['user_id'],
-                'description': rel['description'],
-                'notes': rel['notes'],
-                'tags': rel['tags'],
-                'last_viewed': None
-            }
-            cursor.execute(relationship_sql, reverse_rel)
         
         conn.commit()
-        print(f"{len(relationships) * 2} relationships added successfully (bidirectional).")
+        print(f"{len(relationships)} relationships added successfully (one-way).")
 
         cursor.close()
         conn.close()

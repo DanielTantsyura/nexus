@@ -614,15 +614,8 @@ def test_connection_operations():
     if not test_update_last_viewed(user1_id, user2_id):
         return False
     
-    # Check bidirectional connection
-    connections = test_get_connections(user2_id)
-    connection_exists = any(conn.get('id') == user1_id for conn in connections)
-    if not connection_exists:
-        log("❌ Bidirectional connection not found")
-        increment_test(False)
-    else:
-        log("✅ Bidirectional connection verified")
-        increment_test(True)
+    # We now only create one-way relationships (user_id -> contact_id)
+    # No need to check for relationships in the other direction
     
     # Remove connection
     if not test_remove_connection(user1_id, user2_id):

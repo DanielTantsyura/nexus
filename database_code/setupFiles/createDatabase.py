@@ -57,7 +57,7 @@ CREATE TABLE logins (
     id SERIAL PRIMARY KEY,
     
     -- User relationship
-    user_id INT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+    people_id INT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
     
     -- Authentication information
     username VARCHAR(50) NOT NULL UNIQUE,

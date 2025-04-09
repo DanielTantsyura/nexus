@@ -191,10 +191,10 @@ The system leverages OpenAI's API to extract structured data from natural langua
    |----------|--------|-------------|
    | `/people` | GET | List all people |
    | `/people` | POST | Create a new user |
-   | `/people/<int:user_id>` | GET | Get user by ID |
-   | `/people/<int:user_id>` | PUT | Update a user |
+   | `/people/<int:id>` | GET | Get user by ID |
+   | `/people/<int:id>` | PUT | Update a user |
    | `/people/search` | GET | Search for people |
-   | `/people/<int:user_id>/connections` | GET | Get user connections |
+   | `/people/<int:id>/connections` | GET | Get user connections |
    | `/connections` | POST | Create a new connection |
    | `/connections/update` | PUT | Update a connection |
    | `/contacts/create` | POST | Create a contact from text |

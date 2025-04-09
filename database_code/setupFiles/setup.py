@@ -14,9 +14,9 @@ willing to lose all existing data.
 """
 
 # Update imports to use the correct paths
-from setupFiles.createDatabase import create_database
-from setupFiles.insertSampleUsers import insert_sample_users
-from setupFiles.insertSampleRelationships import insert_sample_relationships
+from createDatabase import create_database
+from insertSampleUsers import insert_sample_users
+from insertSampleRelationships import insert_sample_relationships
 import sys
 import time
 import os

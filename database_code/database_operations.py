@@ -433,15 +433,14 @@ class DatabaseManager:
                        notes: str = None, tags: str = None) -> bool:
         """
         Add a new connection between two users.
-        relationship_description is bidirectional (shared in both directions)
-        notes, tags, and last_viewed are unidirectional (specific to each direction)
+        One-directional: only from user_id to contact_id
         
         Args:
             user_id: ID of the first user
             contact_id: ID of the second user
             relationship_description: Type of the relationship
-            notes: Optional detailed note about the connection (one-way)
-            tags: Optional comma-separated tags for the connection (one-way)
+            notes: Optional detailed note about the connection
+            tags: Optional comma-separated tags for the connection
             
         Returns:
             True if successful, False otherwise
@@ -452,11 +451,8 @@ class DatabaseManager:
         """
         
         try:
-            # First direction: user_id -> contact_id (with full data)
+            # Create the one-way relationship: user_id -> contact_id
             self.cursor.execute(query, (user_id, contact_id, relationship_description, notes, tags))
-            
-            # Second direction: contact_id -> user_id (with shared relationship_description only)
-            self.cursor.execute(query, (contact_id, user_id, relationship_description, None, None))
             
             self.connection.commit()
             return True
@@ -467,7 +463,7 @@ class DatabaseManager:
     
     def remove_connection(self, user_id: int, contact_id: int) -> bool:
         """
-        Remove a connection between two users in both directions.
+        Remove a connection between two users (one-way only).
         
         Args:
             user_id: ID of the first user
@@ -478,12 +474,12 @@ class DatabaseManager:
         """
         query = """
         DELETE FROM relationships
-        WHERE (user_id = %s AND contact_id = %s) OR (user_id = %s AND contact_id = %s);
+        WHERE user_id = %s AND contact_id = %s;
         """
         
         try:
-            # Remove connections in both directions
-            self.cursor.execute(query, (user_id, contact_id, contact_id, user_id))
+            # Remove the one-way connection
+            self.cursor.execute(query, (user_id, contact_id))
             self.connection.commit()
             return True
         except Exception as e:
@@ -495,7 +491,6 @@ class DatabaseManager:
         """
         Update a connection with notes, tags, or other metadata.
         Only updates the one-way relationship (from user_id to contact_id).
-        If relationship_description is updated, it updates both directions.
         
         Args:
             user_id: ID of the user
@@ -506,47 +501,37 @@ class DatabaseManager:
             True if successful, False otherwise
         """
         # Build the SET clause dynamically based on provided fields
-        one_way_fields = []
-        one_way_params = []
+        set_fields = []
+        params = []
         
-        # Handle one-way fields (notes, tags)
+        # Handle all updateable fields
         for key, value in data.items():
-            if key in ['notes', 'tags']:
-                one_way_fields.append(f"{key} = %s")
-                one_way_params.append(value)
+            if key in ['notes', 'tags', 'relationship_description']:
+                set_fields.append(f"{key} = %s")
+                params.append(value)
         
         # Always update the last_viewed timestamp
-        one_way_fields.append("last_viewed = NOW()")
+        set_fields.append("last_viewed = NOW()")
         
-        # Create the one-way update query
-        one_way_query = None
-        if one_way_fields:
-            one_way_params.extend([user_id, contact_id])
-            one_way_query = f"""
+        # Create the update query
+        if not set_fields:
+            # If only updating timestamp
+            query = """
             UPDATE relationships
-            SET {', '.join(one_way_fields)}
+            SET last_viewed = NOW()
+            WHERE user_id = %s AND contact_id = %s;
+            """
+            params = [user_id, contact_id]
+        else:
+            params.extend([user_id, contact_id])
+            query = f"""
+            UPDATE relationships
+            SET {', '.join(set_fields)}
             WHERE user_id = %s AND contact_id = %s;
             """
         
-        # Check if relationship_description needs to be updated (two-way)
-        two_way_query = None
-        if 'relationship_description' in data:
-            two_way_query = """
-            UPDATE relationships
-            SET relationship_description = %s
-            WHERE (user_id = %s AND contact_id = %s) OR (user_id = %s AND contact_id = %s);
-            """
-        
         try:
-            # Execute one-way update if needed
-            if one_way_query:
-                self.cursor.execute(one_way_query, one_way_params)
-            
-            # Execute two-way update if needed
-            if two_way_query:
-                self.cursor.execute(two_way_query, 
-                    (data['relationship_description'], user_id, contact_id, contact_id, user_id))
-            
+            self.cursor.execute(query, params)
             self.connection.commit()
             return True
         except Exception as e:
@@ -681,7 +666,7 @@ class DatabaseManager:
             True if successful, False otherwise
         """
         query = """
-        INSERT INTO logins (people_id, username, passkey, last_login)
+        INSERT INTO logins (user_id, username, passkey, last_login)
         VALUES (%s, %s, %s, NOW())
         """
         
@@ -706,7 +691,7 @@ class DatabaseManager:
             User ID if login successful, None otherwise
         """
         query = """
-        SELECT people_id
+        SELECT user_id
         FROM logins
         WHERE username = %s AND passkey = %s
         """
@@ -756,20 +741,20 @@ class DatabaseManager:
                 last_name = user['last_name']
                 
                 # Check if login exists
-                self.cursor.execute("SELECT id FROM logins WHERE people_id = %s;", (user_id,))
+                self.cursor.execute("SELECT id FROM logins WHERE user_id = %s;", (user_id,))
                 login = self.cursor.fetchone()
                 
                 if login:
                     # Update existing login
                     self.cursor.execute(
-                        "UPDATE logins SET passkey = %s WHERE people_id = %s;", 
+                        "UPDATE logins SET passkey = %s WHERE user_id = %s;", 
                         (new_password, user_id)
                     )
                     print(f"Updated password for {first_name} {last_name} (ID: {user_id})")
                 else:
                     # Create new login
                     self.cursor.execute(
-                        "INSERT INTO logins (people_id, username, passkey) VALUES (%s, %s, %s);",
+                        "INSERT INTO logins (user_id, username, passkey) VALUES (%s, %s, %s);",
                         (user_id, username, new_password)
                     )
                     print(f"Created login for {first_name} {last_name} (ID: {user_id})")
