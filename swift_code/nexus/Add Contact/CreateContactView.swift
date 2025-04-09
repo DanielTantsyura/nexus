@@ -35,6 +35,34 @@ struct CreateContactView: View {
     /// Environment access to keyboard dismiss mode
     @Environment(\.keyboardDismissMode) private var keyboardDismissMode
    
+    /// Sorted tags based on frequency of use
+    private var sortedTags: [String] {
+        // Get all connections for the current user
+        let connections = coordinator.networkManager.connections
+        
+        // Count occurrences of each tag
+        var tagCounts: [String: Int] = [:]
+        
+        // Initialize counts for all recent tags to ensure they all appear
+        for tag in coordinator.networkManager.recentTags {
+            tagCounts[tag] = 0
+        }
+        
+        // Count occurrences in connections
+        for connection in connections {
+            if let tags = connection.tags {
+                for tag in tags {
+                    tagCounts[tag, default: 0] += 1
+                }
+            }
+        }
+        
+        // Sort tags by count (descending)
+        return coordinator.networkManager.recentTags.sorted { tag1, tag2 in
+            return tagCounts[tag1, default: 0] > tagCounts[tag2, default: 0]
+        }
+    }
+   
     // MARK: - View Body
    
     var body: some View {
@@ -262,7 +290,7 @@ struct CreateContactView: View {
                             ],
                             spacing: 8
                         ) {
-                            ForEach(coordinator.networkManager.recentTags, id: \.self) { tag in
+                            ForEach(sortedTags, id: \.self) { tag in
                                 Button(action: {
                                     addTag(tag)
                                     hideKeyboard()
