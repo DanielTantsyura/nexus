@@ -646,8 +646,9 @@ struct ContactView: View {
         let currentRelationship = relationship
         
         // Update the contact through coordinator
-        coordinator.networkManager.updateUser(userId: user.id, userData: userData) { success in
-            if success {
+        coordinator.networkManager.updateUser(userId: user.id, userData: userData) { result in
+            switch result {
+            case .success(true):
                 // Fetch the updated user and update our @State variable
                 self.coordinator.networkManager.fetchUser(withId: self.user.id) { result in
                     DispatchQueue.main.async {
@@ -666,8 +667,8 @@ struct ContactView: View {
                                 description: relationship.relationshipDescription,
                                 notes: self.editNotes,
                                 tags: relationship.tags
-                            ) { success in
-                                if success {
+                            ) { result in
+                                if case .success(true) = result {
                                     // Refresh data after updating
                                     self.coordinator.networkManager.fetchConnections(forUserId: self.coordinator.networkManager.userId ?? 0)
                                     
@@ -689,7 +690,7 @@ struct ContactView: View {
                         }
                     }
                 }
-            } else {
+            case .success(false), .failure:
                 // Reset editing state if the update failed
                 self.isEditing = false
             }
@@ -703,13 +704,16 @@ struct ContactView: View {
     
     /// Delete the contact
     private func deleteContact() {
-        coordinator.networkManager.deleteContact(contactId: user.id) { success in
-            if success {
+        coordinator.networkManager.deleteContact(contactId: user.id) { result in
+            switch result {
+            case .success(true):
                 // Navigate back
                 coordinator.navigateBack()
-            } else {
+            case .failure:
                 // Handle error - could show an alert here
                 print("Failed to delete contact")
+            default:
+                break
             }
         }
     }

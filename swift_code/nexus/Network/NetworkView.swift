@@ -682,14 +682,17 @@ struct NetworkView: View {
     
     /// Delete a connection
     private func deleteConnection(_ connection: Connection) {
-        coordinator.networkManager.deleteContact(contactId: connection.id) { success in
-            if success {
+        coordinator.networkManager.deleteContact(contactId: connection.id) { result in
+            switch result {
+            case .success(true):
                 // The connection list will be updated automatically by the NetworkManager
                 // We can add additional feedback if desired
                 print("Successfully deleted connection to \(connection.user.fullName)")
-            } else {
+            case .failure:
                 // Handle error - could show an alert here
                 print("Failed to delete connection to \(connection.user.fullName)")
+            default:
+                break
             }
         }
     }

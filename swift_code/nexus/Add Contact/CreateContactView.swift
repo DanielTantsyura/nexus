@@ -167,16 +167,27 @@ struct CreateContactView: View {
     /// Multi-line text entry area for contact information
     private var contactTextArea: some View {
         SectionCard(title: "") {
-            TextEditor(text: $contactText)
-                .frame(minHeight: 150)
-                .padding(4)
-                .background(Color(UIColor.secondarySystemBackground))
-                .cornerRadius(8)
-                .focused($contactTextFieldFocused)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
-                )
+            ZStack(alignment: .topLeading) {
+                TextEditor(text: $contactText)
+                    .frame(minHeight: 150)
+                    .padding(4)
+                    .background(Color(UIColor.secondarySystemBackground))
+                    .cornerRadius(8)
+                    .focused($contactTextFieldFocused)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+                    )
+                
+                if contactText.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("First Name Last Name 123-456-7890 SpaceX Product Manager Hiking Pickleball Met at John's 24th Birthday Lives in Austin TX")
+                            .foregroundColor(.gray)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 8)
+                    }
+                }
+            }
         }
     }
    

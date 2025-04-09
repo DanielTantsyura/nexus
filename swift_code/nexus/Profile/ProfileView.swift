@@ -488,8 +488,9 @@ struct ProfileView: View {
         userData["current_company"] = editCompany
         
         // Update the user through coordinator
-        coordinator.networkManager.updateUser(userId: user.id, userData: userData) { success in
-            if success {
+        coordinator.networkManager.updateUser(userId: user.id, userData: userData) { result in
+            switch result {
+            case .success:
                 // Refresh user data once only
                 self.coordinator.networkManager.fetchCurrentUser()
                 
@@ -498,7 +499,7 @@ struct ProfileView: View {
                 
                 // Force a single UI refresh after saving
                 self.refreshTrigger.toggle()
-            } else {
+            case .failure:
                 self.isEditing = false
             }
         }

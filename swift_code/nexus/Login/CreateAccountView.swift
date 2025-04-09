@@ -194,15 +194,15 @@ struct CreateAccountView: View {
         isUsernameValid = nil
         
         networkManager.checkUsernameAvailability(username) { result in
-            isCheckingUsername = false
+            self.isCheckingUsername = false
             
             switch result {
             case .success(let isAvailable):
-                isUsernameValid = isAvailable
+                self.isUsernameValid = isAvailable
             case .failure:
                 // If check fails, assume it's not available to be safe
-                isUsernameValid = false
-                errorMessage = "Could not verify username. Please try again."
+                self.isUsernameValid = false
+                self.errorMessage = "Could not verify username. Please try again."
             }
         }
     }
