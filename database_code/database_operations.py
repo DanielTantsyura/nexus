@@ -696,7 +696,7 @@ class DatabaseManager:
             True if successful, False otherwise
         """
         query = """
-        INSERT INTO logins (people_id, username, passkey, last_login)
+        INSERT INTO logins (user_id, username, passkey, last_login)
         VALUES (%s, %s, %s, NOW())
         """
         
@@ -721,7 +721,7 @@ class DatabaseManager:
             User ID if login successful, None otherwise
         """
         query = """
-        SELECT people_id
+        SELECT user_id
         FROM logins
         WHERE username = %s AND passkey = %s
         """
@@ -741,9 +741,7 @@ class DatabaseManager:
                 self.cursor.execute(update_last_login_query, (username, passkey))
                 self.connection.commit()
                 
-                # Return the people_id
-                return result['people_id'] if result else None
-            return None
+            return result['people_id'] if result else None
         except Exception as e:
             print(f"Error validating login: {e}")
             return None

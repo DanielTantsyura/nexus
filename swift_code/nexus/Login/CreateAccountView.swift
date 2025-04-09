@@ -265,35 +265,23 @@ struct CreateAccountView: View {
                         // Set flag to indicate this is a new account that needs profile setup
                         coordinator.isNewAccountCreation = true
                         
-                        // Dismiss this view and navigate to the main app
-                        presentationMode.wrappedValue.dismiss()
-                        // Coordinator will handle navigation to the main app
+                        // Ensure user data is fetched before dismissing
+                        coordinator.networkManager.fetchCurrentUser()
+                        
+                        // Force a navigation to the profile screen to ensure proper view loading
+                        DispatchQueue.main.async {
+                            coordinator.selectedTab = .profile
+                            coordinator.activeScreen = .profile
+                            
+                            // Schedule a refresh signal to trigger edit mode in ProfileView
+                            coordinator.networkManager.scheduleRefreshSignal(type: .currentUser, delay: 0.5)
+                            
+                            // Dismiss this view and navigate to the main app
+                            presentationMode.wrappedValue.dismiss()
+                        }
                         
                     case .failure(let error):
-                        // If login fails for a new account, try to explicitly create the login entry first
-                        // This handles cases where the createLogin call in createUser fails
-                        networkManager.createLoginEntry(userId: userId, password: password) { createLoginResult in
-                            switch createLoginResult {
-                            case .success:
-                                // Now try logging in again
-                                networkManager.login(username: username, password: password) { retryLoginResult in
-                                    switch retryLoginResult {
-                                    case .success:
-                                        // Set flag to indicate this is a new account that needs profile setup
-                                        coordinator.isNewAccountCreation = true
-                                        
-                                        // Dismiss this view and navigate to the main app
-                                        presentationMode.wrappedValue.dismiss()
-                                        
-                                    case .failure(let retryError):
-                                        // If login still fails, show the error
-                                        errorMessage = "Account created but login still failed: \(retryError.localizedDescription)"
-                                    }
-                                }
-                            case .failure(let createLoginError):
-                                errorMessage = "Account created but login setup failed: \(createLoginError.localizedDescription)"
-                            }
-                        }
+                        errorMessage = "Account created but login failed: \(error.localizedDescription)"
                     }
                 }
                 

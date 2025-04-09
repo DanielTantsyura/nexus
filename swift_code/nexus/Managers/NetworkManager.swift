@@ -246,15 +246,4 @@ class NetworkManager: ObservableObject {
         // Schedule a delayed refresh signal
         scheduleRefreshSignal(type: .profile, delay: 0.5)
     }
-    
-    // MARK: - Authentication
-    
-    /// Create a login entry for a user
-    /// - Parameters:
-    ///   - userId: The ID of the user to create a login for
-    ///   - password: The password for the login
-    ///   - completion: Closure called with the result of the login creation
-    func createLoginEntry(userId: Int, password: String, completion: @escaping (Result<String, Error>) -> Void) {
-        authManager.createLogin(userId: userId, password: password, completion: completion)
-    }
 } 
