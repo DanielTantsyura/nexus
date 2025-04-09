@@ -440,7 +440,7 @@ struct ProfileView: View {
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text("LinkedIn")
-                            .font(.subheadline)
+                            .font(.caption)
                             .foregroundColor(.gray)
                         
                         TextField("LinkedIn URL", text: $editLinkedinUrl)

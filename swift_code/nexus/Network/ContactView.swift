@@ -36,6 +36,11 @@ struct ContactView: View {
     @State private var editLinkedinUrl = ""
     @State private var editBirthday = ""
     
+    // Tag management
+    @State private var editTags: [String] = []
+    @State private var newTagText = ""
+    @FocusState private var tagTextFieldFocused: Bool
+    
     // Add state for confirmation dialog
     @State private var showDeleteConfirmation = false
     
@@ -67,6 +72,7 @@ struct ContactView: View {
         .id("contact-view-\(refreshTrigger)") // Force entire view to refresh when data changes
         .navigationTitle(user.fullName)
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(isEditing) // Hide back button in edit mode
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 if isEditing {
@@ -76,6 +82,16 @@ struct ContactView: View {
                 } else {
                     Button(action: { startEditing() }) {
                         Image(systemName: "square.and.pencil")
+                    }
+                }
+            }
+            
+            // Add cancel button in edit mode
+            ToolbarItem(placement: .navigationBarLeading) {
+                if isEditing {
+                    Button(action: { cancelEditing() }) {
+                        Image(systemName: "xmark")
+                            .foregroundColor(.red)
                     }
                 }
             }
@@ -111,7 +127,7 @@ struct ContactView: View {
                 userHeaderView
                 
                 // Tags displayed directly under header
-                if let relationship = relationship, let tags = relationship.tags, !tags.isEmpty {
+                if !isEditing, let relationship = relationship, let tags = relationship.tags, !tags.isEmpty {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
                             ForEach(tags, id: \.self) { tag in
@@ -127,6 +143,9 @@ struct ContactView: View {
                         .padding(.vertical, 8)
                     }
                     .padding(.top, 4)
+                } else if isEditing {
+                    // Tag management in edit mode
+                    tagManagementSection
                 }
             }
         }
@@ -531,56 +550,26 @@ struct ContactView: View {
                         }
                     }
                     
-                    // Edit buttons
-                    HStack(spacing: 12) {
-                        Button(action: {
-                            saveChanges()
-                        }) {
-                            HStack {
-                                Image(systemName: "checkmark")
-                                    .imageScale(.small)
-                                Text("Save")
-                                    .font(.subheadline)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 6)
-                        }
-                        .buttonStyle(PrimaryButtonStyle(backgroundColor: .green))
-                        .scaleEffect(0.9)
-                        
-                        Button(action: {
-                            cancelEditing()
-                        }) {
-                            HStack {
-                                Image(systemName: "xmark")
-                                    .imageScale(.small)
-                                Text("Cancel")
-                                    .font(.subheadline)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 6)
-                        }
-                        .buttonStyle(PrimaryButtonStyle(backgroundColor: .red))
-                        .scaleEffect(0.9)
-                    }
-                    .padding(.top, 10)
-                    
                     // Delete contact button
                     Button(action: {
                         showDeleteConfirmation = true
                     }) {
                         HStack {
                             Image(systemName: "trash")
-                                .imageScale(.small)
+                                .foregroundColor(.red)
                             Text("Delete Contact")
                                 .font(.subheadline)
+                                .foregroundColor(.red)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 16)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(Color.red.opacity(0.6), lineWidth: 1)
+                        )
+                        .padding(.top, 24)
                     }
-                    .buttonStyle(PrimaryButtonStyle(backgroundColor: .red))
-                    .scaleEffect(0.9)
-                    .padding(.top, 8)
+                    .frame(maxWidth: .infinity, alignment: .center)
                 } else {
                     // Birthday field at the top
                     if let birthday = user.birthday {
@@ -684,6 +673,7 @@ struct ContactView: View {
         editNotes = relationship?.notes ?? ""
         editLinkedinUrl = user.linkedinUrl ?? ""
         editBirthday = user.birthday ?? ""
+        editTags = relationship?.tags ?? []
         
         isEditing = true
     }
@@ -727,13 +717,13 @@ struct ContactView: View {
                         // Reset editing state
                         self.isEditing = false
                         
-                        // Update the relationship with the new notes if we have a relationship
+                        // Update the relationship with the new notes and tags if we have a relationship
                         if let relationship = currentRelationship {
                             self.coordinator.networkManager.updateConnection(
                                 contactId: self.user.id,
                                 description: relationship.relationshipDescription,
                                 notes: self.editNotes,
-                                tags: relationship.tags
+                                tags: self.editTags
                             ) { result in
                                 if case .success(true) = result {
                                     // Refresh data after updating
@@ -791,5 +781,143 @@ struct ContactView: View {
         let colors: [Color] = [.blue, .green, .orange, .purple, .pink, .red]
         let hash = abs(tag.hashValue)
         return colors[hash % colors.count]
+    }
+    
+    // MARK: - Tag Management
+    
+    /// Tag management UI section
+    private var tagManagementSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Tags")
+                .font(.headline)
+                .padding(.vertical, 4)
+            
+            // Display currently selected tags with delete option
+            if !editTags.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(editTags, id: \.self) { tag in
+                            HStack(spacing: 4) {
+                                Text(tag)
+                                    .font(.system(size: 12))
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                
+                                Button(action: {
+                                    removeTag(tag)
+                                }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(tagColor(for: tag))
+                                }
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(tagColor(for: tag).opacity(0.3))
+                            .foregroundColor(tagColor(for: tag))
+                            .cornerRadius(14)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(tagColor(for: tag).opacity(0.5), lineWidth: 1)
+                            )
+                        }
+                    }
+                    .padding(.vertical, 8)
+                }
+            }
+            
+            // Recent tags from NetworkManager
+            if !coordinator.networkManager.recentTags.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Recent Tags")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(coordinator.networkManager.recentTags, id: \.self) { tag in
+                                Button(action: {
+                                    toggleTag(tag)
+                                }) {
+                                    Text(tag)
+                                        .font(.system(size: 11))
+                                        .lineLimit(1)
+                                        .truncationMode(.tail)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 5)
+                                        .background(editTags.contains(tag) 
+                                            ? tagColor(for: tag).opacity(0.3)
+                                            : tagColor(for: tag).opacity(0.1))
+                                        .foregroundColor(editTags.contains(tag)
+                                            ? tagColor(for: tag)
+                                            : tagColor(for: tag).opacity(0.8))
+                                        .cornerRadius(14)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 14)
+                                                .stroke(tagColor(for: tag).opacity(editTags.contains(tag) ? 0.5 : 0.2), lineWidth: 1)
+                                        )
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Add new tag
+            HStack {
+                TextField("Add custom tag...", text: $newTagText)
+                    .focused($tagTextFieldFocused)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color(UIColor.secondarySystemBackground))
+                    .cornerRadius(8)
+                    .onSubmit {
+                        addCustomTag()
+                    }
+                
+                Button(action: {
+                    addCustomTag()
+                }) {
+                    Text("Add")
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(newTagText.isEmpty ? Color.secondary : Color.blue)
+                        .cornerRadius(8)
+                }
+                .disabled(newTagText.isEmpty)
+            }
+            .padding(.top, 8)
+        }
+        .padding(.top, 4)
+    }
+    
+    /// Removes a tag from the selected tags array
+    private func removeTag(_ tag: String) {
+        editTags.removeAll { $0 == tag }
+    }
+    
+    /// Toggles a tag in the selected tags array
+    private func toggleTag(_ tag: String) {
+        if editTags.contains(tag) {
+            removeTag(tag)
+        } else {
+            editTags.append(tag)
+        }
+    }
+    
+    /// Adds a custom tag based on the newTagText value
+    private func addCustomTag() {
+        let trimmedText = newTagText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedText.isEmpty else { return }
+        
+        if !editTags.contains(trimmedText) {
+            editTags.append(trimmedText)
+        }
+        
+        newTagText = ""
+        tagTextFieldFocused = false
     }
 }
