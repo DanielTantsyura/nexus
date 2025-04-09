@@ -709,6 +709,7 @@ struct ContactView: View {
             case .success(true):
                 // Navigate back
                 coordinator.navigateBack()
+                self.coordinator.networkManager.signalRefresh(type: .connections)
             case .failure:
                 // Handle error - could show an alert here
                 print("Failed to delete contact")
