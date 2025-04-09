@@ -696,7 +696,7 @@ class DatabaseManager:
             True if successful, False otherwise
         """
         query = """
-        INSERT INTO logins (user_id, username, passkey, last_login)
+        INSERT INTO logins (people_id, username, passkey, last_login)
         VALUES (%s, %s, %s, NOW())
         """
         
@@ -721,7 +721,7 @@ class DatabaseManager:
             User ID if login successful, None otherwise
         """
         query = """
-        SELECT user_id
+        SELECT people_id
         FROM logins
         WHERE username = %s AND passkey = %s
         """
@@ -784,13 +784,13 @@ class DatabaseManager:
                 else:
                     # Create new login
                     self.cursor.execute(
-                        "INSERT INTO logins (user_id, username, passkey) VALUES (%s, %s, %s);",
+                        "INSERT INTO logins (people_id, username, passkey) VALUES (%s, %s, %s);",
                         (user_id, username, new_password)
                     )
                     print(f"Created login for {first_name} {last_name} (ID: {user_id})")
                 
                 password_updates += 1
-            
+             
             self.connection.commit()
             print(f"Updated {password_updates} user passwords to '{new_password}'")
             

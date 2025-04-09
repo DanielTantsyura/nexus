@@ -79,54 +79,48 @@ struct ProfileView: View {
             logoutAlert
         }
         .onAppear {
-            // Refresh current user data when view appears, but only if needed
             coordinator.activeScreen = .profile
-            
-            // Force an immediate refresh if data is already loaded
-            if coordinator.networkManager.currentUser != nil {
-                // Data is already loaded, force refresh UI
+
+            // 1) If new account creation was flagged, capture it immediately
+            if coordinator.isNewAccountCreation {
+                isNewAccount = true
+                coordinator.isNewAccountCreation = false
+            }
+
+            // 2) Now see if currentUser is already loaded
+            if let currentUser = coordinator.networkManager.currentUser {
+                // Force UI refresh
                 refreshTrigger.toggle()
                 
-                // Check if this is a new account that needs to complete profile setup
-                if coordinator.isNewAccountCreation {
-                    isNewAccount = true
-                    coordinator.isNewAccountCreation = false  // Reset the flag
-                    
-                    // Start editing mode automatically when user data is loaded
-                    if let user = coordinator.networkManager.currentUser {
-                        startEditing(user)
-                    }
+                // If we know it’s a brand-new account, start editing right away
+                if isNewAccount {
+                    startEditing(currentUser)
                 }
-            } else if !coordinator.networkManager.isLoading {
-                // Need to load data
+            } 
+            // 3) If still nil, attempt loading, but isNewAccount remains true
+            else if !coordinator.networkManager.isLoading {
                 loadUserData()
             }
-            
-            // Listen for refresh signals from the NetworkManager
+
+            // 4) Listen for refresh signals
             refreshCancellable = coordinator.networkManager.$refreshSignal
                 .receive(on: DispatchQueue.main)
                 .sink { _ in
-                    // Check which type of refresh occurred
                     let refreshType = coordinator.networkManager.lastRefreshType
                     
-                    // Only refresh UI if it's a profile or current user refresh
                     if refreshType == .profile || refreshType == .currentUser {
-                        // Force UI refresh
                         refreshTrigger.toggle()
-                        
-                        // Cancel any ongoing retry timer
                         invalidateRetryTimer()
                         
-                        // If this is a new account and user data has loaded, start editing mode
+                        // If new account & user has since loaded, start editing
                         if isNewAccount, let user = coordinator.networkManager.currentUser {
                             startEditing(user)
-                            isNewAccount = false  // Reset after starting edit mode
+                            isNewAccount = false
                         }
                     }
                 }
-            
-            // Also directly observe the currentUser property for immediate updates
-            // This ensures UI updates even without explicit refresh signals
+
+            // Also watch currentUser directly, etc.
             coordinator.networkManager.$currentUser
                 .receive(on: DispatchQueue.main)
                 .sink { _ in
