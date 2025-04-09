@@ -72,6 +72,9 @@ final class AppCoordinator: ObservableObject {
     /// Track if initial loading has completed
     @Published var initialLoadComplete = false
     
+    /// Flag to indicate if the user just created a new account and should enter edit mode
+    @Published var isNewAccountCreation = false
+    
     // MARK: - Private Properties
     
     /// Timer to retry loading data if needed

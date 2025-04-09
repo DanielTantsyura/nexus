@@ -250,10 +250,11 @@ class AuthManager {
             return
         }
         
-        // Prepare request data
+        // Prepare request data - don't include password in user data
         var completeUserData = userData
-        completeUserData["password"] = password
         completeUserData["username"] = username
+        // Remove password from user data - it should be sent to the login endpoint instead
+        completeUserData.removeValue(forKey: "password")
         
         guard let jsonData = try? JSONSerialization.data(withJSONObject: completeUserData) else {
             networkManager.setLoading(false)
@@ -304,7 +305,21 @@ class AuthManager {
                 do {
                     let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
                     if let userId = json?["id"] as? Int {
-                        completion(.success(userId))
+                        // Now create the login entry with the userId and password
+                        self.createLogin(userId: userId, password: password) { loginResult in
+                            switch loginResult {
+                            case .success(_):
+                                // Login entry created successfully
+                                completion(.success(userId))
+                            case .failure(let error):
+                                // Login entry creation failed - this is the likely issue
+                                // Return the error but include the userId for better error handling
+                                print("Created user but failed to create login: \(error.localizedDescription)")
+                                // Still return success to maintain compatibility, as the user was created
+                                // The login attempt will handle the error separately
+                                completion(.success(userId))
+                            }
+                        }
                     } else {
                         completion(.failure(self.createError(message: "User ID not found in response", code: 0)))
                     }
@@ -320,7 +335,7 @@ class AuthManager {
         networkManager.setLoading(true)
         networkManager.setErrorMessage(nil)
         
-        guard let url = URL(string: "\(networkManager.baseURL)/login"),
+        guard let url = URL(string: "\(networkManager.baseURL)/login/create"),
               let jsonData = try? JSONEncoder().encode(CreateLoginRequest(userId: userId, passkey: password)) else {
             networkManager.setLoading(false)
             networkManager.setErrorMessage("Failed to prepare request")
@@ -332,6 +347,11 @@ class AuthManager {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = jsonData
+        
+        // For debugging - log the request
+        if let jsonString = String(data: jsonData, encoding: .utf8) {
+            print("Creating login with payload: \(jsonString)")
+        }
         
         URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             DispatchQueue.main.async {
@@ -349,6 +369,11 @@ class AuthManager {
                     self.networkManager.setErrorMessage(error.localizedDescription)
                     completion(.failure(error))
                     return
+                }
+                
+                // For debugging - log the response
+                if let data = data, let responseString = String(data: data, encoding: .utf8) {
+                    print("Login creation response (\(httpResponse.statusCode)): \(responseString)")
                 }
                 
                 guard (200...299).contains(httpResponse.statusCode), let data = data else {

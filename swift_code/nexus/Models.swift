@@ -351,7 +351,7 @@ struct CreateLoginRequest: Codable {
     let passkey: String
     
     enum CodingKeys: String, CodingKey {
-        case userId = "user_id"
+        case userId = "people_id"
         case passkey
     }
 }

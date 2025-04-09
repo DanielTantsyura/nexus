@@ -262,12 +262,38 @@ struct CreateAccountView: View {
                 networkManager.login(username: username, password: password) { loginResult in
                     switch loginResult {
                     case .success:
+                        // Set flag to indicate this is a new account that needs profile setup
+                        coordinator.isNewAccountCreation = true
+                        
                         // Dismiss this view and navigate to the main app
                         presentationMode.wrappedValue.dismiss()
                         // Coordinator will handle navigation to the main app
                         
                     case .failure(let error):
-                        errorMessage = "Account created but login failed: \(error.localizedDescription)"
+                        // If login fails for a new account, try to explicitly create the login entry first
+                        // This handles cases where the createLogin call in createUser fails
+                        networkManager.createLoginEntry(userId: userId, password: password) { createLoginResult in
+                            switch createLoginResult {
+                            case .success:
+                                // Now try logging in again
+                                networkManager.login(username: username, password: password) { retryLoginResult in
+                                    switch retryLoginResult {
+                                    case .success:
+                                        // Set flag to indicate this is a new account that needs profile setup
+                                        coordinator.isNewAccountCreation = true
+                                        
+                                        // Dismiss this view and navigate to the main app
+                                        presentationMode.wrappedValue.dismiss()
+                                        
+                                    case .failure(let retryError):
+                                        // If login still fails, show the error
+                                        errorMessage = "Account created but login still failed: \(retryError.localizedDescription)"
+                                    }
+                                }
+                            case .failure(let createLoginError):
+                                errorMessage = "Account created but login setup failed: \(createLoginError.localizedDescription)"
+                            }
+                        }
                     }
                 }
                 

@@ -19,6 +19,9 @@ struct ProfileView: View {
     /// State to track whether the view is in edit mode
     @State private var isEditing = false
     
+    /// State to track if user just created a new account and needs to complete profile
+    @State private var isNewAccount = false
+    
     /// Toggle to force UI refresh
     @State private var refreshTrigger = false
     
@@ -83,6 +86,17 @@ struct ProfileView: View {
             if coordinator.networkManager.currentUser != nil {
                 // Data is already loaded, force refresh UI
                 refreshTrigger.toggle()
+                
+                // Check if this is a new account that needs to complete profile setup
+                if coordinator.isNewAccountCreation {
+                    isNewAccount = true
+                    coordinator.isNewAccountCreation = false  // Reset the flag
+                    
+                    // Start editing mode automatically when user data is loaded
+                    if let user = coordinator.networkManager.currentUser {
+                        startEditing(user)
+                    }
+                }
             } else if !coordinator.networkManager.isLoading {
                 // Need to load data
                 loadUserData()
@@ -102,6 +116,12 @@ struct ProfileView: View {
                         
                         // Cancel any ongoing retry timer
                         invalidateRetryTimer()
+                        
+                        // If this is a new account and user data has loaded, start editing mode
+                        if isNewAccount, let user = coordinator.networkManager.currentUser {
+                            startEditing(user)
+                            isNewAccount = false  // Reset after starting edit mode
+                        }
                     }
                 }
             
