@@ -7,7 +7,12 @@ A personal network management application built with SwiftUI that connects to th
 The Nexus iOS client follows a structured architecture with these key components:
 
 - **Central Coordinator**: `AppCoordinator.swift` manages application state and navigation flow
-- **Network Layer**: `NetworkManager.swift` handles all API communication
+- **Manager System**: A collection of dedicated manager classes that handle different aspects of the application:
+  - `NetworkManager`: Central hub for state and API interactions
+  - `AuthManager`: Handles authentication and session management
+  - `ConnectionsManager`: Manages user connections and relationships
+  - `ContactsManager`: Manages user profile data
+  - `TagsManager`: Handles tag-related operations
 - **Data Models**: `Models.swift` defines the core data structures used throughout the app
 - **Tab-Based Navigation**: `MainTabView.swift` organizes the app into Network and Profile sections
 
@@ -18,24 +23,65 @@ The Nexus iOS client follows a structured architecture with these key components
 - **Relationship Tracking**: Connect with users and maintain relationship details
 - **Natural Language Contact Creation**: Add contacts by describing them in free-form text
 - **Profile Management**: Edit and view comprehensive profile information
+- **Standardized Error Handling**: Consistent Result type-based error handling throughout
 
-## Primary View Controllers
+## Primary View Folders
 
-- **MainTabView**: Tab-based navigation controller with custom styling
-- **UserListView**: Browse and search through available contacts
-- **ContactView**: View comprehensive contact information and manage connections
-- **CreateContactView**: Add new contacts using natural language processing
-- **ProfileView**: View and manage the current user's profile
-- **EditProfileView**: Update profile information with form-based editing
+- **Network**: Views for browsing and managing connections
+- **Profile**: User profile management
+- **Login**: Authentication views
+- **Add Contact**: Creating new contacts with NLP
+- **UIComponents**: Shared visual components
 
-## Network Operations
+## Manager System
 
-The `NetworkManager` class handles all API communication:
+The app uses a specialized manager system to separate concerns:
 
-- **User Operations**: Fetch, search, create, and update user profiles
-- **Connection Management**: Add, update, and retrieve connections
-- **Authentication**: Login, session persistence, and session validation
-- **Error Handling**: Standardized error processing with retry capabilities
+### NetworkManager
+
+The central manager that:
+- Maintains app-wide state via published properties
+- Delegates specialized operations to sub-managers
+- Provides helper methods for common tasks
+- Acts as the central point for UI data binding
+
+### ConnectionsManager
+
+Handles all connection-related operations:
+- Creating, updating, and removing connections
+- Fetching user connections
+- Standardized error handling with the Result pattern
+- Helper methods for connection data processing
+
+### AuthManager
+
+Manages user authentication:
+- Login and session persistence
+- Account creation and validation
+- Secure credential storage
+
+### ContactsManager
+
+Manages user profiles:
+- Fetching user data
+- Creating and updating users
+- Contact search functionality
+
+### TagsManager
+
+Handles tag operations:
+- Fetching recent tags
+- Tag processing and formatting
+
+## Error Handling Pattern
+
+The app implements a consistent error handling approach:
+
+- All asynchronous operations return `Result<Success, Error>` types
+- Network errors are standardized through helper methods like `createError`
+- Error handling is consolidated in specialized methods
+- Errors propagate properly from managers to the UI layer
+- UI components handle errors through switch statements on Result types
 
 ## Data Models
 

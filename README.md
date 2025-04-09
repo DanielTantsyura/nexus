@@ -48,14 +48,14 @@ The system allows users to:
 2. **State Management**
    - Centralized state via NetworkManager and AppCoordinator
    - Reactive UI updates through published properties
-   - Persistent login with UserDefaults
-   - Clean error handling and loading states
+   - Persistent login with UserDefaults and KeychainHelper
+   - Standardized error handling with Result types across the application
 
 3. **Network Communication**
-   - Robust API client with standardized error handling
+   - Robust API client with consistent error handling patterns
+   - Result-based API responses for better error propagation
    - Automatic retry for failed network requests
    - Support for simulator and physical device testing
-   - Comprehensive data models that map directly to API responses
 
 ## Architecture
 
@@ -83,17 +83,23 @@ The system allows users to:
    - `User`, `Connection`, `Login` and other model types
    - Proper Codable implementation for JSON serialization
 
-- **Network Layer**
-   - `NetworkManager.swift` - Handles all API communication
-   - Published properties for reactive UI updates
-   - Comprehensive error handling and retry mechanisms
-   - Session management with persistent login
+- **Manager Subsystem**
+   - `NetworkManager.swift` - Central hub for API interactions and shared state
+   - `AuthManager.swift` - Authentication and session handling
+   - `ConnectionsManager.swift` - Contact relationship management 
+   - `ContactsManager.swift` - User profile management
+   - `TagsManager.swift` - Tag management and categorization
 
 - **UI Layer**
    - `MainTabView.swift` - Tab-based main navigation
-   - `UserListView.swift`, `UserDetailView.swift`, etc. - Primary UI components
-   - `UIComponents.swift` - Reusable UI elements
    - `AppCoordinator.swift` - Centralized navigation and state management
+   - Organized view folders (Network, Profile, Login, Add Contact)
+   - `UIComponents.swift` - Reusable UI elements
+
+- **Error Handling**
+   - Consistent Result<Success, Error> pattern across all asynchronous operations
+   - Standardized error creation and handling for all network requests
+   - Proper propagation of errors to the UI layer for user feedback
 
 ## Database Features
 
@@ -273,12 +279,9 @@ Follow these steps to deploy the Nexus API to Railway:
 - **SwiftUI** - Declarative UI
 - **Combine** - Reactive programming
 - **MVVM + Coordinator** - Architecture pattern
+- **Result pattern** - Error handling
 
 ## Contributors
 
+- Corwin Cheung
 - Daniel Tantsyura
-- Contributions welcome!
-
-## License
-
-This project is available under the MIT License.
