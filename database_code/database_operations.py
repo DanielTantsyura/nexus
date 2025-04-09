@@ -464,6 +464,8 @@ class DatabaseManager:
     def remove_connection(self, user_id: int, contact_id: int) -> bool:
         """
         Remove a connection between two users (one-way only).
+        If the contact doesn't have login credentials and is not referenced as a contact
+        by any other user, the contact will also be deleted from the people table.
         
         Args:
             user_id: ID of the first user
@@ -481,6 +483,34 @@ class DatabaseManager:
             # Remove the one-way connection
             self.cursor.execute(query, (user_id, contact_id))
             self.connection.commit()
+
+            print("WE ARE REMOVING A CONNECTION")
+            
+            # Check if this contact should be deleted completely
+            # 1. Check if contact has login credentials (is a real user)
+            has_login = self.user_has_login(contact_id)
+            
+            if not has_login:
+                # 2. Check if contact is referenced by any other user
+                check_query = """
+                SELECT COUNT(*) AS connection_count
+                FROM relationships
+                WHERE contact_id = %s;
+                """
+                self.cursor.execute(check_query, (contact_id,))
+                result = self.cursor.fetchone()
+                
+                # If connection count is 0, no one references this contact anymore
+                if result and result['connection_count'] == 0:
+                    # Delete the contact from the people table
+                    delete_query = """
+                    DELETE FROM people
+                    WHERE id = %s;
+                    """
+                    self.cursor.execute(delete_query, (contact_id,))
+                    self.connection.commit()
+                    print(f"Deleted contact {contact_id} from people table as it was a hanging node.")
+            
             return True
         except Exception as e:
             self.connection.rollback()
@@ -873,6 +903,32 @@ class DatabaseManager:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit point."""
         self.disconnect()
+
+    def user_has_login(self, user_id: int) -> bool:
+        """
+        Check if a user has login credentials.
+        
+        Args:
+            user_id: ID of the user to check
+            
+        Returns:
+            True if the user has login credentials, False otherwise
+        """
+        query = """
+        SELECT COUNT(*) AS login_count
+        FROM logins
+        WHERE people_id = %s;
+        """
+        
+        try:
+            self.cursor.execute(query, (user_id,))
+            result = self.cursor.fetchone()
+            
+            # If login count is greater than 0, user has login credentials
+            return result and result['login_count'] > 0
+        except Exception as e:
+            print(f"Error checking if user has login: {e}")
+            return False
 
 
 # Example usage
