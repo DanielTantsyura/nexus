@@ -136,14 +136,50 @@ struct UserAvatar: View {
     }
     
     var body: some View {
-        Circle()
-            .fill(Color.blue.opacity(0.2))
-            .frame(width: size, height: size)
-            .overlay(
+        ZStack {
+            // Fallback background circle
+            Circle()
+                .fill(Color.blue.opacity(0.2))
+                .frame(width: size, height: size)
+            
+            // Check if user has a profile image URL
+            if let profileImageUrl = user.profileImageUrl, !profileImageUrl.isEmpty,
+               let url = URL(string: profileImageUrl) {
+                // Use AsyncImage to load the remote image
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .empty:
+                        // Show initials while loading
+                        Text(getInitials())
+                            .font(.system(size: size * 0.4, weight: .bold))
+                            .foregroundColor(.blue)
+                    case .success(let image):
+                        // Show loaded image
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: size, height: size)
+                            .clipShape(Circle())
+                    case .failure:
+                        // Show initials on error
+                        Text(getInitials())
+                            .font(.system(size: size * 0.4, weight: .bold))
+                            .foregroundColor(.blue)
+                    @unknown default:
+                        // Fallback for future cases
+                        Text(getInitials())
+                            .font(.system(size: size * 0.4, weight: .bold))
+                            .foregroundColor(.blue)
+                    }
+                }
+            } else {
+                // No image URL, show initials
                 Text(getInitials())
                     .font(.system(size: size * 0.4, weight: .bold))
                     .foregroundColor(.blue)
-            )
+            }
+        }
+        .frame(width: size, height: size)
     }
     
     /// Get the initials from first and last name

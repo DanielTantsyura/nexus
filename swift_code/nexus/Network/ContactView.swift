@@ -1,24 +1,28 @@
 import SwiftUI
+import Combine
 
-/// Displays detailed information about a user including their profile and relationship data
 struct ContactView: View {
     @EnvironmentObject private var coordinator: AppCoordinator
     
     // MARK: - State
     
-    // Keep the incoming user around just in case
     let initialUser: User
     
-    // Actual mutable copy SwiftUI will watch
+    // This is the @State copy that SwiftUI watches
     @State private var user: User
     
     @State private var isEditing = false
     @State private var relationship: Connection?
     @State private var isLoadingRelationship = true
     @State private var relationshipError: String?
+    
+    /// The main toggle for forcing a refresh of the entire ContactView
     @State private var refreshTrigger = false
     
-    // Editing state variables
+    // For subscribing to refresh signals
+    @State private var refreshCancellable: AnyCancellable?
+    
+    // Editing state variables...
     @State private var editFirstName = ""
     @State private var editLastName = ""
     @State private var editJobTitle = ""
@@ -36,15 +40,15 @@ struct ContactView: View {
     @State private var editLinkedinUrl = ""
     @State private var editBirthday = ""
     
-    // Tag management
+    // Tags
     @State private var editTags: [String] = []
     @State private var newTagText = ""
     @FocusState private var tagTextFieldFocused: Bool
     
-    // Add state for confirmation dialog
+    // Confirmation dialog
     @State private var showDeleteConfirmation = false
     
-    // init lets us set up that @State copy
+    // This init sets up your local copy of `user`
     init(user: User) {
         self.initialUser = user
         self._user = State(initialValue: user)
@@ -53,26 +57,18 @@ struct ContactView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                // User info section with tags
                 userInfoSection
-                    .id("info-section-\(refreshTrigger)")
-                
-                // Notes section (if any)
                 if let relationship = relationship, let notes = relationship.notes {
                     notesSection(notes: notes)
-                        .id("notes-section-\(refreshTrigger)")
                 }
-                
-                // Combined relationship description and contact information
                 combinedInfoSection
-                    .id("combined-section-\(refreshTrigger)")
             }
             .padding()
         }
-        .id("contact-view-\(refreshTrigger)") // Force entire view to refresh when data changes
+        .id("contact-view-\(refreshTrigger)")  // This forces a fresh load of the entire body when toggled
         .navigationTitle(user.fullName)
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(isEditing) // Hide back button in edit mode
+        .navigationBarBackButtonHidden(isEditing)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 if isEditing {
@@ -85,8 +81,6 @@ struct ContactView: View {
                     }
                 }
             }
-            
-            // Add cancel button in edit mode
             ToolbarItem(placement: .navigationBarLeading) {
                 if isEditing {
                     Button(action: { cancelEditing() }) {
@@ -95,11 +89,6 @@ struct ContactView: View {
                     }
                 }
             }
-        }
-        .onAppear {
-            coordinator.activeScreen = .contact
-            loadRelationship()
-            updateLastViewed()
         }
         .confirmationDialog(
             "Delete Contact",
@@ -115,19 +104,79 @@ struct ContactView: View {
         } message: {
             Text("Are you sure you want to delete this contact? This action cannot be undone.")
         }
+        .onAppear {
+            coordinator.activeScreen = .contact
+            
+            // If we don’t already have a relationship loaded, fetch it once
+            loadRelationshipIfNeeded()
+            
+            // Update "last viewed" if needed
+            updateLastViewed()
+            
+            // Subscribe to refresh signals so we can toggle refreshTrigger
+            refreshCancellable = coordinator.networkManager.$refreshSignal
+                .receive(on: DispatchQueue.main)
+                .sink { _ in
+                    let refreshType = coordinator.networkManager.lastRefreshType
+                    // Only refresh if it's relevant for connections or contact changes
+                    if refreshType == .connections {
+                        // Relationship data might have changed or re-fetched
+                        reloadRelationship() 
+                        refreshTrigger.toggle()
+                    }
+                }
+        }
+        .onDisappear {
+            // Clean up the subscription
+            refreshCancellable?.cancel()
+        }
+    }
+    
+    // MARK: - Relationship Loading
+    
+    private func loadRelationshipIfNeeded() {
+        guard let currentUserId = coordinator.networkManager.userId else { return }
+        guard currentUserId != user.id else { return } // Skip if looking at ourselves
+        
+        // If we don't already have a relationship or if the manager doesn't have them fetched
+        if relationship == nil || coordinator.networkManager.connections.isEmpty {
+            isLoadingRelationship = true
+            coordinator.networkManager.fetchConnections(forUserId: currentUserId)
+            // We'll rely on the refresh signal that fetchConnections emits
+        }
+        
+        // Then in reloadRelationship() below, we actually update `relationship` from the manager.
+        // This way we avoid the repeated .asyncAfter stuff.
+        reloadRelationship()
+    }
+    
+    private func reloadRelationship() {
+        guard let currentUserId = coordinator.networkManager.userId else { return }
+        guard currentUserId != user.id else { return }
+        
+        // Try to find the connection in the manager’s memory
+        let found = coordinator.networkManager.connections.first { $0.id == self.user.id }
+        self.relationship = found
+        self.isLoadingRelationship = false
+    }
+    
+    private func updateLastViewed() {
+        guard let currentUserId = coordinator.networkManager.userId else { return }
+        guard currentUserId != user.id else { return }
+        
+        coordinator.networkManager.updateConnectionTimestamp(contactId: user.id) { _ in
+            // Not super critical if it fails, just ignore
+        }
     }
     
     // MARK: - Subviews
     
-    /// Displays user profile information including personal details and education/work history
     private var userInfoSection: some View {
         SectionCard(title: "") {
             VStack(alignment: .leading, spacing: 16) {
-                // Header with name and basic info
                 userHeaderView
-                
-                // Tags displayed directly under header
                 if !isEditing, let relationship = relationship, let tags = relationship.tags, !tags.isEmpty {
+                    // Read-only tags
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
                             ForEach(tags, id: \.self) { tag in
@@ -142,9 +191,7 @@ struct ContactView: View {
                         }
                         .padding(.vertical, 8)
                     }
-                    .padding(.top, 4)
                 } else if isEditing {
-                    // Tag management in edit mode
                     tagManagementSection
                 }
             }
@@ -153,27 +200,20 @@ struct ContactView: View {
         .onLongPressGesture { startEditing() }
     }
     
-    /// Header with user's basic information
     private var userHeaderView: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 4) {
                 if isEditing {
                     HStack {
                         TextField("First Name", text: $editFirstName)
-                            .font(.title2)
-                            .fontWeight(.bold)
+                            .font(.title2).fontWeight(.bold)
                         TextField("Last Name", text: $editLastName)
-                            .font(.title2)
-                            .fontWeight(.bold)
+                            .font(.title2).fontWeight(.bold)
                     }
-                    
-                    // Job title field and company on same row
                     HStack(spacing: 8) {
                         TextField("Job Title", text: $editJobTitle)
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
+                            .font(.subheadline).fontWeight(.semibold)
                         
-                        // Company icon and field
                         HStack(spacing: 4) {
                             Image(systemName: "building.2.fill")
                                 .font(.caption)
@@ -182,8 +222,6 @@ struct ContactView: View {
                                 .font(.subheadline)
                         }
                     }
-                    
-                    // University and location fields
                     HStack(spacing: 8) {
                         HStack(spacing: 4) {
                             Image(systemName: "building.columns.fill")
@@ -192,7 +230,6 @@ struct ContactView: View {
                             TextField("University", text: $editUniversity)
                                 .font(.subheadline)
                         }
-                        
                         HStack(spacing: 4) {
                             Image(systemName: "location.fill")
                                 .font(.caption)
@@ -203,49 +240,44 @@ struct ContactView: View {
                     }
                 } else {
                     Text(user.fullName)
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                
-                    // Job title and company with building icon
+                        .font(.largeTitle).fontWeight(.bold)
+                    
                     if let jobTitle = user.jobTitle, let company = user.currentCompany {
                         HStack {
                             Text(jobTitle)
-                                .fontWeight(.bold) // Bold job title
-                                .font(.subheadline) // Make job title smaller
-                                .foregroundColor(.gray) // Make job title gray
-                            Image(systemName: "building.2.fill") // Light blue work building icon
-                                .foregroundColor(Color.blue.opacity(0.5)) // Light blue icon
+                                .font(.subheadline).fontWeight(.bold)
+                                .foregroundColor(.gray)
+                            Image(systemName: "building.2.fill")
+                                .foregroundColor(Color.blue.opacity(0.5))
                             Text(company)
-                                .foregroundColor(.gray) // Make company gray
+                                .foregroundColor(.gray)
                         }
                     } else if let jobTitle = user.jobTitle {
                         Text(jobTitle)
-                            .fontWeight(.bold) // Bold job title
-                            .font(.subheadline) // Make job title smaller
-                            .foregroundColor(.gray) // Make job title gray
+                            .font(.subheadline).fontWeight(.bold)
+                            .foregroundColor(.gray)
                     } else if let company = user.currentCompany {
                         HStack {
-                            Image(systemName: "building.2.fill") // Light blue work building icon
-                                .foregroundColor(Color.blue.opacity(0.5)) // Light blue icon
+                            Image(systemName: "building.2.fill")
+                                .foregroundColor(Color.blue.opacity(0.5))
                             Text(company)
-                                .foregroundColor(.gray) // Make company gray
+                                .foregroundColor(.gray)
                         }
                     }
-                
-                    // Education and location on the third line
+                    
                     HStack {
                         if let university = user.university {
-                            Image(systemName: "graduationcap.fill") // Light blue university icon
-                                .foregroundColor(Color.blue.opacity(0.5)) // Light blue icon
+                            Image(systemName: "graduationcap.fill")
+                                .foregroundColor(Color.blue.opacity(0.5))
                             Text(university)
-                                .font(.subheadline) // Make university text smaller
+                                .font(.subheadline)
                                 .foregroundColor(.gray)
                         }
                         if let location = user.location {
-                            Image(systemName: "location.fill") // Blue location icon
-                                .foregroundColor(.blue) // Blue icon
+                            Image(systemName: "location.fill")
+                                .foregroundColor(.blue)
                             Text(location)
-                                .font(.subheadline) // Make location text smaller
+                                .font(.subheadline)
                                 .foregroundColor(.gray)
                         }
                     }
@@ -255,197 +287,6 @@ struct ContactView: View {
             UserAvatar(user: user, size: 80)
         }
         .padding(.bottom, 8)
-    }
-    
-    /// User's personal details section
-    private var personalDetailsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Personal Details")
-                .font(.headline)
-                .padding(.vertical, 4)
-            
-            Group {
-                if isEditing {
-                    HStack {
-                        Image(systemName: "person.fill")
-                            .foregroundColor(.blue)
-                            .frame(width: 20)
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Gender")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                            
-                            TextField("Gender", text: $editGender)
-                        }
-                    }
-                    
-                    HStack {
-                        Image(systemName: "person.2.fill")
-                            .foregroundColor(.blue)
-                            .frame(width: 20)
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Ethnicity")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                            
-                            TextField("Ethnicity", text: $editEthnicity)
-                        }
-                    }
-                } else {
-                    if let gender = user.gender {
-                        InfoRow(icon: "person.fill", title: "Gender", value: gender)
-                    }
-                
-                    if let ethnicity = user.ethnicity {
-                        InfoRow(icon: "person.2.fill", title: "Ethnicity", value: ethnicity)
-                    }
-                }
-            }
-        }
-    }
-    
-    /// User's education and work section
-    private var educationWorkSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Education & Work")
-                .font(.headline)
-                .padding(.vertical, 4)
-            
-            Group {
-                if isEditing {
-                    HStack {
-                        Image(systemName: "building.columns.fill")
-                            .foregroundColor(.blue)
-                            .frame(width: 20)
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("University")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                            
-                            TextField("University", text: $editUniversity)
-                        }
-                    }
-                    
-                    HStack {
-                        Image(systemName: "book.fill")
-                            .foregroundColor(.blue)
-                            .frame(width: 20)
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Major")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                            
-                            TextField("Major", text: $editUniMajor)
-                        }
-                    }
-                    
-                    HStack {
-                        Image(systemName: "graduationcap.fill")
-                            .foregroundColor(.blue)
-                            .frame(width: 20)
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("High School")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                            
-                            TextField("High School", text: $editHighSchool)
-                        }
-                    }
-                    
-                    HStack {
-                        Image(systemName: "star.fill")
-                            .foregroundColor(.blue)
-                            .frame(width: 20)
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Interests")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                            
-                            TextField("Interests", text: $editInterests)
-                        }
-                    }
-                } else {
-                    if let university = user.university {
-                        InfoRow(icon: "building.columns.fill", title: "University", value: university)
-                    }
-                
-                    if let major = user.uniMajor {
-                        InfoRow(icon: "book.fill", title: "Major", value: major)
-                    }
-                
-                    if let highSchool = user.highSchool {
-                        InfoRow(icon: "graduationcap.fill", title: "High School", value: highSchool)
-                    }
-                
-                    if let interests = user.fieldOfInterest {
-                        InfoRow(icon: "star.fill", title: "Interests", value: interests)
-                    }
-                }
-            }
-        }
-    }
-    
-    
-    
-    /// Load relationship data between current user and this user
-    private func loadRelationship() {
-        guard let currentUserId = coordinator.networkManager.userId else { return }
-        guard currentUserId != user.id else { return } // Don't load relationship with self
-        
-        print("Loading relationship for current user ID: \(currentUserId) and contact ID: \(user.id)")
-        
-        isLoadingRelationship = true
-        relationshipError = nil
-        
-        // First fetch all connections for the current user
-        coordinator.networkManager.fetchConnections(forUserId: currentUserId)
-        
-        // Give time for the fetch to complete
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            // Find the connection to this user if it exists
-            // In the API response, the id field is actually the contact's ID
-            self.relationship = self.coordinator.networkManager.connections.first { connection in
-                return connection.id == self.user.id
-            }
-            
-            if let relationship = self.relationship {
-                print("Found relationship: id=\(relationship.id), notes=\(relationship.notes ?? "nil"), tags=\(relationship.tags?.joined(separator: ",") ?? "nil")")
-            } else {
-                print("No relationship found between user \(currentUserId) and contact \(self.user.id)")
-            }
-            
-            self.isLoadingRelationship = false
-            self.refreshTrigger.toggle() // Force UI refresh when relationship data loads
-        }
-    }
-    
-    /// Update the last viewed timestamp of this connection
-    private func updateLastViewed() {
-        guard let currentUserId = coordinator.networkManager.userId else { return }
-        guard currentUserId != user.id else { return } // Don't update for self
-        
-        coordinator.networkManager.updateConnectionTimestamp(contactId: user.id) { _ in
-            // Success or failure doesn't matter much here
-        }
-    }
-    
-    // New sections to add
-    
-    private func tagsSection(tags: [String]) -> some View {
-        SectionCard(title: "Tags") {
-            FlowLayout(spacing: 8) {
-                ForEach(tags, id: \.self) { tag in
-                    TagBadge(text: tag, showRemoveButton: false)
-                }
-            }
-            .padding(.vertical, 8)
-        }
     }
     
     private func notesSection(notes: String) -> some View {
@@ -474,83 +315,61 @@ struct ContactView: View {
         }
     }
     
-    // New combined section for relationship description and contact info
     private var combinedInfoSection: some View {
         SectionCard(title: "Contact Information") {
             VStack(alignment: .leading, spacing: 12) {
-                // Relationship description first (if available)
                 if let relationship = relationship, let description = relationship.relationshipDescription {
                     InfoRow(icon: "person.2.fill", title: "Relationship Description", value: description)
+                    Divider().padding(.vertical, 4)
                 }
                 
-                // Divider only if both description and contact info exist
-                if (relationship?.relationshipDescription != nil) && 
-                   (user.email != nil || user.phoneNumber != nil || user.birthday != nil || user.linkedinUrl != nil) {
-                    Divider()
-                        .padding(.vertical, 4)
-                }
-                
-                // Contact information
                 if isEditing {
-                    // Birthday field at the top
                     HStack {
                         Image(systemName: "calendar")
                             .foregroundColor(.blue)
                             .frame(width: 20)
-                        
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Birthday")
                                 .font(.caption)
                                 .foregroundColor(.gray)
-                            
                             TextField("MM/DD/YYYY", text: $editBirthday)
                         }
                     }
-                    
                     HStack {
                         Image(systemName: "envelope.fill")
                             .foregroundColor(.blue)
                             .frame(width: 20)
-                        
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Email")
                                 .font(.caption)
                                 .foregroundColor(.gray)
-                            
                             TextField("Email", text: $editEmail)
                         }
                     }
-                    
                     HStack {
                         Image(systemName: "phone.fill")
                             .foregroundColor(.blue)
                             .frame(width: 20)
-                        
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Phone")
                                 .font(.caption)
                                 .foregroundColor(.gray)
-                            
                             TextField("Phone", text: $editPhone)
                         }
                     }
-                    
-                    // LinkedIn field under phone
                     HStack {
                         Image(systemName: "link")
                             .foregroundColor(.blue)
                             .frame(width: 20)
-                        
                         VStack(alignment: .leading, spacing: 4) {
                             Text("LinkedIn")
                                 .font(.caption)
                                 .foregroundColor(.gray)
-                            
                             TextField("LinkedIn URL", text: $editLinkedinUrl)
                         }
                     }
                     
-                    // Delete contact button
+                    // Delete contact
                     Button(action: {
                         showDeleteConfirmation = true
                     }) {
@@ -570,14 +389,14 @@ struct ContactView: View {
                         .padding(.top, 24)
                     }
                     .frame(maxWidth: .infinity, alignment: .center)
+                    
                 } else {
-                    // Birthday field at the top
                     if let birthday = user.birthday {
                         InfoRow(icon: "calendar", title: "Birthday", value: birthday)
                             .padding(.vertical, 4)
                     }
-                
                     if let email = user.email {
+                        // Tappable row that tries to open mail app
                         HStack {
                             InfoRow(icon: "envelope.fill", title: "Email", value: email)
                             Spacer()
@@ -593,8 +412,8 @@ struct ContactView: View {
                         }
                         .padding(.vertical, 4)
                     }
-                
                     if let phone = user.phoneNumber {
+                        // Tappable row that tries to open phone
                         HStack {
                             InfoRow(icon: "phone.fill", title: "Phone", value: phone)
                             Spacer()
@@ -604,14 +423,12 @@ struct ContactView: View {
                         }
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            if let url = URL(string: "tel:\(phone.replacingOccurrences(of: " ", with: ""))") {
+                            if let url = URL(string: "tel:\(phone.filter { !$0.isWhitespace })") {
                                 UIApplication.shared.open(url)
                             }
                         }
                         .padding(.vertical, 4)
                     }
-                    
-                    // LinkedIn field under phone
                     if let linkedin = user.linkedinUrl, !linkedin.isEmpty {
                         HStack {
                             Image(systemName: "link")
@@ -629,14 +446,11 @@ struct ContactView: View {
                         .onTapGesture {
                             if let url = URL(string: linkedin), UIApplication.shared.canOpenURL(url) {
                                 UIApplication.shared.open(url)
-                            } else {
-                                print("Invalid LinkedIn URL: \(linkedin)")
                             }
                         }
                         .padding(.vertical, 4)
                     }
-                
-                    // Add edit button at the bottom of the section
+                    
                     Button(action: {
                         startEditing()
                     }) {
@@ -653,146 +467,15 @@ struct ContactView: View {
         }
     }
     
-    // MARK: - Edit Mode Methods
-    
-    /// Initialize edit mode with current user data
-    private func startEditing() {
-        editFirstName = user.firstName ?? ""
-        editLastName = user.lastName ?? ""
-        editJobTitle = user.jobTitle ?? ""
-        editCompany = user.currentCompany ?? ""
-        editUniversity = user.university ?? ""
-        editUniMajor = user.uniMajor ?? ""
-        editLocation = user.location ?? ""
-        editEmail = user.email ?? ""
-        editPhone = user.phoneNumber ?? ""
-        editGender = user.gender ?? ""
-        editEthnicity = user.ethnicity ?? ""
-        editInterests = user.fieldOfInterest ?? ""
-        editHighSchool = user.highSchool ?? ""
-        editNotes = relationship?.notes ?? ""
-        editLinkedinUrl = user.linkedinUrl ?? ""
-        editBirthday = user.birthday ?? ""
-        editTags = relationship?.tags ?? []
-        
-        isEditing = true
-    }
-    
-    /// Save changes to contact profile
-    private func saveChanges() {
-        // Prepare update data
-        var userData: [String: Any] = [:]
-        
-        userData["first_name"] = editFirstName
-        userData["last_name"] = editLastName
-        userData["job_title"] = editJobTitle
-        userData["current_company"] = editCompany
-        userData["university"] = editUniversity
-        userData["uni_major"] = editUniMajor
-        userData["location"] = editLocation
-        userData["email"] = editEmail
-        userData["phone_number"] = editPhone
-        userData["gender"] = editGender
-        userData["ethnicity"] = editEthnicity
-        userData["field_of_interest"] = editInterests
-        userData["high_school"] = editHighSchool
-        userData["linkedin_url"] = editLinkedinUrl
-        userData["birthday"] = editBirthday
-        
-        // Store local reference to the relationship for use in closures
-        let currentRelationship = relationship
-        
-        // Update the contact through coordinator
-        coordinator.networkManager.updateUser(userId: user.id, userData: userData) { result in
-            switch result {
-            case .success(true):
-                // Fetch the updated user and update our @State variable
-                self.coordinator.networkManager.fetchUser(withId: self.user.id) { result in
-                    DispatchQueue.main.async {
-                        if case .success(let updatedUser) = result {
-                            // Overwrite the local @State user
-                            self.user = updatedUser
-                        }
-                        
-                        // Reset editing state
-                        self.isEditing = false
-                        
-                        // Update the relationship with the new notes and tags if we have a relationship
-                        if let relationship = currentRelationship {
-                            self.coordinator.networkManager.updateConnection(
-                                contactId: self.user.id,
-                                description: relationship.relationshipDescription,
-                                notes: self.editNotes,
-                                tags: self.editTags
-                            ) { result in
-                                if case .success(true) = result {
-                                    // Refresh data after updating
-                                    self.coordinator.networkManager.fetchConnections(forUserId: self.coordinator.networkManager.userId ?? 0)
-                                    
-                                    // Reload the specific relationship data
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                        // Refresh the relationship in our local state
-                                        self.relationship = self.coordinator.networkManager.connections.first { connection in
-                                            return connection.id == self.user.id
-                                        }
-                                        
-                                        // Force UI refresh
-                                        self.refreshTrigger.toggle()
-                                    }
-                                }
-                            }
-                        } else {
-                            // If no relationship to update, still force refresh the UI to show user data changes
-                            self.refreshTrigger.toggle()
-                        }
-                    }
-                }
-            case .success(false), .failure:
-                // Reset editing state if the update failed
-                self.isEditing = false
-            }
-        }
-    }
-    
-    /// Cancel editing and reset fields
-    private func cancelEditing() {
-        isEditing = false
-    }
-    
-    /// Delete the contact
-    private func deleteContact() {
-        coordinator.networkManager.deleteContact(contactId: user.id) { result in
-            switch result {
-            case .success(true):
-                // Navigate back
-                coordinator.navigateBack()
-                self.coordinator.networkManager.signalRefresh(type: .connections)
-            case .failure:
-                // Handle error - could show an alert here
-                print("Failed to delete contact")
-            default:
-                break
-            }
-        }
-    }
-    
-    // Color function to match NetworkView tag coloring
-    private func tagColor(for tag: String) -> Color {
-        let colors: [Color] = [.blue, .green, .orange, .purple, .pink, .red]
-        let hash = abs(tag.hashValue)
-        return colors[hash % colors.count]
-    }
-    
     // MARK: - Tag Management
     
-    /// Tag management UI section
     private var tagManagementSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Tags")
                 .font(.headline)
                 .padding(.vertical, 4)
             
-            // Display currently selected tags with delete option
+            // Display selected tags
             if !editTags.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -800,9 +483,6 @@ struct ContactView: View {
                             HStack(spacing: 4) {
                                 Text(tag)
                                     .font(.system(size: 12))
-                                    .lineLimit(1)
-                                    .truncationMode(.tail)
-                                
                                 Button(action: {
                                     removeTag(tag)
                                 }) {
@@ -826,7 +506,7 @@ struct ContactView: View {
                 }
             }
             
-            // Recent tags from NetworkManager
+            // Recent tags
             if !coordinator.networkManager.recentTags.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Recent Tags")
@@ -841,11 +521,9 @@ struct ContactView: View {
                                 }) {
                                     Text(tag)
                                         .font(.system(size: 11))
-                                        .lineLimit(1)
-                                        .truncationMode(.tail)
                                         .padding(.horizontal, 10)
                                         .padding(.vertical, 5)
-                                        .background(editTags.contains(tag) 
+                                        .background(editTags.contains(tag)
                                             ? tagColor(for: tag).opacity(0.3)
                                             : tagColor(for: tag).opacity(0.1))
                                         .foregroundColor(editTags.contains(tag)
@@ -857,7 +535,7 @@ struct ContactView: View {
                                                 .stroke(tagColor(for: tag).opacity(editTags.contains(tag) ? 0.5 : 0.2), lineWidth: 1)
                                         )
                                 }
-                                .buttonStyle(PlainButtonStyle())
+                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -870,7 +548,7 @@ struct ContactView: View {
                     .focused($tagTextFieldFocused)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(Color(UIColor.secondarySystemBackground))
+                    .background(Color(uiColor: .secondarySystemBackground))
                     .cornerRadius(8)
                     .onSubmit {
                         addCustomTag()
@@ -894,12 +572,10 @@ struct ContactView: View {
         .padding(.top, 4)
     }
     
-    /// Removes a tag from the selected tags array
     private func removeTag(_ tag: String) {
         editTags.removeAll { $0 == tag }
     }
     
-    /// Toggles a tag in the selected tags array
     private func toggleTag(_ tag: String) {
         if editTags.contains(tag) {
             removeTag(tag)
@@ -908,16 +584,117 @@ struct ContactView: View {
         }
     }
     
-    /// Adds a custom tag based on the newTagText value
     private func addCustomTag() {
-        let trimmedText = newTagText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedText.isEmpty else { return }
+        let trimmed = newTagText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
         
-        if !editTags.contains(trimmedText) {
-            editTags.append(trimmedText)
+        if !editTags.contains(trimmed) {
+            editTags.append(trimmed)
         }
-        
         newTagText = ""
         tagTextFieldFocused = false
+    }
+    
+    // MARK: - Edit Mode
+    
+    private func startEditing() {
+        editFirstName = user.firstName ?? ""
+        editLastName = user.lastName ?? ""
+        editJobTitle = user.jobTitle ?? ""
+        editCompany = user.currentCompany ?? ""
+        editUniversity = user.university ?? ""
+        editUniMajor = user.uniMajor ?? ""
+        editLocation = user.location ?? ""
+        editEmail = user.email ?? ""
+        editPhone = user.phoneNumber ?? ""
+        editGender = user.gender ?? ""
+        editEthnicity = user.ethnicity ?? ""
+        editInterests = user.fieldOfInterest ?? ""
+        editHighSchool = user.highSchool ?? ""
+        editNotes = relationship?.notes ?? ""
+        editLinkedinUrl = user.linkedinUrl ?? ""
+        editBirthday = user.birthday ?? ""
+        editTags = relationship?.tags ?? []
+        
+        isEditing = true
+    }
+    
+    private func saveChanges() {
+        // Prepare the user data
+        var userData: [String: Any] = [:]
+        userData["first_name"] = editFirstName
+        userData["last_name"] = editLastName
+        userData["job_title"] = editJobTitle
+        userData["current_company"] = editCompany
+        userData["university"] = editUniversity
+        userData["uni_major"] = editUniMajor
+        userData["location"] = editLocation
+        userData["email"] = editEmail
+        userData["phone_number"] = editPhone
+        userData["gender"] = editGender
+        userData["ethnicity"] = editEthnicity
+        userData["field_of_interest"] = editInterests
+        userData["high_school"] = editHighSchool
+        userData["linkedin_url"] = editLinkedinUrl
+        userData["birthday"] = editBirthday
+        
+        let currentRelationship = relationship
+        
+        coordinator.networkManager.updateUser(userId: user.id, userData: userData) { result in
+            switch result {
+            case .success(true):
+                // Refresh the updated user info
+                coordinator.networkManager.fetchUser(withId: self.user.id) { fetchResult in
+                    DispatchQueue.main.async {
+                        if case .success(let updatedUser) = fetchResult {
+                            self.user = updatedUser
+                        }
+                        // Turn off editing
+                        self.isEditing = false
+                        
+                        // Update relationship (notes + tags) if we have it
+                        if let relationship = currentRelationship {
+                            coordinator.networkManager.updateConnection(
+                                contactId: self.user.id,
+                                description: relationship.relationshipDescription,
+                                notes: self.editNotes,
+                                tags: self.editTags
+                            ) { updateResult in
+                                if case .success(true) = updateResult {
+                                    // Force a refresh of connections from the network manager
+                                    coordinator.networkManager.fetchConnections(forUserId: coordinator.networkManager.userId ?? 0)
+                                }
+                            }
+                        }
+                    }
+                }
+            case .success(false), .failure(_):
+                self.isEditing = false
+            }
+        }
+    }
+    
+    private func cancelEditing() {
+        isEditing = false
+    }
+    
+    private func deleteContact() {
+        coordinator.networkManager.deleteContact(contactId: user.id) { result in
+            switch result {
+            case .success(true):
+                coordinator.navigateBack()
+                coordinator.networkManager.signalRefresh(type: .connections)
+            default:
+                print("Failed to delete contact")
+            }
+        }
+    }
+    
+    // MARK: - Misc
+    
+    private func tagColor(for tag: String) -> Color {
+        let colors: [Color] = [.blue, .green, .orange, .purple, .pink, .red]
+        let hash = abs(tag.hashValue)
+        return colors[hash % colors.count]
     }
 }

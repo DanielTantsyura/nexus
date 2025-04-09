@@ -45,6 +45,9 @@ struct ProfileView: View {
     @State private var editLinkedinUrl = ""
     @State private var editBirthday = ""
     
+    @State private var showingImageUrlSheet = false
+    @State private var imageUrlInput = ""
+    
     // MARK: - View Body
     
     var body: some View {
@@ -78,6 +81,60 @@ struct ProfileView: View {
         .alert(isPresented: $showLogoutConfirmation) {
             logoutAlert
         }
+        .sheet(isPresented: $showingImageUrlSheet) {
+            // Sheet for editing profile image URL
+            NavigationView {
+                Form {
+                    Section(header: Text("Profile Image URL")) {
+                        TextField("Paste image URL here", text: $imageUrlInput)
+                            .autocapitalization(.none)
+                            .disableAutocorrection(true)
+                        
+                        if !imageUrlInput.isEmpty, let url = URL(string: imageUrlInput) {
+                            VStack {
+                                Text("Preview:")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                
+                                AsyncImage(url: url) { phase in
+                                    switch phase {
+                                    case .empty:
+                                        ProgressView()
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fit)
+                                            .frame(height: 200)
+                                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    case .failure:
+                                        Text("Failed to load image")
+                                            .foregroundColor(.red)
+                                    @unknown default:
+                                        EmptyView()
+                                    }
+                                }
+                                .padding()
+                            }
+                        }
+                    }
+                    
+                    Section {
+                        Button("Clear Image URL") {
+                            imageUrlInput = ""
+                        }
+                        .foregroundColor(.red)
+                    }
+                }
+                .navigationTitle("Edit Profile Image")
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Done") {
+                            showingImageUrlSheet = false
+                        }
+                    }
+                }
+            }
+        }
         .onAppear {
             coordinator.activeScreen = .profile
 
@@ -92,7 +149,7 @@ struct ProfileView: View {
                 // Force UI refresh
                 refreshTrigger.toggle()
                 
-                // If we know it’s a brand-new account, start editing right away
+                // If we know it's a brand-new account, start editing right away
                 if isNewAccount {
                     startEditing(currentUser)
                 }
@@ -196,10 +253,11 @@ struct ProfileView: View {
                                     .font(.subheadline)
                             }
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 6)
+                            .padding(.vertical, 8)
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
                         }
-                        .buttonStyle(PrimaryButtonStyle(backgroundColor: .green))
-                        .scaleEffect(0.9)
                         
                         Button(action: {
                             cancelEditing()
@@ -211,10 +269,11 @@ struct ProfileView: View {
                                     .font(.subheadline)
                             }
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 6)
+                            .padding(.vertical, 8)
+                            .background(Color.gray.opacity(0.2))
+                            .foregroundColor(.primary)
+                            .cornerRadius(8)
                         }
-                        .buttonStyle(PrimaryButtonStyle(backgroundColor: .red))
-                        .scaleEffect(0.9)
                     } else {
                         Button(action: {
                             startEditing(user)
@@ -226,10 +285,11 @@ struct ProfileView: View {
                                     .font(.subheadline)
                             }
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 6)
+                            .padding(.vertical, 8)
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
                         }
-                        .buttonStyle(PrimaryButtonStyle())
-                        .scaleEffect(0.9)
                     }
                 }
                 .padding(.top, 10)
@@ -240,8 +300,28 @@ struct ProfileView: View {
     /// Profile header with avatar and basic info
     private func profileHeader(user: User) -> some View {
         HStack {
-            // Avatar
-            UserAvatar(user: user, size: 80)
+            // Avatar with edit capability
+            ZStack {
+                UserAvatar(user: user, size: 80)
+                if isEditing {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Spacer()
+                            Button(action: {
+                                showImageUrlDialog()
+                            }) {
+                                Image(systemName: "pencil.circle.fill")
+                                    .font(.system(size: 22))
+                                    .foregroundColor(.blue)
+                                    .background(Color.white.clipShape(Circle()))
+                            }
+                            .offset(x: 5, y: 5)
+                        }
+                    }
+                    .frame(width: 80, height: 80)
+                }
+            }
             
             // User info
             VStack(alignment: .leading, spacing: 4) {
@@ -544,6 +624,7 @@ struct ProfileView: View {
         editCompany = user.currentCompany ?? ""
         editLinkedinUrl = user.linkedinUrl ?? ""
         editBirthday = user.birthday ?? ""
+        imageUrlInput = user.profileImageUrl ?? ""
         
         isEditing = true
     }
@@ -565,6 +646,7 @@ struct ProfileView: View {
         userData["current_company"] = editCompany
         userData["linkedin_url"] = editLinkedinUrl
         userData["birthday"] = editBirthday
+        userData["profile_image_url"] = imageUrlInput
         
         // Update the user through coordinator
         coordinator.networkManager.updateUser(userId: user.id, userData: userData) { result in
@@ -621,5 +703,13 @@ struct ProfileView: View {
     private func invalidateRetryTimer() {
         retryTimer?.invalidate()
         retryTimer = nil
+    }
+
+    private func showImageUrlDialog() {
+        if let user = coordinator.networkManager.currentUser {
+            // Initialize with current image URL if available
+            imageUrlInput = user.profileImageUrl ?? ""
+            showingImageUrlSheet = true
+        }
     }
 }

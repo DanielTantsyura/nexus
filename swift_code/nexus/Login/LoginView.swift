@@ -30,95 +30,105 @@ struct LoginView: View {
     // MARK: - View
     
     var body: some View {
-        VStack(spacing: 20) {
-            // App logo
-            Image("LogoWithText")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 220, height: 120)
-                .padding(.bottom, 20)
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Username")
-                    .font(.title3)
-                    .fontWeight(.medium)
-                
-                TextField("Enter your username", text: $username)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .font(.title2)
-                    .textContentType(.username)
-                    .autocapitalization(.none)
-                    .disableAutocorrection(true)
-                    .padding(.vertical, 12)
-                    .padding(.bottom, -15)
-                    .disabled(isLoggingIn)
-                
-            }
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Password")
-                    .font(.title3)
-                    .fontWeight(.medium)
-                
-                SecureField("Enter your password", text: $password)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .font(.title2)
-                    .textContentType(.password)
-                    .padding(.vertical, 12)
-                    .disabled(isLoggingIn)
-            }
-            
-            if showError {
-                Text(errorMessage)
-                    .foregroundColor(.red)
-                    .font(.caption)
-                    .padding(.top, 5)
-            }
-            
-            // Container for buttons to ensure they have the same width
-            VStack(spacing: 12) {
-                Button(action: loginAction) {
-                    Group {
-                        if isLoggingIn {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        } else {
-                            Text("Log In")
-                                .fontWeight(.semibold)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(10)
+        ZStack {
+            // Background Color
+            Color(.systemBackground)
+                .edgesIgnoringSafeArea(.all)
+                .onTapGesture {
+                    // Dismiss keyboard when tapping outside text fields
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                 }
-                .disabled(username.isEmpty || password.isEmpty || isLoggingIn)
                 
-                Button(action: {
-                    showingCreateAccount = true
-                }) {
-                    Text("Create Account")
-                        .font(.headline)
-                        .foregroundColor(.white)
+            VStack(spacing: 20) {
+                // App logo
+                Image("LogoWithText")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 220, height: 120)
+                    .padding(.bottom, 20)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Username")
+                        .font(.title3)
+                        .fontWeight(.medium)
+                    
+                    TextField("Enter your username", text: $username)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .font(.title2)
+                        .textContentType(.username)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+                        .padding(.vertical, 12)
+                        .padding(.bottom, -15)
+                        .disabled(isLoggingIn)
+                    
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Password")
+                        .font(.title3)
+                        .fontWeight(.medium)
+                    
+                    SecureField("Enter your password", text: $password)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                        .font(.title2)
+                        .textContentType(.password)
+                        .padding(.vertical, 12)
+                        .disabled(isLoggingIn)
+                }
+                
+                if showError {
+                    Text(errorMessage)
+                        .foregroundColor(.red)
+                        .font(.caption)
+                        .padding(.top, 5)
+                }
+                
+                // Container for buttons to ensure they have the same width
+                VStack(spacing: 12) {
+                    Button(action: loginAction) {
+                        Group {
+                            if isLoggingIn {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            } else {
+                                Text("Log In")
+                                    .fontWeight(.semibold)
+                            }
+                        }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.orange)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
                         .cornerRadius(10)
+                    }
+                    .disabled(username.isEmpty || password.isEmpty || isLoggingIn)
+                    
+                    Button(action: {
+                        showingCreateAccount = true
+                    }) {
+                        Text("Create Account")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.orange)
+                            .cornerRadius(10)
+                    }
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 20)
+                
+                Spacer()
             }
-            .frame(maxWidth: .infinity)
-            .padding(.top, 20)
-            
-            Spacer()
-        }
-        .padding()
-        .frame(maxWidth: 400)
-        .padding(.top, 50)
-        .sheet(isPresented: $showingCreateAccount) {
-            CreateAccountView()
-                .environmentObject(coordinator)
-                .environmentObject(coordinator.networkManager)
+            .padding()
+            .frame(maxWidth: 400)
+            .padding(.top, 50)
+            .sheet(isPresented: $showingCreateAccount) {
+                CreateAccountView()
+                    .environmentObject(coordinator)
+                    .environmentObject(coordinator.networkManager)
+            }
         }
     }
     
