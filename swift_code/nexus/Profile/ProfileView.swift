@@ -39,6 +39,8 @@ struct ProfileView: View {
     @State private var editMajor = ""
     @State private var editInterests = ""
     @State private var editCompany = ""
+    @State private var editLinkedinUrl = ""
+    @State private var editBirthday = ""
     
     // MARK: - View Body
     
@@ -387,6 +389,21 @@ struct ProfileView: View {
                 .padding(.bottom, 4)
             
             if isEditing {
+                // Birthday field - placed at the top
+                HStack {
+                    Image(systemName: "calendar")
+                        .foregroundColor(.blue)
+                        .frame(width: 20)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Birthday")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                        
+                        TextField("MM/DD/YYYY", text: $editBirthday)
+                    }
+                }
+                
                 HStack {
                     Image(systemName: "envelope.fill")
                         .foregroundColor(.blue)
@@ -414,13 +431,57 @@ struct ProfileView: View {
                         TextField("Phone", text: $editPhone)
                     }
                 }
+                
+                // LinkedIn field - placed under phone
+                HStack {
+                    Image(systemName: "link")
+                        .foregroundColor(.blue)
+                        .frame(width: 20)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("LinkedIn")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                        
+                        TextField("LinkedIn URL", text: $editLinkedinUrl)
+                    }
+                }
             } else {
+                // Birthday field - placed at the top
+                if let birthday = user.birthday {
+                    InfoRow(icon: "calendar", title: "Birthday", value: birthday)
+                }
+                
                 if let email = user.email {
                     InfoRow(icon: "envelope.fill", title: "Email", value: email)
                 }
                 
                 if let phone = user.phoneNumber {
                     InfoRow(icon: "phone.fill", title: "Phone", value: phone)
+                }
+                
+                // LinkedIn field - placed under phone
+                if let linkedin = user.linkedinUrl, !linkedin.isEmpty {
+                    HStack {
+                        Image(systemName: "link")
+                            .foregroundColor(.blue)
+                            .frame(width: 20)
+                        Text("LinkedIn")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                        Spacer()
+                        Image(systemName: "arrow.up.forward.app")
+                            .font(.system(size: 12))
+                            .foregroundColor(.blue)
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if let url = URL(string: linkedin), UIApplication.shared.canOpenURL(url) {
+                            UIApplication.shared.open(url)
+                        } else {
+                            print("Invalid LinkedIn URL: \(linkedin)")
+                        }
+                    }
                 }
             }
         }
@@ -467,6 +528,8 @@ struct ProfileView: View {
         editMajor = user.uniMajor ?? ""
         editInterests = user.fieldOfInterest ?? ""
         editCompany = user.currentCompany ?? ""
+        editLinkedinUrl = user.linkedinUrl ?? ""
+        editBirthday = user.birthday ?? ""
         
         isEditing = true
     }
@@ -486,6 +549,8 @@ struct ProfileView: View {
         userData["uni_major"] = editMajor
         userData["field_of_interest"] = editInterests
         userData["current_company"] = editCompany
+        userData["linkedin_url"] = editLinkedinUrl
+        userData["birthday"] = editBirthday
         
         // Update the user through coordinator
         coordinator.networkManager.updateUser(userId: user.id, userData: userData) { result in

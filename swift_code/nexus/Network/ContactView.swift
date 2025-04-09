@@ -33,6 +33,8 @@ struct ContactView: View {
     @State private var editInterests = ""
     @State private var editHighSchool = ""
     @State private var editNotes = ""
+    @State private var editLinkedinUrl = ""
+    @State private var editBirthday = ""
     
     // Add state for confirmation dialog
     @State private var showDeleteConfirmation = false
@@ -464,13 +466,28 @@ struct ContactView: View {
                 
                 // Divider only if both description and contact info exist
                 if (relationship?.relationshipDescription != nil) && 
-                   (user.email != nil || user.phoneNumber != nil) {
+                   (user.email != nil || user.phoneNumber != nil || user.birthday != nil || user.linkedinUrl != nil) {
                     Divider()
                         .padding(.vertical, 4)
                 }
                 
                 // Contact information
                 if isEditing {
+                    // Birthday field at the top
+                    HStack {
+                        Image(systemName: "calendar")
+                            .foregroundColor(.blue)
+                            .frame(width: 20)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Birthday")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            
+                            TextField("MM/DD/YYYY", text: $editBirthday)
+                        }
+                    }
+                    
                     HStack {
                         Image(systemName: "envelope.fill")
                             .foregroundColor(.blue)
@@ -496,6 +513,21 @@ struct ContactView: View {
                                 .foregroundColor(.gray)
                             
                             TextField("Phone", text: $editPhone)
+                        }
+                    }
+                    
+                    // LinkedIn field under phone
+                    HStack {
+                        Image(systemName: "link")
+                            .foregroundColor(.blue)
+                            .frame(width: 20)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("LinkedIn")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            
+                            TextField("LinkedIn URL", text: $editLinkedinUrl)
                         }
                     }
                     
@@ -550,6 +582,12 @@ struct ContactView: View {
                     .scaleEffect(0.9)
                     .padding(.top, 8)
                 } else {
+                    // Birthday field at the top
+                    if let birthday = user.birthday {
+                        InfoRow(icon: "calendar", title: "Birthday", value: birthday)
+                            .padding(.vertical, 4)
+                    }
+                
                     if let email = user.email {
                         HStack {
                             InfoRow(icon: "envelope.fill", title: "Email", value: email)
@@ -579,6 +617,31 @@ struct ContactView: View {
                         .onTapGesture {
                             if let url = URL(string: "tel:\(phone.replacingOccurrences(of: " ", with: ""))") {
                                 UIApplication.shared.open(url)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    
+                    // LinkedIn field under phone
+                    if let linkedin = user.linkedinUrl, !linkedin.isEmpty {
+                        HStack {
+                            Image(systemName: "link")
+                                .foregroundColor(.blue)
+                                .frame(width: 20)
+                            Text("LinkedIn")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                            Spacer()
+                            Image(systemName: "arrow.up.forward.app")
+                                .font(.system(size: 12))
+                                .foregroundColor(.blue)
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            if let url = URL(string: linkedin), UIApplication.shared.canOpenURL(url) {
+                                UIApplication.shared.open(url)
+                            } else {
+                                print("Invalid LinkedIn URL: \(linkedin)")
                             }
                         }
                         .padding(.vertical, 4)
@@ -619,6 +682,8 @@ struct ContactView: View {
         editInterests = user.fieldOfInterest ?? ""
         editHighSchool = user.highSchool ?? ""
         editNotes = relationship?.notes ?? ""
+        editLinkedinUrl = user.linkedinUrl ?? ""
+        editBirthday = user.birthday ?? ""
         
         isEditing = true
     }
@@ -641,6 +706,8 @@ struct ContactView: View {
         userData["ethnicity"] = editEthnicity
         userData["field_of_interest"] = editInterests
         userData["high_school"] = editHighSchool
+        userData["linkedin_url"] = editLinkedinUrl
+        userData["birthday"] = editBirthday
         
         // Store local reference to the relationship for use in closures
         let currentRelationship = relationship
