@@ -446,4 +446,17 @@ struct TagBadge: View {
         .foregroundColor(.blue)
         .cornerRadius(16)
     }
+}
+
+// MARK: - Keyboard Dismissal Extension
+
+extension View {
+    /// Adds keyboard dismissal functionality when tapping anywhere on the view
+    /// This can be applied to any view to dismiss the keyboard when tapping outside text fields
+    func dismissKeyboardOnTap() -> some View {
+        self.contentShape(Rectangle())
+            .onTapGesture {
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+            }
+    }
 } 

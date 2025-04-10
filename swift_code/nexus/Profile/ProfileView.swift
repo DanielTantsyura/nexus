@@ -78,6 +78,7 @@ struct ProfileView: View {
         }
         .id("profile-view-\(refreshTrigger)") // Force entire view to refresh when data changes
         .navigationBarHidden(true)
+        .dismissKeyboardOnTap()
         .alert(isPresented: $showLogoutConfirmation) {
             logoutAlert
         }

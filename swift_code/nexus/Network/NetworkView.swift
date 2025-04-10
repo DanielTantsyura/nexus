@@ -237,17 +237,22 @@ struct NetworkView: View {
                     ) // Prevent taps from passing through
                 }
                 
-                // Search results counter
-                if !searchText.isEmpty || !selectedTags.isEmpty {
-                    HStack {
+                // Search results counter - Always show and more compact
+                HStack {
+                    if !searchText.isEmpty || !selectedTags.isEmpty {
                         Text("\(filteredConnections.count) connection\(filteredConnections.count == 1 ? "" : "s") found")
-                            .font(.caption)
+                            .font(.caption2)
                             .foregroundColor(.secondary)
-                        
-                        Spacer()
+                    } else {
+                        Text("\(filteredConnections.count) connection\(filteredConnections.count == 1 ? "" : "s")")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
                     }
-                    .padding(.top, 4)
+                    
+                    Spacer()
                 }
+                .padding(.top, 0)
+                .padding(.bottom, 0)
                 
                 // Main content
                 connectionsList
@@ -312,7 +317,9 @@ struct NetworkView: View {
         } message: {
             Text("Are you sure you want to delete this contact? This action cannot be undone.")
         }
+        .dismissKeyboardOnTap()
         .onTapGesture {
+            // Close tag selector if open
             if showTagSelector {
                 withAnimation {
                     showTagSelector = false
@@ -391,7 +398,7 @@ struct NetworkView: View {
     
     /// Content displayed when connections exist
     private var connectionListContent: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 10) {
             // Show connections
             ForEach(filteredConnections) { connection in
                 connectionCard(for: connection)
@@ -484,7 +491,7 @@ struct NetworkView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         
                         // Contact buttons - smaller and more compact
-                        HStack(spacing: 10) {
+                        HStack(spacing: 8) {
                             if let email = connection.user.email, !email.isEmpty {
                                 Button(action: {
                                     if let url = URL(string: "mailto:\(email)") {
@@ -506,6 +513,32 @@ struct NetworkView: View {
                                     Label("Call", systemImage: "phone.fill")
                                         .font(.system(size: 10))
                                         .foregroundColor(.green)
+                                }
+                            }
+                            
+                            // LinkedIn button - opens LinkedIn profile if URL exists
+                            if let linkedInUrl = connection.user.linkedinUrl, !linkedInUrl.isEmpty {
+                                Button(action: {
+                                    if let url = URL(string: linkedInUrl) {
+                                        UIApplication.shared.open(url)
+                                    }
+                                }) {
+                                    Label("LinkedIn", systemImage: "link")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.blue)
+                                }
+                            } else {
+                                // Fallback search on LinkedIn by name
+                                Button(action: {
+                                    // Create a LinkedIn search URL with the person's name
+                                    let searchName = connection.user.fullName.replacingOccurrences(of: " ", with: "%20")
+                                    if let url = URL(string: "https://www.linkedin.com/search/results/people/?keywords=\(searchName)") {
+                                        UIApplication.shared.open(url)
+                                    }
+                                }) {
+                                    Label("LinkedIn", systemImage: "link")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.blue)
                                 }
                             }
                         }

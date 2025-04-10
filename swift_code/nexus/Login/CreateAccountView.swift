@@ -181,6 +181,7 @@ struct CreateAccountView: View {
                     }
                 }
             }
+            .dismissKeyboardOnTap()
         }
     }
     

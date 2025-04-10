@@ -69,6 +69,7 @@ struct ContactView: View {
         .navigationTitle(user.fullName)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(isEditing)
+        .dismissKeyboardOnTap()
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 if isEditing {

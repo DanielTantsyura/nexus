@@ -62,6 +62,9 @@ struct MainTabView: View {
                     // Post a notification that will be picked up by ContactView
                     NotificationCenter.default.post(name: NSNotification.Name("CancelContactEditing"), object: nil)
                 }
+                
+                // Call coordinator's selectTab method to handle the tab change
+                coordinator.selectTab(newTab)
             }
             
             // Only show add button if keyboard is not visible
@@ -73,9 +76,6 @@ struct MainTabView: View {
                 })
                 .offset(y: 8)
             }
-        }
-        .onChange(of: coordinator.selectedTab) { oldValue, newValue in
-            coordinator.selectTab(newValue)
         }
     }
     
@@ -170,25 +170,6 @@ struct LoadingOverlayView: View {
                     .fill(Color(UIColor.systemGray5))
             )
         }
-    }
-}
-
-// MARK: - Extension for keyboard handling
-
-extension View {
-    /// Adds automatic keyboard dismissal when tapping outside input fields
-    func dismissKeyboardOnTap() -> some View {
-        self.modifier(DismissKeyboardOnTap())
-    }
-}
-
-/// View modifier that dismisses the keyboard when tapping outside input fields
-struct DismissKeyboardOnTap: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .onTapGesture {
-                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-            }
     }
 }
 
