@@ -679,11 +679,14 @@ struct ContactView: View {
                         
                         // Update relationship (notes + tags) if we have it
                         if let relationship = currentRelationship {
+                            // Only pass tags if the array is not empty
+                            let tagsToUpdate = self.editTags.isEmpty ? nil : self.editTags
+                            
                             coordinator.networkManager.updateConnection(
                                 contactId: self.user.id,
                                 description: relationship.relationshipDescription,
                                 notes: self.editNotes,
-                                tags: self.editTags
+                                tags: tagsToUpdate
                             ) { updateResult in
                                 if case .success(true) = updateResult {
                                     // Force a refresh of connections from the network manager
