@@ -32,6 +32,15 @@ struct CreateContactView: View {
     /// User created after submitting the form
     @State private var createdUser: User? = nil
     
+    /// Filtered tags based on search text
+    @State private var filteredTags: [String] = []
+    
+    /// Recent tags from user's history
+    @State private var recentTags: [String] = []
+    
+    /// All tags ranked by frequency with recent tags first
+    @State private var orderedTags: [String] = []
+    
     /// Environment access to keyboard dismiss mode
     @Environment(\.keyboardDismissMode) private var keyboardDismissMode
    
@@ -68,21 +77,22 @@ struct CreateContactView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                // App header with X button
+                // App header with checkmark button (replaces X button)
                 AppHeader(
                     firstName: coordinator.networkManager.currentUser?.firstName,
                     subtitle: "Your personal network tracker"
                 ) {
                     Button(action: {
-                        clearForm()
+                        submitContact()
                         hideKeyboard()
-                        coordinator.backFromCreateContact()
                     }) {
-                        Image(systemName: "xmark")
-                            .foregroundColor(.red)
-                            .font(.system(size: 24))
-                            .frame(height: 50)
+                        Image(systemName: "checkmark")
+                            .foregroundColor(.white)
+                            .font(.system(size: 20))
+                            .padding(12)
+                            .background(Circle().fill(contactText.isEmpty ? Color.green.opacity(0.5) : Color.green))
                     }
+                    .disabled(contactText.isEmpty)
                 }
                 .padding(.bottom, 10)
                 
@@ -122,13 +132,9 @@ struct CreateContactView: View {
         .dismissKeyboardOnTap()
         .navigationBarHidden(true)
         .onAppear {
-            // Auto-focus the contact text field when view appears
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                contactTextFieldFocused = true
-            }
-            
-            // Fetch recent tags when the view appears
-            coordinator.networkManager.fetchRecentTags()
+            // Fetch tags when the view appears
+            loadAllTags()
+            fetchRecentTags()
         }
         .disabled(isSubmitting)
         .overlay {
@@ -195,30 +201,28 @@ struct CreateContactView: View {
     /// Multi-line text entry area for contact information
     private var contactTextArea: some View {
         SectionCard(title: "") {
-            ZStack(alignment: .topLeading) {
+            ZStack(alignment: .leading) {
                 TextEditor(text: $contactText)
-                    .frame(minHeight: 150)
-                    .padding(4)
+                    .scrollContentBackground(.hidden)
+                    .padding(8)
                     .background(Color(UIColor.secondarySystemBackground))
                     .cornerRadius(8)
                     .focused($contactTextFieldFocused)
+                    .frame(minHeight: 120, maxHeight: .infinity)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
                     )
                 
                 if contactText.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("First Name Last Name 123-456-7890 SpaceX Product Manager Hiking Pickleball Met at John's 24th Birthday Lives in Austin TX")
-                            .foregroundColor(.gray)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 8)
-                    }
+                    Text("John Smith, Software Engineer at Apple, lives in New York and went to Columbia University...")
+                        .foregroundColor(.gray)
+                        .allowsHitTesting(false)
                 }
             }
         }
     }
-   
+    
     /// View displaying selected tags with delete functionality
     private var selectedTagsView: some View {
         Group {
@@ -276,58 +280,42 @@ struct CreateContactView: View {
     private var tagSection: some View {
         SectionCard(title: "Add Tags") {
             VStack(alignment: .leading, spacing: 16) {
-                // Recent tags
-                if !coordinator.networkManager.recentTags.isEmpty {
+                // Combined tags section
+                if !orderedTags.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Recent Tags")
+                        Text(newTagText.isEmpty ? "Commonly Used Tags" : "Matching Tags")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
-                       
-                        // Use a LazyVGrid for tag layout instead of FlowLayout
-                        LazyVGrid(
-                            columns: [
-                                GridItem(.adaptive(minimum: 80, maximum: 120), spacing: 8)
-                            ],
-                            spacing: 8
-                        ) {
-                            ForEach(sortedTags, id: \.self) { tag in
-                                Button(action: {
-                                    addTag(tag)
-                                    hideKeyboard()
-                                }) {
-                                    Text(tag)
-                                        .font(.system(size: 11))
-                                        .lineLimit(1)
-                                        .truncationMode(.tail)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 5)
-                                        .background(selectedTags.contains(tag) 
-                                            ? tagColor(for: tag).opacity(0.3)
-                                            : tagColor(for: tag).opacity(0.1))
-                                        .foregroundColor(selectedTags.contains(tag)
-                                            ? tagColor(for: tag)
-                                            : tagColor(for: tag).opacity(0.8))
-                                        .cornerRadius(14)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 14)
-                                                .stroke(tagColor(for: tag).opacity(selectedTags.contains(tag) ? 0.5 : 0.2), lineWidth: 1)
-                                        )
+                        
+                        // Horizontal scrollable tag grid
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            LazyHGrid(rows: [
+                                GridItem(.adaptive(minimum: 28, maximum: 32), spacing: 8),
+                                GridItem(.adaptive(minimum: 28, maximum: 32), spacing: 8),
+                                GridItem(.adaptive(minimum: 28, maximum: 32), spacing: 8)
+                            ], spacing: 8) {
+                                ForEach(newTagText.isEmpty ? orderedTags : filteredTags, id: \.self) { tag in
+                                    tagButton(tag)
                                 }
-                                .buttonStyle(PlainButtonStyle())
                             }
+                            .padding(.vertical, 4)
                         }
+                        .frame(height: 100)
                     }
                 }
-               
-                // Custom tag creation
+                
+                // Custom tag creation - moved below the tag list
                 HStack {
-                    TextField("Add custom tag...", text: $newTagText)
+                    TextField("Search or add custom tag...", text: $newTagText)
                         .focused($tagTextFieldFocused)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .background(Color(UIColor.secondarySystemBackground))
                         .cornerRadius(8)
+                        .onChange(of: newTagText) { _, newValue in
+                            // Filter tags when typing
+                            updateFilteredTags()
+                        }
                         .onSubmit {
                             addCustomTag()
                             hideKeyboard()
@@ -348,6 +336,30 @@ struct CreateContactView: View {
                     .disabled(newTagText.isEmpty)
                 }
             }
+        }
+    }
+   
+    /// Tag button used throughout the interface
+    private func tagButton(_ tag: String) -> some View {
+        Button(action: {
+            toggleTag(tag)
+            hideKeyboard()
+        }) {
+            Text(tag)
+                .font(.system(size: 11))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(selectedTags.contains(tag)
+                    ? tagColor(for: tag).opacity(0.3)
+                    : tagColor(for: tag).opacity(0.1))
+                .foregroundColor(selectedTags.contains(tag)
+                    ? tagColor(for: tag)
+                    : tagColor(for: tag).opacity(0.8))
+                .cornerRadius(14)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(tagColor(for: tag).opacity(selectedTags.contains(tag) ? 0.5 : 0.2), lineWidth: 1)
+                )
         }
     }
    
@@ -388,6 +400,18 @@ struct CreateContactView: View {
     /// Removes a tag from the selected tags array
     private func removeTag(_ tag: String) {
         selectedTags.removeAll { $0 == tag }
+        print("Removed tag: \(tag)")
+    }
+    
+    /// Toggle a tag selection
+    private func toggleTag(_ tag: String) {
+        if selectedTags.contains(tag) {
+            removeTag(tag)
+            print("Removed tag: \(tag)")
+        } else {
+            selectedTags.append(tag)
+            print("Added tag: \(tag)")
+        }
     }
    
     /// Clears the form fields
@@ -398,6 +422,7 @@ struct CreateContactView: View {
         errorMessage = nil
         successMessage = nil
         createdUser = nil
+        updateFilteredTags()
     }
    
     /// Submits the contact information to the API
@@ -407,33 +432,46 @@ struct CreateContactView: View {
         isSubmitting = true
         errorMessage = nil
        
-        coordinator.networkManager.createContact(fromText: contactText, tags: selectedTags) { result in
-            isSubmitting = false
+        // Auto-capitalize the contact text
+        let capitalizedText = capitalizeContactText(contactText)
+        
+        // Filter out any empty tags and capitalize the rest
+        let finalTags = selectedTags
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .map { capitalizeTag($0) }
+        
+        print("Submitting contact with text length: \(capitalizedText.count) characters")
+        print("Tags to submit: \(finalTags.isEmpty ? "none" : "\(finalTags)")")
+        print("Tag count: \(finalTags.count)")
+       
+        // Create contact with all tags in one step (API now handles multiple tags)
+        coordinator.networkManager.createContact(fromText: capitalizedText, tags: finalTags) { result in
+            self.isSubmitting = false
            
             switch result {
             case .success(let userId):
-                successMessage = "Contact created successfully!"
-                // Automatically hide success message after a few seconds
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                    withAnimation {
-                        successMessage = nil
+                print("Contact created with ID: \(userId)")
+                
+                // Clear the form
+                self.clearForm()
+                
+                // Navigate to the edit view for the newly created contact
+                self.coordinator.networkManager.fetchUser(withId: userId) { userResult in
+                    switch userResult {
+                    case .success(let user):
+                        // Navigate to the contact view in edit mode
+                        DispatchQueue.main.async {
+                            self.coordinator.showContactInEditMode(user)
+                        }
+                    case .failure(let error):
+                        self.errorMessage = "Contact created but couldn't load details: \(error.localizedDescription)"
                     }
                 }
-                // Clear the form after successful creation
-                clearForm()
                 
             case .failure(let error):
-                errorMessage = "Failed to create contact: \(error.localizedDescription)"
+                self.errorMessage = "Failed to create contact: \(error.localizedDescription)"
             }
-        }
-    }
-   
-    /// Adds a tag to the selected tags array if not already present
-    private func addTag(_ tag: String) {
-        if !selectedTags.contains(tag) {
-            selectedTags.append(tag)
-        } else {
-            removeTag(tag)
         }
     }
    
@@ -441,9 +479,21 @@ struct CreateContactView: View {
     private func addCustomTag() {
         let trimmedText = newTagText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty else { return }
-       
-        addTag(trimmedText)
+        
+        // Capitalize the tag before adding
+        let capitalizedTag = capitalizeTag(trimmedText)
+        
+        // Make sure the tag isn't already in the list
+        if !selectedTags.contains(capitalizedTag) {
+            selectedTags.append(capitalizedTag)
+            print("Added custom tag: \(capitalizedTag)")
+        } else {
+            print("Tag already exists: \(capitalizedTag)")
+        }
+        
+        // Reset search field and update filtering
         newTagText = ""
+        updateFilteredTags()
     }
     
     /// Helper to explicitly hide the keyboard
@@ -451,6 +501,150 @@ struct CreateContactView: View {
         contactTextFieldFocused = false
         tagTextFieldFocused = false
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+    
+    /// Fetch user's recent tags
+    private func fetchRecentTags() {
+        guard coordinator.networkManager.userId != nil else { return }
+        
+        // First, directly fetch recent tags from NetworkManager
+        coordinator.networkManager.fetchRecentTags()
+        
+        // After a short delay, get the tags from the published property
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.recentTags = Array(self.coordinator.networkManager.recentTags.prefix(3))
+            print("Loaded \(self.recentTags.count) recent tags from NetworkManager")
+            
+            // If no recent tags were loaded, try fetching with the completion handler as fallback
+            if self.recentTags.isEmpty {
+                self.fetchRecentTagsWithCompletion()
+            } else {
+                // Update the ordered tags when recent tags are loaded
+                self.updateOrderedTags()
+            }
+        }
+    }
+    
+    /// Fallback method to fetch recent tags using the completion handler
+    private func fetchRecentTagsWithCompletion() {
+        coordinator.networkManager.fetchUserRecentTags { result in
+            switch result {
+            case .success(let tags):
+                DispatchQueue.main.async {
+                    self.recentTags = Array(tags.prefix(3))
+                    print("Loaded \(self.recentTags.count) recent tags via completion handler")
+                    self.updateOrderedTags()
+                }
+            case .failure(let error):
+                print("Failed to load recent tags: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    /// Load all tags from connections
+    private func loadAllTags() {
+        // Ensure connections are loaded
+        guard let userId = coordinator.networkManager.userId else { return }
+        
+        coordinator.networkManager.fetchConnections(forUserId: userId) 
+        
+        // Extract and sort tags by frequency
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            let tagCounts = self.countTagsFromConnections()
+            let rankedTags = tagCounts.sorted { $0.value > $1.value }.map { $0.key }
+            
+            // Update the ordered tags with the ranked tags
+            self.filteredTags = rankedTags
+            self.updateOrderedTags()
+            print("Loaded \(rankedTags.count) ranked tags")
+        }
+    }
+    
+    /// Update the ordered tags list with recent tags at the front
+    private func updateOrderedTags() {
+        // Start with recent tags
+        var newOrderedTags = recentTags
+        
+        // Add other tags that aren't already in the list
+        for tag in filteredTags {
+            if !newOrderedTags.contains(tag) {
+                newOrderedTags.append(tag)
+            }
+        }
+        
+        // Update the state variable
+        self.orderedTags = newOrderedTags
+        print("Updated ordered tags: \(newOrderedTags.count) total with \(recentTags.count) recent tags first")
+    }
+    
+    /// Count tag frequency in connections
+    private func countTagsFromConnections() -> [String: Int] {
+        var tagCounts: [String: Int] = [:]
+        
+        for connection in coordinator.networkManager.connections {
+            if let tags = connection.tags {
+                for tag in tags {
+                    tagCounts[tag, default: 0] += 1
+                }
+            }
+        }
+        
+        return tagCounts
+    }
+    
+    /// Update filtered tags based on search
+    private func updateFilteredTags() {
+        if newTagText.isEmpty {
+            // Show all tags in the ordered list
+            filteredTags = orderedTags
+        } else {
+            // Filter tags that contain the search text
+            let searchText = newTagText.lowercased()
+            filteredTags = orderedTags.filter { $0.lowercased().contains(searchText) }
+        }
+    }
+    
+    /// Properly capitalize tags
+    private func capitalizeTag(_ tag: String) -> String {
+        return tag.split(separator: " ")
+            .map { String($0).capitalized }
+            .joined(separator: " ")
+    }
+    
+    /// Capitalize contact text properly
+    private func capitalizeContactText(_ text: String) -> String {
+        // Keep the original formatting but ensure names and proper nouns are capitalized
+        // This is a simplified implementation - a more robust solution could be implemented
+        // if needed to identify proper nouns, company names, etc.
+        
+        // Split by newlines to preserve format
+        let lines = text.split(separator: "\n")
+        let processedLines = lines.map { line -> String in
+            // Process each line
+            let lineString = String(line)
+            
+            // Split by commas
+            let components = lineString.split(separator: ",")
+            let processedComponents = components.map { component -> String in
+                let trimmed = String(component).trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                // Don't capitalize emails or URLs
+                if trimmed.contains("@") || trimmed.contains("http") {
+                    return trimmed
+                }
+                
+                // Capitalize words
+                let words = trimmed.split(separator: " ")
+                let capitalizedWords = words.map { String($0).capitalized }
+                return capitalizedWords.joined(separator: " ")
+            }
+            
+            // Rejoin with commas
+            return processedComponents.joined(separator: ", ")
+        }
+        
+        // Rejoin with newlines
+        return processedLines.joined(separator: "\n")
     }
 }
 

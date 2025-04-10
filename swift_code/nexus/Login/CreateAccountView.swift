@@ -231,7 +231,7 @@ struct CreateAccountView: View {
         errorMessage = nil
         
         // Create user data dictionary for the people table
-        var userData: [String: Any] = [
+        let userData: [String: Any] = [
             "first_name": firstName,
             "last_name": lastName,
             "username": username,

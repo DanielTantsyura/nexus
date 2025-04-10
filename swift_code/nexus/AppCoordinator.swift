@@ -196,6 +196,32 @@ final class AppCoordinator: ObservableObject {
         networkManager.scheduleRefreshSignal(type: .profile, delay: 0.2)
     }
     
+    /// Navigate to the user detail screen and immediately start editing
+    /// - Parameter user: The user to display and edit
+    func showContactInEditMode(_ user: User) {
+        // First set the proper tab
+        selectedTab = .network
+        
+        // Force navigation path to be empty first to avoid any stacking issues
+        networkTabPath = NavigationPath()
+        
+        // Now show the contact
+        networkManager.selectedUser = user
+        networkTabPath.append(user)
+        navigationPath = networkTabPath
+        activeScreen = .contact
+        
+        // Set a flag in UserDefaults that ContactView will check to start editing
+        UserDefaults.standard.set(true, forKey: "StartContactInEditMode")
+        UserDefaults.standard.set(user.id, forKey: "EditContactId")
+        
+        // Schedule a refresh signal
+        networkManager.scheduleRefreshSignal(type: .profile, delay: 0.3)
+        
+        // Print debug info
+        print("Navigating to contact edit mode for user ID: \(user.id), name: \(user.fullName)")
+    }
+    
     /// Navigate back from user detail to user list
     func navigateBackFromContact() {
         // If we're showing user detail, go back to user list

@@ -106,12 +106,26 @@ struct ContactView: View {
         }
         .onAppear {
             coordinator.activeScreen = .contact
-            
-            // If we don’t already have a relationship loaded, fetch it once
-            loadRelationshipIfNeeded()
-            
-            // Update "last viewed" if needed
+            loadRelationship()
             updateLastViewed()
+            
+            // Check if we should start in edit mode
+            if UserDefaults.standard.bool(forKey: "StartContactInEditMode") {
+                let editContactId = UserDefaults.standard.integer(forKey: "EditContactId")
+                if editContactId == user.id {
+                    // Clear the flags so it only happens once
+                    UserDefaults.standard.set(false, forKey: "StartContactInEditMode")
+                    UserDefaults.standard.removeObject(forKey: "EditContactId")
+                    
+                    print("Starting edit mode for newly created contact: \(user.id)")
+                    
+                    // Start editing after a short delay to ensure view is fully loaded
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        self.isEditing = true
+                        startEditing()
+                    }
+                }
+            }
             
             // Subscribe to refresh signals so we can toggle refreshTrigger
             refreshCancellable = coordinator.networkManager.$refreshSignal
@@ -121,7 +135,7 @@ struct ContactView: View {
                     // Only refresh if it's relevant for connections or contact changes
                     if refreshType == .connections {
                         // Relationship data might have changed or re-fetched
-                        reloadRelationship() 
+                        self.loadRelationship() 
                         refreshTrigger.toggle()
                     }
                 }
@@ -134,7 +148,7 @@ struct ContactView: View {
     
     // MARK: - Relationship Loading
     
-    private func loadRelationshipIfNeeded() {
+    private func loadRelationship() {
         guard let currentUserId = coordinator.networkManager.userId else { return }
         guard currentUserId != user.id else { return } // Skip if looking at ourselves
         
@@ -145,16 +159,7 @@ struct ContactView: View {
             // We'll rely on the refresh signal that fetchConnections emits
         }
         
-        // Then in reloadRelationship() below, we actually update `relationship` from the manager.
-        // This way we avoid the repeated .asyncAfter stuff.
-        reloadRelationship()
-    }
-    
-    private func reloadRelationship() {
-        guard let currentUserId = coordinator.networkManager.userId else { return }
-        guard currentUserId != user.id else { return }
-        
-        // Try to find the connection in the manager’s memory
+        // Try to find the connection in the manager's memory
         let found = coordinator.networkManager.connections.first { $0.id == self.user.id }
         self.relationship = found
         self.isLoadingRelationship = false
