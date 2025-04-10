@@ -589,38 +589,30 @@ struct NetworkView: View {
                 // Right side: Tags
                 if let tags = connection.tags, !tags.isEmpty {
                     VStack(alignment: .trailing, spacing: 2) {
-                        // Grid layout for tags with max display and ellipsis
-                        let displayTags = tags.count > 8 
-                            ? Array(tags.prefix(7)) + ["..."] 
+                        // Show max 4 tags in a single column with ellipsis if more
+                        let displayTags = tags.count > 4 
+                            ? Array(tags.prefix(3)) + ["..."] 
                             : tags
                         
-                        LazyVGrid(
-                            columns: [
-                                GridItem(.adaptive(minimum: 50, maximum: 60), spacing: 2)
-                            ],
-                            alignment: .trailing,
-                            spacing: 2
-                        ) {
-                            ForEach(displayTags, id: \.self) { tag in
-                                Text(tag)
-                                    .font(.system(size: 10))
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(tag == "..." 
-                                        ? Color.gray.opacity(0.2) 
-                                        : tagColor(for: tag).opacity(0.2))
-                                    .foregroundColor(tag == "..." 
-                                        ? Color.gray 
-                                        : tagColor(for: tag))
-                                    .cornerRadius(6)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.8)
-                            }
+                        ForEach(displayTags, id: \.self) { tag in
+                            Text(tag)
+                                .font(.system(size: 10))
+                                .padding(.horizontal, 4) // Reduced from 8 to 4
+                                .padding(.vertical, 4)
+                                .background(tag == "..." 
+                                    ? Color.gray.opacity(0.2) 
+                                    : tagColor(for: tag).opacity(0.2))
+                                .foregroundColor(tag == "..." 
+                                    ? Color.gray 
+                                    : tagColor(for: tag))
+                                .cornerRadius(6)
+                                .lineLimit(1)
+                                .frame(maxWidth: 70) // Reduced from 80 to 70
                         }
-                        .frame(width: 120)
-                        .layoutPriority(0)
-                        .padding(.trailing, -4)
+                        .padding(.trailing, -2) // Reduced from -4 to -2
                     }
+                    .frame(width: 75) // Reduced from 85 to 75
+                    .layoutPriority(0)
                 }
             }
             .padding(.vertical, 2) // Reduced vertical padding from 4 to 2
