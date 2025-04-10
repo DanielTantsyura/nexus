@@ -181,14 +181,15 @@ def add_connection():
     data = request.json
     
     # Validate required fields
-    required_fields = ['user_id', 'contact_id', 'relationship_type']
+    required_fields = ['user_id', 'contact_id', 'relationship_description']
     for field in required_fields:
         if field not in data:
             return jsonify({"error": f"Missing required field: {field}"}), 400
     
     user_id = data['user_id']
     contact_id = data['contact_id']
-    relationship_description = data['relationship_type']
+    # Get value from API as relationship_description but use it as relationship_description internally
+    relationship_description = data['relationship_description']
     custom_note = data.get('note')
     tags = data.get('tags')
     
@@ -217,7 +218,7 @@ def add_connection():
             if not contact:
                 return jsonify({"error": f"Contact with ID {contact_id} not found"}), 404
             
-            # Add the connection
+            # Add the connection - API uses relationship_description but DB expects relationship_description
             success = db_manager.add_connection(user_id, contact_id, relationship_description, custom_note, connection_tags)
             
             # Update the user's recent tags if tags were provided
@@ -277,8 +278,9 @@ def update_connection():
         update_data['tags'] = None
     
     # Map field names from API to database schema
-    if 'relationship_type' in update_data:
-        update_data['relationship_description'] = update_data.pop('relationship_type')
+    # The API uses 'relationship_description' but the DB and Swift model expect 'relationship_description'
+    if 'relationship_description' in update_data:
+        update_data['relationship_description'] = update_data.pop('relationship_description')
     
     if 'note' in update_data:
         update_data['notes'] = update_data.pop('note')
@@ -370,7 +372,8 @@ def create_contact():
     
     user_id = data['user_id']
     contact_text = data['contact_text']
-    relationship_type = data.get('relationship_type', 'contact')
+    # API uses relationship_description, but internally we'll use relationship_description to match DB/Swift
+    relationship_description = data.get('relationship_description', 'Contact')
     
     # Get custom tags if provided in the request
     custom_tags = data.get('tags', [])
@@ -390,7 +393,7 @@ def create_contact():
         connection_tags = None
     
     # Log request info for debugging
-    print(f"Contact creation request: user_id={user_id}, text_length={len(contact_text)}, relationship_type={relationship_type}, tags={custom_tags}")
+    print(f"Contact creation request: user_id={user_id}, text_length={len(contact_text)}, relationship_description={relationship_description}, tags={custom_tags}")
     
     try:
         # First check if the user exists
@@ -434,10 +437,11 @@ def create_contact():
             user_data["username"] = f"{first}{last}"
             user_data["recent_tags"] = DEFAULT_TAGS
 
-            relationship_description = relationship_future.result()
-            if relationship_description and relationship_description != "Contact":
-                relationship_type = relationship_description
-                print(f"Using LLM-generated relationship type: {relationship_type}")
+            # Get the relationship description from the parallel task
+            relationship_from_llm = relationship_future.result()
+            if relationship_from_llm and relationship_from_llm != "Contact":
+                relationship_description = relationship_from_llm
+                print(f"Using LLM-generated relationship description: {relationship_description}")
             
             # Directly use database operations to create the user
             with db_manager:
@@ -454,10 +458,11 @@ def create_contact():
                     print(f"Using note: {note}")
                     
                     # Create the connection with the note and all custom tags in one operation
+                    # Swift model expects relationship_description
                     connection_success = db_manager.add_connection(
                         user_id, 
                         new_user_id,
-                        relationship_type,
+                        relationship_description,  # This will be used as relationship_description in the DB
                         note,  # Use the LLM-extracted note
                         connection_tags  # Use all tags at once
                     )
