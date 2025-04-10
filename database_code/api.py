@@ -18,7 +18,7 @@ print(f"Files in current directory: {os.listdir('.')}")
 print(f"Environment variables: PORT={os.environ.get('PORT')}, API_HOST={os.environ.get('API_HOST')}")
 
 from database_operations import DatabaseManager
-from newUser import process_contact_text, create_new_contact
+from newContact import process_contact_text, create_new_contact
 from config import API_HOST, API_PORT, DATABASE_URL, API_DEBUG, DEFAULT_TAGS
 print(f"Config loaded: API_HOST={API_HOST}, API_PORT={API_PORT}, DATABASE_URL={DATABASE_URL} (truncated for security)")
 import argparse

@@ -1,11 +1,12 @@
 """
-Module for processing free-form text into structured user data and creating new users.
+Module for processing free-form text into structured user data and creating new contacts.
 
 This module uses the OpenAI API to extract structured information from
 unstructured text descriptions, and provides functions to:
 - Process contact text into user fields
-- Create new users from contact information
+- Create new contacts from contact information
 - Establish relationships between users
+- Ensure all input information is preserved in either structured fields or notes
 """
 
 import json
@@ -107,10 +108,7 @@ def process_contact_text(text: str) -> Tuple[bool, Optional[Dict[str, Any]], str
         The database has the following fields:
         {', '.join(USER_FIELDS)}
         
-        ADDITIONALLY, you need to extract a "note" field that contains any relationship context, 
-        descriptive details, or other information that doesn't fit into the structured fields above.
-        For example, if the text includes phrases like "close friend", "met at conference", or other context,
-        these should go into the note field.
+        ADDITIONALLY, you need to extract a "note" field that contains ALL remaining information that doesn't fit into the structured fields above.
         
         IMPORTANT GUIDELINES:
         1. The input might be a formal paragraph or a shorthand note with brief biographical information.
@@ -125,9 +123,14 @@ def process_contact_text(text: str) -> Tuple[bool, Optional[Dict[str, Any]], str
         6. If the information for a field is not provided, return null for that field
         7. Only extract first_name and last_name if they're clearly identifiable
         8. Don't guess or make up information that isn't in the text
-        9. For the note field, include only contextual information or descriptive details that don't fit the structured fields.
-           This might include relationship descriptions ("close friend"), how you met them, or personal observations.
-           If there is no such information, leave note as an empty string.
+        9. CRITICAL: The note field MUST preserve ALL information from the original text that isn't captured in the structured fields.
+           - Include relationship descriptions ("close friend", "met at a conference")
+           - Include personal observations or context ("good at tennis", "knows my sister")
+           - Include ANY other details not captured in structured fields (hobbies, personality traits, etc.)
+           - If there's any doubt about whether information belongs in a structured field, include it in the note
+           - Never discard any information from the input text
+           - The user will be frustrated if any information they provided is lost
+        10. If the note field would be empty after extracting structured fields, analyze the input again to ensure nothing was missed.
         
         Format your response as a valid JSON object with all these fields including note.
         """
@@ -181,9 +184,37 @@ def process_contact_text(text: str) -> Tuple[bool, Optional[Dict[str, Any]], str
             
             # Ensure note field exists (may be None or empty string)
             if "note" not in extracted_data:
-                extracted_data["note"] = ""
+                # If note field is missing, create a default note that captures any remaining information
+                structured_info = set()
+                for field in USER_FIELDS:
+                    if extracted_data.get(field):
+                        # Add the field value to the set of structured info
+                        if isinstance(extracted_data[field], str):
+                            structured_info.add(extracted_data[field].lower())
+                
+                # Create a note with any information not captured in structured fields
+                # This is a fallback mechanism to ensure we don't lose information
+                words = text.lower().split()
+                remaining_info = []
+                for word in words:
+                    word = word.strip('.,;:')
+                    if word and all(word not in info for info in structured_info):
+                        remaining_info.append(word)
+                
+                if remaining_info:
+                    extracted_data["note"] = " ".join(remaining_info)
+                else:
+                    extracted_data["note"] = ""
                 
             print(f"Extracted note: {extracted_data.get('note', '')}")
+            
+            # Double-check that we haven't lost any significant information
+            if not extracted_data.get("note") or len(extracted_data.get("note", "").strip()) < 10:
+                # Check if the original text is significantly longer than what we've captured
+                total_structured_length = sum(len(str(v) or "") for k, v in extracted_data.items() if k != "note" and v is not None)
+                if len(text.strip()) > total_structured_length + 20:  # If we're missing significant content
+                    # Create a simple note with whatever might be missing
+                    extracted_data["note"] = f"Additional information: {text}"
             
             return True, extracted_data, "Successfully extracted user information."
         
@@ -202,6 +233,7 @@ def basic_text_processing(text: str, fields: List[str]) -> Tuple[bool, Dict[str,
     Basic text processing for when OpenAI is not available.
     
     Extract first and last name from text and set all other fields to None.
+    Put all remaining text in the note field to ensure no information is lost.
     
     Args:
         text: Free-form text containing user information
@@ -225,9 +257,9 @@ def basic_text_processing(text: str, fields: List[str]) -> Tuple[bool, Dict[str,
         if field not in user_data:
             user_data[field] = None
     
-    # If there are more than just first and last name, use the rest as a note
+    # Put ALL remaining text in the note field to preserve information
     if len(words) > 2:
-        user_data["note"] = " ".join(words[2:])
+        user_data["note"] = text
     else:
         user_data["note"] = ""
     

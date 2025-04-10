@@ -25,7 +25,7 @@ The system allows users to:
    - Last login timestamp tracking for sorting the contacts
 
 2. **Natural Language Contact Creation**
-   - OpenAI GPT integration via `newUser.py` module
+   - OpenAI GPT integration via `newContact.py` module
    - Free-form text parsing into structured user data
    - Smart field extraction (names, universities, interests, etc.)
    - Suggested filling in of fields like email and location 
@@ -72,7 +72,7 @@ The system allows users to:
    - Comprehensive error handling and response formatting
 
 - **Natural Language Processing**
-   - `newUser.py` - OpenAI GPT integration for text processing
+   - `newContact.py` - OpenAI GPT integration for text processing
    - Structured user data extraction from free-form descriptions
    - Integration with database operations for seamless contact creation
 

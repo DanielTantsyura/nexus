@@ -28,7 +28,7 @@ The Flask-based API (`api.py`) provides endpoints for:
 
 ### Natural Language Processing
 
-The `newUser.py` module uses OpenAI's GPT-4o-mini to extract structured information from free-form text descriptions of contacts, enabling users to easily add new contacts by simply describing them.
+The `newContact.py` module uses OpenAI's GPT-4o-mini to extract structured information from free-form text descriptions of contacts, enabling users to easily add new contacts by simply describing them.
 
 ## Directory Structure
 
@@ -36,7 +36,7 @@ The `newUser.py` module uses OpenAI's GPT-4o-mini to extract structured informat
 - **database_operations.py**: Core database access layer with CRUD operations
 - **database_utils.py**: Helper functions for database access
 - **config.py**: Configuration settings and environment variables
-- **newUser.py**: OpenAI integration for text processing
+- **newContact.py**: OpenAI integration for text processing
 - **setupFiles/**: Database setup and initialization scripts
   - **createDatabase.py**: Schema creation script
   - **insertSampleUsers.py**: Sample user data script
@@ -44,23 +44,17 @@ The `newUser.py` module uses OpenAI's GPT-4o-mini to extract structured informat
   - **setup.py**: Unified setup script
 - **testFiles/**: Test suite for various components
   - **test_api.py**: API endpoint tests
-  - **test_newUser.py**: NLP processing tests
-  - **test_newUser_samples.py**: Sample-based NLP tests
+  - **test_database.py**: Database operations tests
+  - **test_newContact.py**: NLP processing tests
+  - **test_newContact_samples.py**: Sample-based NLP tests
   - **test_samples.json**: Test data for NLP tests
 
 ## Data Flow
 
-1. API request arrives at a Flask endpoint
-2. API layer validates input and prepares parameters
-3. Database operations layer executes SQL against PostgreSQL
-4. Results are processed and returned as JSON
-
-For contact creation via natural language:
-1. Text is sent to the `/contacts/create` endpoint
-2. `newUser.py` processes text using OpenAI's API
-3. Structured data is extracted and validated
-4. User record is created using database operations
-5. Relationship is established between the creator and new contact
+1. Client application sends a request to `api.py`
+2. `newContact.py` processes text using OpenAI's API
+3. `database_operations.py` performs CRUD operations
+4. Results are returned to the client
 
 ## Login Generation
 
@@ -165,7 +159,8 @@ To run specific test modules:
 
 ```bash
 python -m unittest testFiles.test_api
-python -m unittest testFiles.test_newUser
+python -m unittest testFiles.test_database
+python -m unittest testFiles.test_newContact
 ```
 
 These tests cover all major API functionality including:
