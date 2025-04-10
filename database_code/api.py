@@ -412,30 +412,13 @@ def create_contact():
                 elif isinstance(custom_tags, str):
                     tag_list = [tag.strip() for tag in custom_tags.split(',') if tag.strip()]
                     print(f"DEBUG: Converted custom_tags string to list: {tag_list}")
-            
-            print("DEBUG: Starting parallel operations with ThreadPoolExecutor")
-            # Start both operations in parallel using concurrent futures
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                # Start contact text processing
-                print("DEBUG: Submitting process_contact_text task")
-                contact_future = executor.submit(process_contact_text, contact_text)
-                
-                # Start relationship description generation in parallel
-                print(f"DEBUG: Submitting generate_relationship_description task with tag_list: {tag_list if tag_list else None}")
-                relationship_future = executor.submit(
-                    generate_relationship_description,
-                    user_id,
-                    contact_text,
-                    tag_list if tag_list else None
-                )
-
             # Get the processed contact data
-            print("DEBUG: Waiting for contact_future result")
-            success, user_data, message = contact_future.result()
-            print(f"DEBUG: contact_future completed - success: {success}, message: {message}")
+            print(f"Processing contact text for user_id={user_id}")
+            success, user_data, message = process_contact_text(contact_text)
+            print(f"Contact processing result: success={success}, message='{message}'")
             
             if not success or not user_data:
-                print(f"DEBUG: Contact processing failed: {message}")
+                print(f"Contact processing failed: {message}")
                 return jsonify({"error": message}), 400
                 
             # Add required fields that aren't part of the extraction
@@ -443,12 +426,12 @@ def create_contact():
             last = user_data.get("last_name", "").lower().replace(" ", "")
             user_data["username"] = f"{first}{last}"
             user_data["recent_tags"] = DEFAULT_TAGS
-            print(f"DEBUG: Generated username: {user_data['username']}")
+            print(f"Generated username: {user_data['username']}")
 
-            # Get the relationship description from the parallel task
-            print("DEBUG: Waiting for relationship_future result")
-            relationship_description = relationship_future.result()
-            print(f"DEBUG: Generated relationship description: {relationship_description}")
+            # Get the relationship description
+            print(f"Generating relationship description with {len(tag_list)} tags")
+            relationship_description = generate_relationship_description(user_id, contact_text, tag_list)
+            print(f"Generated relationship description: '{relationship_description}'")
             
             # Directly use database operations to create the user
             with db_manager:
