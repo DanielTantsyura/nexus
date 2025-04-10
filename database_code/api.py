@@ -372,8 +372,7 @@ def create_contact():
     
     user_id = data['user_id']
     contact_text = data['contact_text']
-    # API uses relationship_description, but internally we'll use relationship_description to match DB/Swift
-    relationship_description = data.get('relationship_description', 'Contact')
+    relationship_description = 'Contact'
     
     # Get custom tags if provided in the request
     custom_tags = data.get('tags', [])
@@ -393,7 +392,7 @@ def create_contact():
         connection_tags = None
     
     # Log request info for debugging
-    print(f"Contact creation request: user_id={user_id}, text_length={len(contact_text)}, relationship_description={relationship_description}, tags={custom_tags}")
+    print(f"Contact creation request: user_id={user_id}, text_length={len(contact_text)}, tags={custom_tags}")
     
     try:
         # First check if the user exists
@@ -409,15 +408,20 @@ def create_contact():
             if custom_tags:
                 if isinstance(custom_tags, list):
                     tag_list = custom_tags
+                    print(f"DEBUG: Using custom_tags as list: {tag_list}")
                 elif isinstance(custom_tags, str):
                     tag_list = [tag.strip() for tag in custom_tags.split(',') if tag.strip()]
+                    print(f"DEBUG: Converted custom_tags string to list: {tag_list}")
             
+            print("DEBUG: Starting parallel operations with ThreadPoolExecutor")
             # Start both operations in parallel using concurrent futures
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 # Start contact text processing
+                print("DEBUG: Submitting process_contact_text task")
                 contact_future = executor.submit(process_contact_text, contact_text)
                 
                 # Start relationship description generation in parallel
+                print(f"DEBUG: Submitting generate_relationship_description task with tag_list: {tag_list if tag_list else None}")
                 relationship_future = executor.submit(
                     generate_relationship_description,
                     user_id,
@@ -426,9 +430,12 @@ def create_contact():
                 )
 
             # Get the processed contact data
+            print("DEBUG: Waiting for contact_future result")
             success, user_data, message = contact_future.result()
+            print(f"DEBUG: contact_future completed - success: {success}, message: {message}")
             
             if not success or not user_data:
+                print(f"DEBUG: Contact processing failed: {message}")
                 return jsonify({"error": message}), 400
                 
             # Add required fields that aren't part of the extraction
@@ -436,17 +443,18 @@ def create_contact():
             last = user_data.get("last_name", "").lower().replace(" ", "")
             user_data["username"] = f"{first}{last}"
             user_data["recent_tags"] = DEFAULT_TAGS
+            print(f"DEBUG: Generated username: {user_data['username']}")
 
             # Get the relationship description from the parallel task
-            relationship_from_llm = relationship_future.result()
-            if relationship_from_llm and relationship_from_llm != "Contact":
-                relationship_description = relationship_from_llm
-                print(f"Using LLM-generated relationship description: {relationship_description}")
+            print("DEBUG: Waiting for relationship_future result")
+            relationship_description = relationship_future.result()
+            print(f"DEBUG: Generated relationship description: {relationship_description}")
             
             # Directly use database operations to create the user
             with db_manager:
                 print("Creating user in database...")
                 try:
+                    print(f"DEBUG: Adding user with data: {user_data}")
                     new_user_id = db_manager.add_user(user_data)
                     print(f"User created with ID: {new_user_id}")
                     
@@ -459,6 +467,7 @@ def create_contact():
                     
                     # Create the connection with the note and all custom tags in one operation
                     # Swift model expects relationship_description
+                    print(f"DEBUG: Adding connection - user_id: {user_id}, new_user_id: {new_user_id}, relationship: {relationship_description}, tags: {connection_tags}")
                     connection_success = db_manager.add_connection(
                         user_id, 
                         new_user_id,
@@ -475,19 +484,24 @@ def create_contact():
                         if custom_tags:
                             if isinstance(custom_tags, list) and len(custom_tags) > 0:
                                 tag_list = custom_tags
+                                print(f"DEBUG: Using custom_tags list for recent tags update: {tag_list}")
                             elif isinstance(custom_tags, str):
                                 tag_list = [tag.strip() for tag in custom_tags.split(',') if tag.strip()]
+                                print(f"DEBUG: Converted custom_tags string for recent tags update: {tag_list}")
                             else:
                                 tag_list = []
+                                print("DEBUG: No valid custom_tags for recent tags update")
                                 
                             if tag_list:
                                 print(f"Updating recent tags for user {user_id} with: {tag_list}")
                                 # Update the user's recent tags list for future tag suggestions
                                 db_manager.update_user_recent_tags(user_id, tag_list)
+                                print("DEBUG: Recent tags updated successfully")
                     else:
                         print("Connection creation failed")
                     
                     # Get the complete user object
+                    print(f"DEBUG: Retrieving complete user data for ID: {new_user_id}")
                     new_user = db_manager.get_user_by_id(new_user_id)
                     
                     # Return success with user data
@@ -498,7 +512,9 @@ def create_contact():
                         "user_id": new_user_id,
                         "connection_error": not connection_success
                     }
+                    print(f"DEBUG: Returning success response with user_id: {new_user_id}, connection_error: {not connection_success}")
                 except Exception as db_error:
+                    print(f"DEBUG: Database operation failed with error: {str(db_error)}")
                     traceback.print_exc()
                     return jsonify({"error": f"Database error: {str(db_error)}"}), 500
                     
