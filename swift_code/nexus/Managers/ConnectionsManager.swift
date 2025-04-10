@@ -127,8 +127,7 @@ class ConnectionsManager {
             if let description = description { requestDict["relationship_type"] = description }
             if let notes = notes { requestDict["notes"] = notes }
             if let tags = tags { 
-                // Always send tags array, even when empty
-                // This allows explicitly clearing all tags
+                // Always include tags parameter to ensure it gets updated when empty
                 requestDict["tags"] = tags
             }
         }

@@ -202,7 +202,7 @@ def add_connection():
         connection_tags = tags
     else:
         print("No custom tags provided, leaving tags empty")
-        # Don't use any default tag
+        # Explicitly set to None for empty lists, empty strings or null values
         connection_tags = None
     
     try:
@@ -263,7 +263,17 @@ def update_connection():
     
     # Normalize tags to a string format if it's an array
     if tags and isinstance(tags, list):
-        update_data['tags'] = ",".join(tags)
+        if len(tags) > 0:
+            update_data['tags'] = ",".join(tags)
+        else:
+            # Handle empty arrays by setting tags to None
+            update_data['tags'] = None
+    elif tags == []:
+        # Also catch any empty list that might have been missed
+        update_data['tags'] = None
+    elif tags == "":
+        # Empty string should also be converted to NULL
+        update_data['tags'] = None
     
     # Map field names from API to database schema
     if 'relationship_type' in update_data:
