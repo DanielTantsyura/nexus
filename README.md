@@ -30,7 +30,13 @@ The system allows users to:
    - Smart field extraction (names, universities, interests, etc.)
    - Suggested filling in of fields like email and location 
 
-3. **API Endpoints**
+3. **Intelligent Relationship Description Generation**
+   - Context-aware relationship descriptions using both user profiles and contact information
+   - Tag-based relationship context enhancement for more accurate descriptions
+   - Robust error handling with graceful fallbacks when AI services are unavailable
+   - Result normalization and formatting for consistent interface presentation
+
+4. **API Endpoints**
    - RESTful Flask API with comprehensive error handling
    - User CRUD operations (Create, Read, Update, Delete)
    - Connection management through the `relationships` table
@@ -139,6 +145,8 @@ The system leverages OpenAI's API to extract structured data from natural langua
 - Detection of interests and professional details
 - Demographic information parsing
 - Fallback to basic extraction if API processing fails
+- Intelligent relationship description generation using both user profiles and contextual tags
+- Robust error handling to ensure dependable operation even when AI services are unavailable
 
 ## Getting Started
 

@@ -22,6 +22,8 @@ The Nexus iOS client follows a structured architecture with these key components
 - **Contact Management**: View, search, and manage contact information
 - **Relationship Tracking**: Connect with users and maintain relationship details
 - **Natural Language Contact Creation**: Add contacts by describing them in free-form text
+- **Tag-based Organization**: Categorize connections with custom tags for easier filtering
+- **Intelligent Relationship Descriptions**: Automatically generate meaningful relationship labels based on user profiles and tags
 - **Profile Management**: Edit and view comprehensive profile information
 - **Standardized Error Handling**: Consistent Result type-based error handling throughout
 
@@ -52,6 +54,7 @@ Handles all connection-related operations:
 - Fetching user connections
 - Standardized error handling with the Result pattern
 - Helper methods for connection data processing
+- Tag processing and relationship description integration
 
 ### AuthManager
 
@@ -72,6 +75,8 @@ Manages user profiles:
 Handles tag operations:
 - Fetching recent tags
 - Tag processing and formatting
+- Recent tag suggestions for new connections
+- Integration with relationship descriptions for improved context
 
 ## Error Handling Pattern
 

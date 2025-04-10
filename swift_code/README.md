@@ -52,6 +52,12 @@ The application interacts with the Nexus API through the NetworkManager class. T
 - Environment variable settings for local development
 - Production configuration for deployed instances
 
+Key integrations include:
+- User profile synchronization
+- Connection management with tags and notes
+- Natural language contact creation
+- Automatic relationship description generation
+
 ## Authentication Flow
 
 1. User logs in with username/password or creates a new account
@@ -64,9 +70,10 @@ The application interacts with the Nexus API through the NetworkManager class. T
 - **User Authentication**: Login, registration, session management
 - **Profile Management**: View and edit user profiles
 - **Connection Management**: Add, view, filter, and search connections
-- **Contact Creation**: Add new contacts to your network
+- **Contact Creation**: Add new contacts to your network with natural language
 - **Real-time Search**: Filter connections as you type
-- **Tag-based Filtering**: Categorize and filter connections by tags
+- **Tag-based Organization**: Categorize and filter connections by tags
+- **Intelligent Relationship Descriptions**: Contextual relationship labels based on user profiles and tags
 
 ## Troubleshooting
 

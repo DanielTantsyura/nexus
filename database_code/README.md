@@ -25,10 +25,17 @@ The Flask-based API (`api.py`) provides endpoints for:
 - Contact creation from natural language
 - Authentication
 - Database utilities
+- Tag operations for categorizing and filtering connections
 
 ### Natural Language Processing
 
-The `newContact.py` module uses OpenAI's GPT-4o-mini to extract structured information from free-form text descriptions of contacts, enabling users to easily add new contacts by simply describing them.
+The `newContact.py` module uses OpenAI's GPT-4o-mini to:
+- Extract structured information from free-form text descriptions of contacts
+- Generate intelligent relationship descriptions based on user profiles and tags
+- Provide robust fallbacks when AI services are unavailable
+- Process and handle tags for improved relationship context
+
+This enables users to easily add new contacts by simply describing them, while also getting meaningful relationship descriptions.
 
 ## Directory Structure
 
@@ -136,7 +143,12 @@ And extract structured data including:
 - Fields of interest
 - Other inferred information
 
-This makes it easy for users to add contacts in a natural way without filling out forms.
+The system also generates relationship descriptions (like "University Friend" or "Industry Peer") using:
+- The current user's profile information
+- The contact's description 
+- Any tags provided for the relationship
+
+This makes it easy for users to add contacts in a natural way without filling out forms, while also getting meaningful categorization of relationships.
 
 ## Error Handling
 

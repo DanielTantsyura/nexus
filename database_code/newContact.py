@@ -3,9 +3,13 @@ Module for processing free-form text into structured user data and creating new 
 
 This module uses the OpenAI API to extract structured information from
 unstructured text descriptions, and provides functions to:
-- Process contact text into user fields
-- Generate relationship descriptions between users
-- Ensure all input information is preserved in either structured fields or notes
+- Process contact text into user fields (extract structured data from free text)
+- Generate relationship descriptions between users based on their profiles and tags
+- Apply intelligent NLP processing with fallback to basic extraction when needed
+- Handle tag information for improved relationship context and categorization
+
+All functions include robust error handling to ensure the application continues 
+to function even if OpenAI API calls fail or return unexpected results.
 """
 
 import json
@@ -297,13 +301,21 @@ def generate_relationship_description(user_info: Dict[str, Any], contact_text: s
     """
     Generate a relationship description between the current user and a new contact using LLM.
     
+    This function uses OpenAI to generate a short, natural description of the relationship
+    between two people based on their profile information and any tags associated with
+    the relationship. It includes robust error handling to ensure a valid description
+    is always returned.
+    
     Args:
-        user_info: Dictionary containing the current user's information
+        user_info: Dictionary containing the current user's information including fields
+                   such as first_name, last_name, location, university, job_title, etc.
         contact_text: Text description of the new contact
-        tags: Optional list of tags associated with the relationship
+        tags: Optional list of tags associated with the relationship, used to provide
+              additional context for generating the relationship description
         
     Returns:
-        A natural language description of their relationship
+        A natural language description of their relationship (1-5 words),
+        or "Contact" if generation fails
     """
     # Default relationship type if something fails
     default_relationship = "Contact"

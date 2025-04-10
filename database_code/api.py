@@ -3,6 +3,16 @@ API endpoints for the Nexus application.
 
 This module provides RESTful API endpoints for user and contact management,
 including creating, searching, and updating users and relationships.
+
+Key features include:
+- User authentication and account management
+- Contact creation from free-form text using NLP
+- Relationship management with custom tags and notes
+- Intelligent relationship description generation using OpenAI
+- Tag processing and management for connection categorization
+
+The API provides integration between the Swift frontend and the Python backend,
+handling data transformation, validation, and persistent storage.
 """
 
 from flask import Flask, request, jsonify, make_response
@@ -80,7 +90,21 @@ def get_user_by_id(user_id):
 
 @app.route('/people/<int:user_id>/recent-tags', methods=['GET'])
 def get_user_recent_tags(user_id):
-    """Get recent tags used by a specific user."""
+    """
+    Get recent tags used by a specific user.
+    
+    This endpoint retrieves the tags that a user has recently used when creating
+    or updating connections. These tags can be used to suggest commonly used
+    relationship categories for new connections.
+    
+    Path Parameters:
+        - user_id: ID of the user whose recent tags to retrieve
+        
+    Response:
+        - JSON array of strings representing tags
+        - Empty array if the user has no recent tags
+        - 404 error if the user does not exist
+    """
     try:
         with db_manager:
             # Check if user exists
@@ -177,7 +201,27 @@ def get_user_connections(user_id):
 
 @app.route('/connections', methods=['POST'])
 def add_connection():
-    """Add a new connection between two users."""
+    """
+    Add a new connection between two users.
+    
+    This endpoint creates a bidirectional relationship between two users, with
+    additional metadata such as relationship description, notes, and tags.
+    
+    Request:
+        - user_id: ID of the user creating the connection
+        - contact_id: ID of the user to connect with
+        - relationship_description: A short description of the relationship (e.g., "College Friend")
+        - note: Optional. Additional notes about the relationship
+        - tags: Optional. List or comma-separated string of tags to categorize the relationship
+        
+    Response:
+        - Success message if the connection was created
+        - Error message if the operation failed
+        
+    Notes:
+        - If tags are provided, they are also added to the user's recent tags list
+        - Handles both list and string formats for tags
+    """
     data = request.json
     
     # Validate required fields
@@ -188,7 +232,6 @@ def add_connection():
     
     user_id = data['user_id']
     contact_id = data['contact_id']
-    # Get value from API as relationship_description but use it as relationship_description internally
     relationship_description = data['relationship_description']
     custom_note = data.get('note')
     tags = data.get('tags')
@@ -245,7 +288,28 @@ def add_connection():
 
 @app.route('/connections', methods=['PUT'])
 def update_connection():
-    """Update an existing connection between two users."""
+    """
+    Update an existing connection between two users.
+    
+    This endpoint modifies the metadata for a connection between two users, 
+    such as relationship description, notes, and tags.
+    
+    Request:
+        - user_id: ID of the user who owns the connection
+        - contact_id: ID of the connected user
+        - relationship_description: Optional. Updated description of the relationship
+        - note: Optional. Updated notes about the relationship
+        - tags: Optional. Updated list or comma-separated string of tags
+        
+    Response:
+        - Success message if the connection was updated
+        - Error message if the operation failed
+        
+    Notes:
+        - If tags are provided, they are also added to the user's recent tags list
+        - Empty tag lists or strings result in NULL tag values in the database
+        - Field names are mapped from API convention (note) to database convention (notes)
+    """
     data = request.json
     
     # Validate required fields
@@ -361,7 +425,28 @@ def remove_connection():
 
 @app.route('/contacts/create', methods=['POST'])
 def create_contact():
-    """Create a new contact from text and establish a relationship."""
+    """
+    Create a new contact from text and establish a relationship.
+    
+    This endpoint accepts free-form text describing a person, processes it using NLP,
+    and creates a new user record with structured information. It then establishes a 
+    connection between the current user and the newly created contact.
+    
+    The relationship description is generated using the current user's profile information,
+    the contact text, and any provided tags to create a contextual and meaningful label.
+    
+    Request:
+        - user_id: ID of the user creating the contact
+        - contact_text: Free-form text describing the contact
+        - tags: Optional. List or comma-separated string of tags to associate with the contact
+        
+    Response:
+        - success: Boolean indicating success
+        - message: Success or error message
+        - user: Complete user data for the newly created contact
+        - user_id: ID of the newly created contact
+        - connection_error: Boolean indicating if connection creation failed
+    """
     data = request.json
     
     # Validate required fields
