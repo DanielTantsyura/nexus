@@ -4,8 +4,7 @@ Module for processing free-form text into structured user data and creating new 
 This module uses the OpenAI API to extract structured information from
 unstructured text descriptions, and provides functions to:
 - Process contact text into user fields
-- Create new contacts from contact information
-- Establish relationships between users
+- Generate relationship descriptions between users
 - Ensure all input information is preserved in either structured fields or notes
 """
 
@@ -15,7 +14,9 @@ import os
 import re
 import time
 import traceback
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Tuple, Optional, Union
+
+# OpenAI imports with fallback to older SDK
 try:
     # Try importing from newer OpenAI SDK (1.x+)
     from openai import OpenAI
@@ -24,23 +25,23 @@ except ImportError:
     # Fall back to older OpenAI SDK (0.28.0)
     import openai
     USING_NEW_SDK = False
+
 from dotenv import load_dotenv
 from config import DEFAULT_TAGS, OPENAI_MODEL, API_PORT, OPENAI_AVAILABLE, API_BASE_URL, IS_RAILWAY
 
-# Only load API key from environment variables
+# Load environment variables
 load_dotenv()
 
-# Track if OpenAI is available
+# Global variables
 OPENAI_WORKING = False
 
-# Initialize OpenAI client with API key from environment only if API key is available
+# Initialize OpenAI client if available
 if OPENAI_AVAILABLE:
     try:
         if USING_NEW_SDK:
             client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
             # Test the client with a simple call
             client.models.list()
-
             OPENAI_WORKING = True
         else:
             openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -54,10 +55,7 @@ if OPENAI_AVAILABLE:
 else:
     print("OpenAI API key not found - natural language processing features disabled")
 
-# API endpoints
-API_BASE_URL = API_BASE_URL
-print(f"API_BASE_URL set to: {API_BASE_URL}")
-
+# User fields from schema
 def get_user_fields_from_schema() -> List[str]:
     """
     Return the specific user fields needed for contact creation.
@@ -65,7 +63,6 @@ def get_user_fields_from_schema() -> List[str]:
     Returns:
         List of user field names
     """
-    # Return the exact fields we need
     return [
         "first_name", "last_name", "email", "phone_number", 
         "gender", "ethnicity", "birthday", "location", 
@@ -74,8 +71,126 @@ def get_user_fields_from_schema() -> List[str]:
         "profile_image_url", "linkedin_url"
     ]
 
-# Initialize USER_FIELDS with the fields from the schema
 USER_FIELDS = get_user_fields_from_schema()
+
+#-----------------------
+# Helper functions
+#-----------------------
+
+def _call_openai_api(
+        system_prompt: str, 
+        user_prompt: str, 
+        model: str = OPENAI_MODEL, 
+        temperature: float = 0.1, 
+        max_tokens: int = 800
+    ) -> Optional[str]:
+    """
+    Helper function to call the OpenAI API with proper error handling.
+    
+    Args:
+        system_prompt: System prompt for the LLM
+        user_prompt: User prompt/query for the LLM
+        model: OpenAI model to use
+        temperature: Sampling temperature (0.0 to 1.0)
+        max_tokens: Maximum tokens in the response
+        
+    Returns:
+        The generated content as a string, or None if an error occurred
+    """
+    if not OPENAI_AVAILABLE or not OPENAI_WORKING:
+        print("OpenAI API not available")
+        return None
+    
+    try:
+        if USING_NEW_SDK:
+            # New SDK format (1.x+)
+            response = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+            # Extract the generated content
+            return response.choices[0].message.content
+        else:
+            # Old SDK format (0.28.0)
+            response = openai.ChatCompletion.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+            # Extract the generated content
+            return response.choices[0].message.content
+    except Exception as e:
+        print(f"Error calling OpenAI API: {str(e)}")
+        return None
+
+def _basic_text_extraction(text: str) -> Tuple[bool, Optional[Dict[str, Any]], str]:
+    """
+    Basic text extraction as a fallback when OpenAI is unavailable.
+    
+    Args:
+        text: Free-form text containing user information
+        
+    Returns:
+        Tuple with success flag, extracted data, and message
+    """
+    words = text.strip().split()
+    if len(words) < 2:
+        return False, None, "At least first and last name are required."
+    
+    # Create a basic user object with just the first and last name
+    user_data = {
+        "first_name": words[0],
+        "last_name": words[1] if len(words) > 1 else ""
+    }
+    
+    # Add all other fields as None
+    for field in USER_FIELDS:
+        if field not in user_data:
+            user_data[field] = None
+    
+    # Put ALL remaining text in the note field to preserve information
+    if len(words) > 2:
+        user_data["note"] = text
+    else:
+        user_data["note"] = ""
+    
+    return True, user_data, "Basic processing only (OpenAI unavailable)."
+
+def get_current_user(user_id: int) -> Optional[Dict[str, Any]]:
+    """
+    Fetch the current user's profile from the API.
+    
+    Args:
+        user_id: ID of the current user
+        
+    Returns:
+        Dictionary with user information or None if unavailable
+    """
+    try:
+        api_url = f"{API_BASE_URL}/people/{user_id}"
+        response = requests.get(api_url)
+        
+        if response.status_code != 200:
+            print(f"Failed to get current user: {response.status_code}")
+            return None
+            
+        return response.json()
+    except Exception as e:
+        print(f"Error getting current user: {str(e)}")
+        return None
+
+#-----------------------
+# Main public functions
+#-----------------------
 
 def process_contact_text(text: str) -> Tuple[bool, Optional[Dict[str, Any]], str]:
     """
@@ -97,10 +212,10 @@ def process_contact_text(text: str) -> Tuple[bool, Optional[Dict[str, Any]], str
     # If OpenAI is not available, use basic processing
     if not OPENAI_AVAILABLE or not OPENAI_WORKING:
         print("OpenAI API not available, using basic text processing")
-        return basic_text_processing(text, USER_FIELDS)
+        return _basic_text_extraction(text)
     
     try:
-        # Create a focused system prompt that explains what we want the model to do
+        # Create a focused system prompt
         system_prompt = f"""
         Extract structured information from the provided text input.
         The text contains details about a person, and you need to extract specific fields to populate a user database.
@@ -135,254 +250,159 @@ def process_contact_text(text: str) -> Tuple[bool, Optional[Dict[str, Any]], str
         Format your response as a valid JSON object with all these fields including note.
         """
         
-        # Send the request to the OpenAI API
-        try:
-            if USING_NEW_SDK:
-                # New SDK format (1.x+)
-                response = client.chat.completions.create(
-                    model=OPENAI_MODEL,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": text}
-                    ],
-                    temperature=0.1,
-                    max_tokens=800
-                )
-                # Extract the generated JSON from the response
-                response_content = response.choices[0].message.content
-            else:
-                # Old SDK format (0.28.0)
-                response = openai.ChatCompletion.create(
-                    model=OPENAI_MODEL,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": text}
-                    ],
-                    temperature=0.1,
-                    max_tokens=800
-                )
-                # Extract the generated JSON from the response
-                response_content = response.choices[0].message.content
-            
-            # Safely parse JSON
-            try:
-                extracted_data = json.loads(response_content)
-            except json.JSONDecodeError as e:
-                print(f"Invalid JSON from OpenAI: {response_content}")
-                return basic_text_processing(text, USER_FIELDS)
-            
-            # Verify that we have at least first_name and last_name (required fields)
-            if not extracted_data.get("first_name") or not extracted_data.get("last_name"):
-                return False, None, "Could not extract first and last name from the text. Please provide clearer information."
-            
-            # Sanitize the data to ensure all fields are present
-            for field in USER_FIELDS:
-                if field not in extracted_data:
-                    extracted_data[field] = None
-                elif extracted_data[field] == "":
-                    extracted_data[field] = None
-            
-            # Ensure note field exists (may be None or empty string)
-            if "note" not in extracted_data:
-                # If note field is missing, create a default note that captures any remaining information
-                structured_info = set()
-                for field in USER_FIELDS:
-                    if extracted_data.get(field):
-                        # Add the field value to the set of structured info
-                        if isinstance(extracted_data[field], str):
-                            structured_info.add(extracted_data[field].lower())
-                
-                # Create a note with any information not captured in structured fields
-                # This is a fallback mechanism to ensure we don't lose information
-                words = text.lower().split()
-                remaining_info = []
-                for word in words:
-                    word = word.strip('.,;:')
-                    if word and all(word not in info for info in structured_info):
-                        remaining_info.append(word)
-                
-                if remaining_info:
-                    extracted_data["note"] = " ".join(remaining_info)
-                else:
-                    extracted_data["note"] = ""
-                
-            print(f"Extracted note: {extracted_data.get('note', '')}")
-            
-            # Double-check that we haven't lost any significant information
-            if not extracted_data.get("note") or len(extracted_data.get("note", "").strip()) < 10:
-                # Check if the original text is significantly longer than what we've captured
-                total_structured_length = sum(len(str(v) or "") for k, v in extracted_data.items() if k != "note" and v is not None)
-                if len(text.strip()) > total_structured_length + 20:  # If we're missing significant content
-                    # Create a simple note with whatever might be missing
-                    extracted_data["note"] = f"Additional information: {text}"
-            
-            return True, extracted_data, "Successfully extracted user information."
+        # Call OpenAI API
+        response_content = _call_openai_api(system_prompt, text)
         
-        except Exception as e:
-            print(f"Error processing text with OpenAI: {str(e)}")
+        if not response_content:
+            # If API call failed, use basic text extraction
+            return _basic_text_extraction(text)
+        
+        # Safely parse JSON
+        try:
+            extracted_data = json.loads(response_content)
+        except json.JSONDecodeError as e:
+            print(f"Invalid JSON from OpenAI: {response_content}")
+            return _basic_text_extraction(text)
+        
+        # Verify that we have at least first_name and last_name (required fields)
+        if not extracted_data.get("first_name") or not extracted_data.get("last_name"):
+            return False, None, "Could not extract first and last name from the text. Please provide clearer information."
+        
+        # Sanitize the data to ensure all fields are present
+        for field in USER_FIELDS:
+            if field not in extracted_data:
+                extracted_data[field] = None
+            elif extracted_data[field] == "":
+                extracted_data[field] = None
+        
+        # Ensure note field exists (may be None or empty string)
+        if "note" not in extracted_data:
+            # If note field is missing, create a default note that captures any remaining information
+            structured_info = set()
+            for field in USER_FIELDS:
+                if extracted_data.get(field):
+                    # Add the field value to the set of structured info
+                    if isinstance(extracted_data[field], str):
+                        structured_info.add(extracted_data[field].lower())
             
-            # Fallback to basic processing if API fails
-            return basic_text_processing(text, USER_FIELDS)
+            # Create a note with any information not captured in structured fields
+            # This is a fallback mechanism to ensure we don't lose information
+            words = text.lower().split()
+            remaining_info = []
+            for word in words:
+                word = word.strip('.,;:')
+                if word and all(word not in info for info in structured_info):
+                    remaining_info.append(word)
+            
+            if remaining_info:
+                extracted_data["note"] = " ".join(remaining_info)
+            else:
+                extracted_data["note"] = ""
+            
+        print(f"Extracted note: {extracted_data.get('note', '')}")
+        
+        # Double-check that we haven't lost any significant information
+        if not extracted_data.get("note") or len(extracted_data.get("note", "").strip()) < 10:
+            # Check if the original text is significantly longer than what we've captured
+            total_structured_length = sum(len(str(v) or "") for k, v in extracted_data.items() if k != "note" and v is not None)
+            if len(text.strip()) > total_structured_length + 20:  # If we're missing significant content
+                # Create a simple note with whatever might be missing
+                extracted_data["note"] = f"Additional information: {text}"
+        
+        return True, extracted_data, "Successfully extracted user information."
     
     except Exception as e:
         print(f"Error processing text: {str(e)}")
         return False, None, "An error occurred while processing the text. Please try again later."
 
-def basic_text_processing(text: str, fields: List[str]) -> Tuple[bool, Dict[str, Any], str]:
+def generate_relationship_description(user_id: int, contact_text: str, tags: List[str] = None) -> str:
     """
-    Basic text processing for when OpenAI is not available.
-    
-    Extract first and last name from text and set all other fields to None.
-    Put all remaining text in the note field to ensure no information is lost.
+    Generate a relationship description between the current user and a new contact using LLM.
     
     Args:
-        text: Free-form text containing user information
-        fields: List of fields to include in user data
+        user_id: ID of the user creating the contact 
+        contact_text: Text description of the new contact
+        tags: Optional list of tags associated with the relationship
         
     Returns:
-        Tuple containing success flag, user data, and message
+        A natural language description of their relationship
     """
-    words = text.strip().split()
-    if len(words) < 2:
-        return False, None, "At least first and last name are required."
-    
-    # Create a basic user object with just the first and last name
-    user_data = {
-        "first_name": words[0],
-        "last_name": words[1] if len(words) > 1 else ""
-    }
-    
-    # Add all other fields as None
-    for field in fields:
-        if field not in user_data:
-            user_data[field] = None
-    
-    # Put ALL remaining text in the note field to preserve information
-    if len(words) > 2:
-        user_data["note"] = text
-    else:
-        user_data["note"] = ""
-    
-    return True, user_data, "Basic processing only (OpenAI unavailable)."
-
-def create_new_contact(contact_text: str, user_id: int, relationship_type: str = "contact") -> Dict[str, Any]:
-    """
-    Process text into a user profile and create a new contact relationship.
-    
-    Args:
-        contact_text: Free-form text describing the contact
-        user_id: ID of the user creating the contact
-        relationship_type: Type of relationship to establish
-        
-    Returns:
-        Dictionary with success status and new user information
-    """
-    # Process the contact text
-    success, user_data, message = process_contact_text(contact_text)
-    
-    if not success or not user_data:
-        return {"success": False, "message": message}
-    
-    # Add username and recent_tags which are not part of USER_FIELDS
-    # Generate username from first and last name
-    first = user_data.get("first_name", "").lower().replace(" ", "")
-    last = user_data.get("last_name", "").lower().replace(" ", "")
-    user_data["username"] = f"{first}{last}"
-    
-    # Always set recent_tags to default
-    user_data["recent_tags"] = DEFAULT_TAGS
-    
-    # Ensure birthday is properly formatted
-    if user_data.get("birthday") and not isinstance(user_data["birthday"], str):
-        user_data["birthday"] = str(user_data["birthday"])
+    if not OPENAI_AVAILABLE or not OPENAI_WORKING:
+        print("OpenAI API not available, using default relationship type")
+        return "Contact"
     
     try:
-        # Call the API to create the user
-        api_url = f"{API_BASE_URL}/people"
-        print(f"Creating user at URL: {api_url}")
+        # Get the current user information
+        current_user = get_current_user(user_id)
+        if not current_user:
+            print(f"Could not retrieve user information for user ID: {user_id}")
+            return "Contact"
         
-        # Make a more robust API call without timeout
-        try:
-            user_response = requests.post(api_url, json=user_data)
-            
-            if user_response.status_code != 201:
-                error_msg = f"Failed to create user: {user_response.text}"
-                print(error_msg)
-                return {"success": False, "message": error_msg}
-            
-            # Safely parse the response
-            try:
-                new_user = user_response.json()
-            except json.JSONDecodeError:
-                error_msg = "Error parsing API response"
-                print(error_msg)
-                return {"success": False, "message": error_msg}
-            
-            # Validate the response contains a user ID
-            new_user_id = new_user.get("id")
-            if not new_user_id:
-                error_msg = "User created but no ID returned in response"
-                print(error_msg)
-                return {"success": False, "message": error_msg}
-        except requests.exceptions.RequestException as e:
-            error_msg = f"API call failed: {str(e)}"
-            print(error_msg)
-            return {"success": False, "message": error_msg}
-        
-        # Since the user was created, try to return success even if connection fails
-        result = {
-            "success": True,
-            "message": "Contact created successfully",
-            "user": new_user
+        # Create user profile with all relevant fields
+        user_profile = {
+            "name": f"{current_user.get('first_name')} {current_user.get('last_name')}",
+            "location": current_user.get('location'),
+            "high_school": current_user.get('high_school'),
+            "university": current_user.get('university'),
+            "uni_major": current_user.get('uni_major'),
+            "job_title": current_user.get('job_title'),
+            "current_company": current_user.get('current_company'),
+            "field_of_interest": current_user.get('field_of_interest')
         }
         
-        # Try to create the connection as a separate step (that might fail)
-        try:
-            # Create the connection with the note containing additional information
-            connection_data = {
-                "user_id": user_id,
-                "contact_id": new_user_id,
-                "relationship_type": relationship_type,
-                "note": user_data.get("note", ""),  # Use the extracted note instead of full text
-                "tags": DEFAULT_TAGS.split(',')[0]  # Use first default tag
-            }
-            
-            # Call the API to create the relationship
-            relationship_url = f"{API_BASE_URL}/connections"
-            print(f"Creating connection at URL: {relationship_url}")
-            
-            # Call without timeout
-            connection_response = requests.post(relationship_url, json=connection_data)
-            
-            if connection_response.status_code != 201:
-                result["message"] = "User created but connection failed. You can add the connection later."
-                result["connection_error"] = True
-                print(f"Connection creation failed with status {connection_response.status_code}")
-            else:
-                print(f"Created new contact: {new_user.get('first_name')} {new_user.get('last_name')}")
-        except Exception as connection_err:
-            # If connection creation fails, still return success for user creation
-            result["message"] = "User created but connection failed. You can add the connection later."
-            result["connection_error"] = True
-            print(f"Error creating connection: {str(connection_err)}")
+        # Format user profile as a simple string
+        user_profile_text = "\n".join([f"{key}: {value}" for key, value in user_profile.items() if value])
         
-        return result
+        # Tags info
+        tags_info = ""
+        if tags and len(tags) > 0:
+            tags_info = f"Tags associated with this relationship: {', '.join(tags)}"
+        
+        # Create system prompt
+        system_prompt = f"""
+        You need to generate a brief, natural-sounding relationship description between two people.
+        
+        Information about the first person (current user):
+        {user_profile_text}
+        
+        Information about the second person (new contact they're adding):
+        {contact_text}
+        
+        {tags_info}
+        
+        Based on this information, describe their relationship in a brief phrase (1-5 words). 
+        Examples: "College Friend", "Work Colleague", "Networking Contact", "Industry Peer", "Former Classmate", "Coworker", etc.
+        
+        Always capitalize the first letter of each word in your response.
+        
+        Just respond with the relationship description ONLY - no explanation or additional text.
+        """
+        
+        # Call OpenAI API
+        response_content = _call_openai_api(
+            system_prompt=system_prompt,
+            user_prompt="Generate a relationship description",
+            temperature=0.7,
+            max_tokens=50
+        )
+        
+        if not response_content:
+            return "Contact"
+        
+        # Sanitize and validate
+        relationship = response_content.strip()
+        relationship = relationship.strip('"\'.,;:')
+        if len(relationship) > 50:
+            relationship = relationship[:50]
+        
+        # Ensure proper capitalization if not already capitalized
+        words = relationship.split()
+        if words and not all(w[0].isupper() for w in words if w):
+            relationship = ' '.join(w.capitalize() for w in words)
+        
+        print(f"Generated relationship description: {relationship}")
+        return relationship
         
     except Exception as e:
-        error_msg = f"Error creating contact: {str(e)}"
-        print(error_msg)
-        traceback.print_exc()  # Print full traceback for debugging
-        return {"success": False, "message": error_msg}
-
-if __name__ == "__main__":
-    # Test the function with sample data
-    sample_text = "John Doe is a software engineer at Google. He graduated from MIT with a computer science degree. His email is john.doe@example.com and phone is 123-456-7890. He lives in San Francisco."
-    sample_user_id = 1
-    
-    result = create_new_contact(sample_text, sample_user_id)
-    print(f"Success: {result.get('success', False)}")
-    print(f"Message: {result.get('message', 'No message')}")
-    if not result.get('success', False):
-        print(f"Error details: {result}")
-    else:
-        print(f"User: {result.get('user', {})}") 
+        print(f"Error in relationship generation: {str(e)}")
+        return "Contact"

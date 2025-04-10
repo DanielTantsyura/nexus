@@ -11,6 +11,7 @@ import json
 import traceback
 import os
 import sys
+import concurrent.futures
 print("Starting API with the following configuration:")
 print(f"Python version: {sys.version}")
 print(f"Current directory: {os.getcwd()}")
@@ -18,7 +19,7 @@ print(f"Files in current directory: {os.listdir('.')}")
 print(f"Environment variables: PORT={os.environ.get('PORT')}, API_HOST={os.environ.get('API_HOST')}")
 
 from database_operations import DatabaseManager
-from newContact import process_contact_text, create_new_contact
+from newContact import process_contact_text, generate_relationship_description
 from config import API_HOST, API_PORT, DATABASE_URL, API_DEBUG, DEFAULT_TAGS
 print(f"Config loaded: API_HOST={API_HOST}, API_PORT={API_PORT}, DATABASE_URL={DATABASE_URL} (truncated for security)")
 import argparse
@@ -400,9 +401,29 @@ def create_contact():
             print(f"Creating contact for user: {user.get('first_name')} {user.get('last_name')}")
         
         try:
-            # Process text into structured user data
-            print("Extracting contact information...")
-            success, user_data, message = process_contact_text(contact_text)
+            # Create tag list for relationship generation
+            tag_list = []
+            if custom_tags:
+                if isinstance(custom_tags, list):
+                    tag_list = custom_tags
+                elif isinstance(custom_tags, str):
+                    tag_list = [tag.strip() for tag in custom_tags.split(',') if tag.strip()]
+            
+            # Start both operations in parallel using concurrent futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                # Start contact text processing
+                contact_future = executor.submit(process_contact_text, contact_text)
+                
+                # Start relationship description generation in parallel
+                relationship_future = executor.submit(
+                    generate_relationship_description,
+                    user_id,
+                    contact_text,
+                    tag_list if tag_list else None
+                )
+
+            # Get the processed contact data
+            success, user_data, message = contact_future.result()
             
             if not success or not user_data:
                 return jsonify({"error": message}), 400
@@ -412,6 +433,11 @@ def create_contact():
             last = user_data.get("last_name", "").lower().replace(" ", "")
             user_data["username"] = f"{first}{last}"
             user_data["recent_tags"] = DEFAULT_TAGS
+
+            relationship_description = relationship_future.result()
+            if relationship_description and relationship_description != "Contact":
+                relationship_type = relationship_description
+                print(f"Using LLM-generated relationship type: {relationship_type}")
             
             # Directly use database operations to create the user
             with db_manager:
