@@ -402,16 +402,7 @@ struct NetworkView: View {
             // Show connections
             ForEach(filteredConnections) { connection in
                 connectionCard(for: connection)
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        Button(role: .destructive) {
-                            // Set the connection to delete and show confirmation
-                            connectionToDelete = connection
-                            showDeleteConfirmation = true
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                        .tint(.red)
-                    }
+                    .contentShape(Rectangle())
                     .onTapGesture {
                         coordinator.showContact(connection.user)
                     }
@@ -430,12 +421,13 @@ struct NetworkView: View {
                         .padding(.leading, -10) // Further reduce left padding
                     
                     // User details with smaller text and spacing
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 1) { // Reduced spacing from 2 to 1
                         // Name - first line that extends fully without abbreviation
                         Text(connection.user.fullName)
                             .font(.headline)
                             .fontWeight(.bold)
                             .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 1) // Reduced from 2 to 1
                         
                         // Job title and company - second line
                         HStack(spacing: 6) {
@@ -490,30 +482,41 @@ struct NetworkView: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         
-                        // Contact buttons - smaller and more compact
+                        // Contact buttons - 25% larger with symbols only, in order: message, call, linkedin, email
                         HStack(spacing: 8) {
-                            if let email = connection.user.email, !email.isEmpty {
+                            // Text Message button (iMessage green)
+                            if let phone = connection.user.phoneNumber, !phone.isEmpty {
                                 Button(action: {
-                                    if let url = URL(string: "mailto:\(email)") {
+                                    let formattedPhone = phone.replacingOccurrences(of: " ", with: "")
+                                    if let url = URL(string: "sms:\(formattedPhone)") {
                                         UIApplication.shared.open(url)
                                     }
                                 }) {
-                                    Label("Email", systemImage: "envelope.fill")
-                                        .font(.system(size: 10))
-                                        .foregroundColor(.blue)
+                                    Image(systemName: "message.fill")
+                                        .font(.system(size: 15)) // 25% larger (from 12 to 15)
+                                        .foregroundColor(Color(red: 0.0, green: 0.8, blue: 0.0)) // iMessage green
+                                        .padding(7) // Slightly larger padding to match the icon
+                                        .background(Color(red: 0.0, green: 0.8, blue: 0.0).opacity(0.1))
+                                        .cornerRadius(5)
                                 }
+                                .buttonStyle(BorderlessButtonStyle())
                             }
                             
+                            // Call button
                             if let phone = connection.user.phoneNumber, !phone.isEmpty {
                                 Button(action: {
                                     if let url = URL(string: "tel:\(phone.replacingOccurrences(of: " ", with: ""))") {
                                         UIApplication.shared.open(url)
                                     }
                                 }) {
-                                    Label("Call", systemImage: "phone.fill")
-                                        .font(.system(size: 10))
+                                    Image(systemName: "phone.fill")
+                                        .font(.system(size: 15)) // 25% larger (from 12 to 15)
                                         .foregroundColor(.green)
+                                        .padding(7) // Slightly larger padding to match the icon
+                                        .background(Color.green.opacity(0.1))
+                                        .cornerRadius(5)
                                 }
+                                .buttonStyle(BorderlessButtonStyle())
                             }
                             
                             // LinkedIn button - opens LinkedIn profile if URL exists
@@ -523,10 +526,18 @@ struct NetworkView: View {
                                         UIApplication.shared.open(url)
                                     }
                                 }) {
-                                    Label("LinkedIn", systemImage: "link")
-                                        .font(.system(size: 10))
-                                        .foregroundColor(.blue)
+                                    ZStack {
+                                        Rectangle()
+                                            .fill(Color(red: 0.0, green: 0.47, blue: 0.71).opacity(0.1))
+                                            .frame(width: 29, height: 29)
+                                            .cornerRadius(5)
+                                            
+                                        Text("in")
+                                            .font(.system(size: 15, weight: .bold))
+                                            .foregroundColor(Color(red: 0.0, green: 0.47, blue: 0.71))
+                                    }
                                 }
+                                .buttonStyle(BorderlessButtonStyle())
                             } else {
                                 // Fallback search on LinkedIn by name
                                 Button(action: {
@@ -536,13 +547,39 @@ struct NetworkView: View {
                                         UIApplication.shared.open(url)
                                     }
                                 }) {
-                                    Label("LinkedIn", systemImage: "link")
-                                        .font(.system(size: 10))
-                                        .foregroundColor(.blue)
+                                    ZStack {
+                                        Rectangle()
+                                            .fill(Color(red: 0.0, green: 0.47, blue: 0.71).opacity(0.1))
+                                            .frame(width: 29, height: 29)
+                                            .cornerRadius(5)
+                                            
+                                        Text("in")
+                                            .font(.system(size: 15, weight: .bold))
+                                            .foregroundColor(Color(red: 0.0, green: 0.47, blue: 0.71))
+                                    }
                                 }
+                                .buttonStyle(BorderlessButtonStyle())
+                            }
+                            
+                            // Email button
+                            if let email = connection.user.email, !email.isEmpty {
+                                Button(action: {
+                                    if let url = URL(string: "mailto:\(email)") {
+                                        UIApplication.shared.open(url)
+                                    }
+                                }) {
+                                    Image(systemName: "envelope.fill")
+                                        .font(.system(size: 15)) // 25% larger (from 12 to 15)
+                                        .foregroundColor(Color(red: 0.87, green: 0.11, blue: 0.11)) // Gmail red
+                                        .padding(7) // Slightly larger padding to match the icon
+                                        .background(Color(red: 0.87, green: 0.11, blue: 0.11).opacity(0.1))
+                                        .cornerRadius(5)
+                                }
+                                .buttonStyle(BorderlessButtonStyle())
                             }
                         }
-                        .padding(.top, 2)
+                        .padding(.top, 0) // No padding on top
+                        .padding(.bottom, 0) // No padding on bottom
                     }
                 }
                 .layoutPriority(1)
@@ -586,7 +623,7 @@ struct NetworkView: View {
                     }
                 }
             }
-            .padding(.vertical, 8)
+            .padding(.vertical, 2) // Reduced vertical padding from 4 to 2
             .padding(.horizontal, 0)
         }
         .padding(.horizontal, 0)
