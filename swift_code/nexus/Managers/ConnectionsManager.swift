@@ -127,8 +127,11 @@ class ConnectionsManager {
             if let description = description { requestDict["relationship_type"] = description }
             if let notes = notes { requestDict["notes"] = notes }
             if let tags = tags { 
-                // Send tags as an array, not as a comma-separated string
-                requestDict["tags"] = tags
+                // Only include tags if the array is not empty
+                if !tags.isEmpty {
+                    // Send tags as an array, not as a comma-separated string
+                    requestDict["tags"] = tags
+                }
             }
         }
         
