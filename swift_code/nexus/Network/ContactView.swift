@@ -683,7 +683,7 @@ struct ContactView: View {
                                 contactId: self.user.id,
                                 description: relationship.relationshipDescription,
                                 notes: self.editNotes,
-                                tags: self.editTags.isEmpty ? nil : self.editTags
+                                tags: self.editTags // Send empty array to explicitly clear tags
                             ) { updateResult in
                                 if case .success(true) = updateResult {
                                     // Force a refresh of connections from the network manager
