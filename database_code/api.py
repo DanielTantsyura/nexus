@@ -191,19 +191,19 @@ def add_connection():
     custom_note = data.get('note')
     tags = data.get('tags')
     
-    # Normalize tags to a comma-separated string regardless of input format
-    if tags:
-        if isinstance(tags, list):
-            # If it's a list, join it into a comma-separated string
-            tags_string = ",".join(tags)
-        elif isinstance(tags, str):
-            # If it's already a string, use it as is
-            tags_string = tags
-        else:
-            # For any other type, convert to string
-            tags_string = str(tags)
+    # Process tags into a comma-separated string for the database
+    if tags and isinstance(tags, list) and len(tags) > 0:
+        print(f"Custom tags provided as list: {tags}")
+        # Join all tags into a comma-separated string for the database
+        connection_tags = ",".join(tags)
+    elif tags and isinstance(tags, str) and tags.strip():
+        print(f"Custom tags provided as string: {tags}")
+        # Use the string directly
+        connection_tags = tags
     else:
-        tags_string = None
+        print("No custom tags provided, leaving tags empty")
+        # Don't use any default tag
+        connection_tags = None
     
     try:
         with db_manager:
@@ -217,7 +217,7 @@ def add_connection():
                 return jsonify({"error": f"Contact with ID {contact_id} not found"}), 404
             
             # Add the connection
-            success = db_manager.add_connection(user_id, contact_id, relationship_description, custom_note, tags_string)
+            success = db_manager.add_connection(user_id, contact_id, relationship_description, custom_note, connection_tags)
             
             # Update the user's recent tags if tags were provided
             if success and tags:

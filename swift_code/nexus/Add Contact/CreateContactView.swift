@@ -96,13 +96,6 @@ struct CreateContactView: View {
                 }
                 .padding(.bottom, 10)
                 
-                // Title
-                Text("Create Contact")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal)
-                
                 // Error message
                 if let errorMessage = errorMessage {
                     errorBanner(message: errorMessage)
@@ -113,7 +106,7 @@ struct CreateContactView: View {
                     successBanner(message: successMessage)
                 }
                
-                // Contact text entry area
+                // Contact text area
                 contactTextArea
                
                 // Selected tags display
@@ -200,7 +193,7 @@ struct CreateContactView: View {
    
     /// Multi-line text entry area for contact information
     private var contactTextArea: some View {
-        SectionCard(title: "") {
+        SectionCard(title: "Create Contact") {
             ZStack(alignment: .topLeading) {
                 TextEditor(text: $contactText)
                     .scrollContentBackground(.hidden)
@@ -285,10 +278,6 @@ struct CreateContactView: View {
                 // Combined tags section
                 if !orderedTags.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(newTagText.isEmpty ? "Commonly Used Tags" : "Matching Tags")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        
                         // Horizontal scrollable tag grid
                         ScrollView(.horizontal, showsIndicators: false) {
                             LazyHGrid(rows: [
