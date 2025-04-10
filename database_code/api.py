@@ -420,17 +420,18 @@ def create_contact():
             if not success or not user_data:
                 print(f"Contact processing failed: {message}")
                 return jsonify({"error": message}), 400
-                
-            # Add required fields that aren't part of the extraction
-            first = user_data.get("first_name", "").lower().replace(" ", "")
-            last = user_data.get("last_name", "").lower().replace(" ", "")
-            user_data["username"] = f"{first}{last}"
-            user_data["recent_tags"] = DEFAULT_TAGS
-            print(f"Generated username: {user_data['username']}")
+
+            # Get the current user information
+            print(f"Fetching user information for ID: {user_id}")
+            with db_manager:
+                current_user = db_manager.get_user_by_id(user_id)
+                if not current_user:
+                    print(f"Warning: Could not get user information for ID: {user_id}")
+                    return jsonify({"error": "Could not retrieve current user information"}), 500
 
             # Get the relationship description
             print(f"Generating relationship description with {len(tag_list)} tags")
-            relationship_description = generate_relationship_description(user_id, contact_text, tag_list)
+            relationship_description = generate_relationship_description(current_user, contact_text, tag_list)
             print(f"Generated relationship description: '{relationship_description}'")
             
             # Directly use database operations to create the user

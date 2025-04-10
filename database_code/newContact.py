@@ -165,28 +165,6 @@ def _basic_text_extraction(text: str) -> Tuple[bool, Optional[Dict[str, Any]], s
     
     return True, user_data, "Basic processing only (OpenAI unavailable)."
 
-def get_current_user(user_id: int) -> Optional[Dict[str, Any]]:
-    """
-    Fetch the current user's profile from the API.
-    
-    Args:
-        user_id: ID of the current user
-        
-    Returns:
-        Dictionary with user information or None if unavailable
-    """
-    try:
-        api_url = f"{API_BASE_URL}/people/{user_id}"
-        response = requests.get(api_url)
-        
-        if response.status_code != 200:
-            print(f"Failed to get current user: {response.status_code}")
-            return None
-            
-        return response.json()
-    except Exception as e:
-        print(f"Error getting current user: {str(e)}")
-        return None
 
 #-----------------------
 # Main public functions
@@ -315,43 +293,51 @@ def process_contact_text(text: str) -> Tuple[bool, Optional[Dict[str, Any]], str
         print(f"Error processing text: {str(e)}")
         return False, None, "An error occurred while processing the text. Please try again later."
 
-def generate_relationship_description(user_id: int, contact_text: str, tags: List[str] = None) -> str:
+def generate_relationship_description(user_info: Dict[str, Any], contact_text: str, tags: List[str] = None) -> str:
     """
     Generate a relationship description between the current user and a new contact using LLM.
     
     Args:
-        user_id: ID of the user creating the contact 
+        user_info: Dictionary containing the current user's information
         contact_text: Text description of the new contact
         tags: Optional list of tags associated with the relationship
         
     Returns:
         A natural language description of their relationship
     """
+    # Default relationship type if something fails
+    default_relationship = "Contact"
+    
+    # Check if OpenAI is available first
     if not OPENAI_AVAILABLE or not OPENAI_WORKING:
         print("OpenAI API not available, using default relationship type")
-        return "Contact"
+        return default_relationship
     
     try:
-        # Get the current user information
-        current_user = get_current_user(user_id)
-        if not current_user:
-            print(f"Could not retrieve user information for user ID: {user_id}")
-            return "Contact"
+        # Validate user info
+        if not user_info:
+            print("No user information provided")
+            return default_relationship
         
-        # Create user profile with all relevant fields
+        # Create user profile with defensive dictionary access
         user_profile = {
-            "name": f"{current_user.get('first_name')} {current_user.get('last_name')}",
-            "location": current_user.get('location'),
-            "high_school": current_user.get('high_school'),
-            "university": current_user.get('university'),
-            "uni_major": current_user.get('uni_major'),
-            "job_title": current_user.get('job_title'),
-            "current_company": current_user.get('current_company'),
-            "field_of_interest": current_user.get('field_of_interest')
+            "name": f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}".strip(),
+            "location": user_info.get('location'),
+            "high_school": user_info.get('high_school'),
+            "university": user_info.get('university'),
+            "uni_major": user_info.get('uni_major'),
+            "job_title": user_info.get('job_title'),
+            "current_company": user_info.get('current_company'),
+            "field_of_interest": user_info.get('field_of_interest')
         }
         
-        # Format user profile as a simple string
+        # Format user profile as a simple string - only include fields with values
         user_profile_text = "\n".join([f"{key}: {value}" for key, value in user_profile.items() if value])
+        
+        # Handle empty user profile
+        if not user_profile_text.strip():
+            print("User profile is empty, using default relationship type")
+            return default_relationship
         
         # Tags info
         tags_info = ""
@@ -378,7 +364,8 @@ def generate_relationship_description(user_id: int, contact_text: str, tags: Lis
         Just respond with the relationship description ONLY - no explanation or additional text.
         """
         
-        # Call OpenAI API
+        # Call OpenAI API with increased robustness
+        print("Calling OpenAI API to generate relationship description")
         response_content = _call_openai_api(
             system_prompt=system_prompt,
             user_prompt="Generate a relationship description",
@@ -387,7 +374,8 @@ def generate_relationship_description(user_id: int, contact_text: str, tags: Lis
         )
         
         if not response_content:
-            return "Contact"
+            print("No response from OpenAI API, using default relationship")
+            return default_relationship
         
         # Sanitize and validate
         relationship = response_content.strip()
@@ -397,12 +385,17 @@ def generate_relationship_description(user_id: int, contact_text: str, tags: Lis
         
         # Ensure proper capitalization if not already capitalized
         words = relationship.split()
-        if words and not all(w[0].isupper() for w in words if w):
-            relationship = ' '.join(w.capitalize() for w in words)
+        if not words:
+            print("Empty response from OpenAI API, using default relationship")
+            return default_relationship
+            
+        if not all(w[0].isupper() for w in words if w and len(w) > 0):
+            relationship = ' '.join(w.capitalize() for w in words if w)
         
         print(f"Generated relationship description: {relationship}")
-        return relationship
+        return relationship if relationship else default_relationship
         
     except Exception as e:
         print(f"Error in relationship generation: {str(e)}")
-        return "Contact"
+        traceback.print_exc()  # Full stack trace for debugging
+        return default_relationship
