@@ -201,7 +201,7 @@ struct CreateContactView: View {
     /// Multi-line text entry area for contact information
     private var contactTextArea: some View {
         SectionCard(title: "") {
-            ZStack(alignment: .leading) {
+            ZStack(alignment: .topLeading) {
                 TextEditor(text: $contactText)
                     .scrollContentBackground(.hidden)
                     .padding(8)
@@ -217,6 +217,8 @@ struct CreateContactView: View {
                 if contactText.isEmpty {
                     Text("John Smith, Software Engineer at Apple, lives in New York and went to Columbia University...")
                         .foregroundColor(.gray)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 16)
                         .allowsHitTesting(false)
                 }
             }

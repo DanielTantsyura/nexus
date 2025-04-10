@@ -54,6 +54,15 @@ struct MainTabView: View {
                 }
                 .tag(TabSelection.profile)
             }
+            .onChange(of: coordinator.selectedTab) { oldTab, newTab in
+                // If navigating away from Network tab, check if we need to exit edit mode
+                if oldTab == .network && coordinator.activeScreen == .contact {
+                    // Reset the "StartContactInEditMode" flag to ensure we exit edit mode
+                    UserDefaults.standard.set(false, forKey: "StartContactInEditMode")
+                    // Post a notification that will be picked up by ContactView
+                    NotificationCenter.default.post(name: NSNotification.Name("CancelContactEditing"), object: nil)
+                }
+            }
             
             // Only show add button if keyboard is not visible
             if !keyboardHandler.isVisible {

@@ -126,7 +126,10 @@ class ConnectionsManager {
         } else {
             if let description = description { requestDict["relationship_type"] = description }
             if let notes = notes { requestDict["notes"] = notes }
-            if let tags = tags { requestDict["tags"] = tags.joined(separator: ",") }
+            if let tags = tags { 
+                // Send tags as an array, not as a comma-separated string
+                requestDict["tags"] = tags
+            }
         }
         
         guard let jsonData = try? JSONSerialization.data(withJSONObject: requestDict) else {
@@ -137,7 +140,7 @@ class ConnectionsManager {
         
         let request = networkManager.createRequest(for: url, method: "PUT", body: jsonData)
         
-        sendConnectionRequest(request, expectedCode: 200, userId: userId, tags: nil, completion: completion)
+        sendConnectionRequest(request, expectedCode: 200, userId: userId, tags: tags, completion: completion)
     }
 
     func updateConnectionTimestamp(contactId: Int, completion: @escaping (Result<Bool, Error>) -> Void) {

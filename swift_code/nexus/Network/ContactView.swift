@@ -139,10 +139,29 @@ struct ContactView: View {
                         refreshTrigger.toggle()
                     }
                 }
+                
+            // Listen for cancel editing notifications
+            NotificationCenter.default.addObserver(
+                forName: NSNotification.Name("CancelContactEditing"),
+                object: nil,
+                queue: .main
+            ) { _ in
+                if self.isEditing {
+                    self.isEditing = false
+                }
+            }
         }
         .onDisappear {
             // Clean up the subscription
             refreshCancellable?.cancel()
+            
+            // Cancel editing if active when navigating away
+            if isEditing {
+                isEditing = false
+            }
+            
+            // Remove the notification observer
+            NotificationCenter.default.removeObserver(self, name: NSNotification.Name("CancelContactEditing"), object: nil)
         }
     }
     
