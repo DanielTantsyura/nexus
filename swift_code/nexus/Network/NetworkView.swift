@@ -493,11 +493,11 @@ struct NetworkView: View {
                                     }
                                 }) {
                                     Image(systemName: "message.fill")
-                                        .font(.system(size: 15)) // 25% larger (from 12 to 15)
-                                        .foregroundColor(Color(red: 0.0, green: 0.8, blue: 0.0)) // iMessage green
-                                        .padding(7) // Slightly larger padding to match the icon
+                                        .font(.system(size: 12))
+                                        .foregroundColor(Color(red: 0.0, green: 0.8, blue: 0.0))
+                                        .padding(5)
                                         .background(Color(red: 0.0, green: 0.8, blue: 0.0).opacity(0.1))
-                                        .cornerRadius(5)
+                                        .cornerRadius(4)
                                 }
                                 .buttonStyle(BorderlessButtonStyle())
                             }
@@ -510,11 +510,11 @@ struct NetworkView: View {
                                     }
                                 }) {
                                     Image(systemName: "phone.fill")
-                                        .font(.system(size: 15)) // 25% larger (from 12 to 15)
+                                        .font(.system(size: 12))
                                         .foregroundColor(.green)
-                                        .padding(7) // Slightly larger padding to match the icon
+                                        .padding(5)
                                         .background(Color.green.opacity(0.1))
-                                        .cornerRadius(5)
+                                        .cornerRadius(4)
                                 }
                                 .buttonStyle(BorderlessButtonStyle())
                             }
@@ -529,32 +529,11 @@ struct NetworkView: View {
                                     ZStack {
                                         Rectangle()
                                             .fill(Color(red: 0.0, green: 0.47, blue: 0.71).opacity(0.1))
-                                            .frame(width: 29, height: 29)
-                                            .cornerRadius(5)
+                                            .frame(width: 22, height: 22)
+                                            .cornerRadius(4)
                                             
                                         Text("in")
-                                            .font(.system(size: 15, weight: .bold))
-                                            .foregroundColor(Color(red: 0.0, green: 0.47, blue: 0.71))
-                                    }
-                                }
-                                .buttonStyle(BorderlessButtonStyle())
-                            } else {
-                                // Fallback search on LinkedIn by name
-                                Button(action: {
-                                    // Create a LinkedIn search URL with the person's name
-                                    let searchName = connection.user.fullName.replacingOccurrences(of: " ", with: "%20")
-                                    if let url = URL(string: "https://www.linkedin.com/search/results/people/?keywords=\(searchName)") {
-                                        UIApplication.shared.open(url)
-                                    }
-                                }) {
-                                    ZStack {
-                                        Rectangle()
-                                            .fill(Color(red: 0.0, green: 0.47, blue: 0.71).opacity(0.1))
-                                            .frame(width: 29, height: 29)
-                                            .cornerRadius(5)
-                                            
-                                        Text("in")
-                                            .font(.system(size: 15, weight: .bold))
+                                            .font(.system(size: 12, weight: .bold))
                                             .foregroundColor(Color(red: 0.0, green: 0.47, blue: 0.71))
                                     }
                                 }
@@ -569,11 +548,11 @@ struct NetworkView: View {
                                     }
                                 }) {
                                     Image(systemName: "envelope.fill")
-                                        .font(.system(size: 15)) // 25% larger (from 12 to 15)
-                                        .foregroundColor(Color(red: 0.87, green: 0.11, blue: 0.11)) // Gmail red
-                                        .padding(7) // Slightly larger padding to match the icon
+                                        .font(.system(size: 12))
+                                        .foregroundColor(Color(red: 0.87, green: 0.11, blue: 0.11))
+                                        .padding(5)
                                         .background(Color(red: 0.87, green: 0.11, blue: 0.11).opacity(0.1))
-                                        .cornerRadius(5)
+                                        .cornerRadius(4)
                                 }
                                 .buttonStyle(BorderlessButtonStyle())
                             }

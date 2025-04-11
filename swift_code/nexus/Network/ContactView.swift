@@ -39,6 +39,7 @@ struct ContactView: View {
     @State private var editNotes = ""
     @State private var editLinkedinUrl = ""
     @State private var editBirthday = ""
+    @State private var editRelationshipDescription = ""
     
     // Tags
     @State private var editTags: [String] = []
@@ -107,7 +108,7 @@ struct ContactView: View {
         }
         .onAppear {
             coordinator.activeScreen = .contact
-            
+             
             // If we don't already have a relationship loaded, fetch it once
             loadRelationship()
             
@@ -356,7 +357,20 @@ struct ContactView: View {
     private var combinedInfoSection: some View {
         SectionCard(title: "Contact Information") {
             VStack(alignment: .leading, spacing: 12) {
-                if let relationship = relationship, let description = relationship.relationshipDescription {
+                if isEditing {
+                    HStack {
+                        Image(systemName: "person.2.fill")
+                            .foregroundColor(.blue)
+                            .frame(width: 20)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Relationship Description")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            TextField("How you know this person", text: $editRelationshipDescription)
+                        }
+                    }
+                    Divider().padding(.vertical, 4)
+                } else if let relationship = relationship, let description = relationship.relationshipDescription {
                     InfoRow(icon: "person.2.fill", title: "Relationship Description", value: description)
                     Divider().padding(.vertical, 4)
                 }
@@ -658,6 +672,7 @@ struct ContactView: View {
         editNotes = relationship?.notes ?? ""
         editLinkedinUrl = user.linkedinUrl ?? ""
         editBirthday = user.birthday ?? ""
+        editRelationshipDescription = relationship?.relationshipDescription ?? ""
         editTags = relationship?.tags ?? []
         
         isEditing = true
@@ -700,7 +715,7 @@ struct ContactView: View {
                         if let relationship = currentRelationship {
                             coordinator.networkManager.updateConnection(
                                 contactId: self.user.id,
-                                description: relationship.relationshipDescription,
+                                description: self.editRelationshipDescription,
                                 notes: self.editNotes,
                                 tags: self.editTags
                             ) { updateResult in

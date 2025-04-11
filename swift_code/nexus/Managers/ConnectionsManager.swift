@@ -275,12 +275,23 @@ class ConnectionsManager {
         }
     }
     
-    /// Sorts connections by last viewed date, most recent first
+    /// Sorts connections by last viewed date, most recent first, with null timestamps at the bottom
     private func sortConnectionsByLastViewed(_ connections: [Connection]) -> [Connection] {
         return connections.sorted { c1, c2 in
-            guard let lv1 = c1.lastViewed else { return false }
-            guard let lv2 = c2.lastViewed else { return true }
-            return lv1 > lv2
+            // If both have no lastViewed, maintain original order
+            if c1.lastViewed == nil && c2.lastViewed == nil {
+                return false
+            }
+            // If only c1 has no lastViewed, it goes to the bottom
+            if c1.lastViewed == nil {
+                return false
+            }
+            // If only c2 has no lastViewed, it goes to the bottom
+            if c2.lastViewed == nil {
+                return true
+            }
+            // Both have timestamps, sort by most recent first
+            return c1.lastViewed! > c2.lastViewed!
         }
     }
     
