@@ -254,7 +254,7 @@ struct ProfileView: View {
                                     .font(.subheadline)
                             }
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 12)
                             .background(Color.blue)
                             .foregroundColor(.white)
                             .cornerRadius(8)
@@ -270,7 +270,7 @@ struct ProfileView: View {
                                     .font(.subheadline)
                             }
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 12)
                             .background(Color.gray.opacity(0.2))
                             .foregroundColor(.primary)
                             .cornerRadius(8)
@@ -286,7 +286,7 @@ struct ProfileView: View {
                                     .font(.subheadline)
                             }
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, 12)
                             .background(Color.blue)
                             .foregroundColor(.white)
                             .cornerRadius(8)

@@ -107,7 +107,11 @@ struct ContactView: View {
         }
         .onAppear {
             coordinator.activeScreen = .contact
+            
+            // If we don't already have a relationship loaded, fetch it once
             loadRelationship()
+            
+            // Update "last viewed" if needed
             updateLastViewed()
             
             // Check if we should start in edit mode
@@ -178,6 +182,15 @@ struct ContactView: View {
             coordinator.networkManager.fetchConnections(forUserId: currentUserId)
             // We'll rely on the refresh signal that fetchConnections emits
         }
+        
+        // Then in reloadRelationship() below, we actually update `relationship` from the manager.
+        // This way we avoid the repeated .asyncAfter stuff.
+        reloadRelationship()
+    }
+    
+    private func reloadRelationship() {
+        guard let currentUserId = coordinator.networkManager.userId else { return }
+        guard currentUserId != user.id else { return }
         
         // Try to find the connection in the manager's memory
         let found = coordinator.networkManager.connections.first { $0.id == self.user.id }
@@ -481,10 +494,16 @@ struct ContactView: View {
                     }) {
                         HStack {
                             Image(systemName: "square.and.pencil")
+                                .imageScale(.small)
                             Text("Edit Contact")
+                                .font(.subheadline)
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
                     }
-                    .buttonStyle(PrimaryButtonStyle())
                     .padding(.top, 10)
                 }
             }
@@ -707,6 +726,7 @@ struct ContactView: View {
         coordinator.networkManager.deleteContact(contactId: user.id) { result in
             switch result {
             case .success(true):
+                coordinator.networkManager.signalRefresh(type: .connections)
                 coordinator.navigateBack()
                 coordinator.networkManager.signalRefresh(type: .connections)
             default:
