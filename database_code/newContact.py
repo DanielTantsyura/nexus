@@ -71,7 +71,7 @@ def get_user_fields_from_schema() -> List[str]:
         "first_name", "last_name", "email", "phone_number", 
         "gender", "ethnicity", "birthday", "location", 
         "high_school", "university", "uni_major", 
-        "job_title", "current_company", "field_of_interest", 
+        "job_title", "current_company", "interests", 
         "profile_image_url", "linkedin_url"
     ]
 
@@ -205,13 +205,15 @@ def process_contact_text(text: str) -> Tuple[bool, Optional[Dict[str, Any]], str
         The database has the following fields:
         {', '.join(USER_FIELDS)}
         
-        ADDITIONALLY, you need to extract a "note" field that contains ALL remaining information that doesn't fit into the structured fields above.
+        ADDITIONALLY, you need to extract:
+        1. A "note" field that contains ALL remaining information that doesn't fit into the structured fields above.
+        2. A "what_they_are_working_on" field that specifically captures what the person is currently working on.
         
         IMPORTANT GUIDELINES:
         1. The input might be a formal paragraph or a shorthand note with brief biographical information.
         2. For shorthand notes like "Daniel Tantsyura CMU interested in real estate and entrepreneurship white male":
            - Extract university names (e.g., "CMU" → "Carnegie Mellon University" or just "CMU")
-           - Extract interests even if they're not explicitly labeled (e.g., "interested in X and Y" → field_of_interest: "X and Y")
+           - Extract interests even if they're not explicitly labeled (e.g., "interested in X and Y" → interests: "X and Y")
            - Identify demographic information like gender and ethnicity
         3. When multiple educational institutions are mentioned (e.g., "Stanford undergrad MIT PhD"):
            - Combine them in the university field as a comma-separated list (e.g., "Stanford, MIT")
@@ -228,8 +230,15 @@ def process_contact_text(text: str) -> Tuple[bool, Optional[Dict[str, Any]], str
            - Never discard any information from the input text
            - The user will be frustrated if any information they provided is lost
         10. If the note field would be empty after extracting structured fields, analyze the input again to ensure nothing was missed.
+        11. SPECIAL INSTRUCTION FOR what_they_are_working_on:
+           - Look for information about what the person is currently working on or their current projects
+           - This could be phrases like "working on", "currently developing", "building", "creating", etc.
+           - Extract ONLY the specific project or work they're doing
+           - Example: If someone says "John is working on a new AI startup", extract "new AI startup"
+           - If no current work is mentioned, leave this field as null
+           - Do NOT include this information in the note field if you extract it here
         
-        Format your response as a valid JSON object with all these fields including note.
+        Format your response as a valid JSON object with all these fields including note and what_they_are_working_on.
         """
         
         # Call OpenAI API
@@ -340,7 +349,7 @@ def generate_relationship_description(user_info: Dict[str, Any], contact_text: s
             "uni_major": user_info.get('uni_major'),
             "job_title": user_info.get('job_title'),
             "current_company": user_info.get('current_company'),
-            "field_of_interest": user_info.get('field_of_interest')
+            "interests": user_info.get('interests')
         }
         
         # Format user profile as a simple string - only include fields with values

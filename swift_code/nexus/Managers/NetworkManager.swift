@@ -168,8 +168,8 @@ class NetworkManager: ObservableObject {
     func createConnection(contactId: Int, description: String, notes: String? = nil, tags: [String]? = nil, completion: @escaping (Result<Bool, Error>) -> Void) {
         connectionsManager.createConnection(contactId: contactId, description: description, notes: notes, tags: tags, completion: completion)
     }
-    func updateConnection(contactId: Int, description: String? = nil, notes: String? = nil, tags: [String]? = nil, updateTimestampOnly: Bool = false, completion: @escaping (Result<Bool, Error>) -> Void) {
-        connectionsManager.updateConnection(contactId: contactId, description: description, notes: notes, tags: tags, updateTimestampOnly: updateTimestampOnly, completion: completion)
+    func updateConnection(contactId: Int, description: String? = nil, notes: String? = nil, tags: [String]? = nil, whatTheyAreWorkingOn: String? = nil, updateTimestampOnly: Bool = false, completion: @escaping (Result<Bool, Error>) -> Void) {
+        connectionsManager.updateConnection(contactId: contactId, description: description, notes: notes, tags: tags, whatTheyAreWorkingOn: whatTheyAreWorkingOn, updateTimestampOnly: updateTimestampOnly, completion: completion)
     }
     func updateConnectionTimestamp(contactId: Int, completion: @escaping (Result<Bool, Error>) -> Void) {
         connectionsManager.updateConnectionTimestamp(contactId: contactId, completion: completion)

@@ -95,7 +95,7 @@ class TestProcessContactText(unittest.TestCase):
                 "phone_number": "415-555-1234",
                 "location": "Cupertino, CA",
                 "university": "Stanford",
-                "field_of_interest": "AI, Product Management",
+                "interests": "AI, Product Management",
                 "uni_major": "Computer Science",
                 "job_title": "Product Manager",
                 "current_company": "Apple",

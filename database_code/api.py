@@ -349,6 +349,8 @@ def update_connection():
     if 'note' in update_data:
         update_data['notes'] = update_data.pop('note')
     
+    # what_they_are_working_on doesn't need renaming as it matches the DB column name
+    
     if not update_data:
         return jsonify({"error": "No fields to update"}), 400
     
@@ -542,7 +544,8 @@ def create_contact():
                         new_user_id,
                         relationship_description,  # This will be used as relationship_description in the DB
                         note,  # Use the LLM-extracted note
-                        connection_tags  # Use all tags at once
+                        connection_tags,  # Use all tags at once
+                        user_data.get("what_they_are_working_on")  # Pass the extracted work information
                     )
                     
                     if connection_success:

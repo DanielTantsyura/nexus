@@ -89,7 +89,7 @@ struct User: Identifiable, Codable, Hashable {
         case phoneNumber = "phone_number"
         case location
         case university
-        case fieldOfInterest = "field_of_interest"
+        case fieldOfInterest = "interests"
         case highSchool = "high_school"
         case birthday
         case createdAt = "created_at"
@@ -212,6 +212,9 @@ struct Connection: Identifiable, Codable, Hashable {
     /// Notes about the connection
     let notes: String?
     
+    /// Information about what the contact is currently working on
+    let whatTheyAreWorkingOn: String?
+    
     /// Tags associated with the connection - may be stored as string or array
     private var _tagsString: String?
     
@@ -291,7 +294,7 @@ struct Connection: Identifiable, Codable, Hashable {
         case phoneNumber = "phone_number"
         case location
         case university
-        case fieldOfInterest = "field_of_interest"
+        case fieldOfInterest = "interests"
         case highSchool = "high_school"
         case relationshipDescription = "relationship_description"
         case gender
@@ -302,6 +305,7 @@ struct Connection: Identifiable, Codable, Hashable {
         case profileImageUrl = "profile_image_url"
         case linkedinUrl = "linkedin_url"
         case notes = "custom_note"
+        case whatTheyAreWorkingOn = "what_they_are_working_on"
         case _tagsString = "tags"
         case lastViewed = "last_viewed"
     }

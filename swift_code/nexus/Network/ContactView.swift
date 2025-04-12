@@ -40,6 +40,7 @@ struct ContactView: View {
     @State private var editLinkedinUrl = ""
     @State private var editBirthday = ""
     @State private var editRelationshipDescription = ""
+    @State private var editWorkingOn = ""
     
     // Tags
     @State private var editTags: [String] = []
@@ -59,6 +60,9 @@ struct ContactView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 userInfoSection
+                if let relationship = relationship, let whatWorkingOn = relationship.whatTheyAreWorkingOn, !whatWorkingOn.isEmpty {
+                    workingOnSection(workingOn: whatWorkingOn)
+                }
                 if let relationship = relationship, let notes = relationship.notes {
                     notesSection(notes: notes)
                 }
@@ -326,6 +330,32 @@ struct ContactView: View {
             UserAvatar(user: user, size: 80)
         }
         .padding(.bottom, 8)
+    }
+    
+    private func workingOnSection(workingOn: String) -> some View {
+        SectionCard(title: "What They're Working On") {
+            if isEditing {
+                VStack(alignment: .leading) {
+                    Text("Current projects or focus")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .padding(.bottom, 4)
+                    
+                    TextEditor(text: $editWorkingOn)
+                        .frame(minHeight: 80)
+                        .padding(8)
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(8)
+                }
+                .padding(.vertical, 8)
+            } else {
+                Text(workingOn)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .lineLimit(nil)
+                    .multilineTextAlignment(.leading)
+            }
+        }
     }
     
     private func notesSection(notes: String) -> some View {
@@ -673,6 +703,7 @@ struct ContactView: View {
         editLinkedinUrl = user.linkedinUrl ?? ""
         editBirthday = user.birthday ?? ""
         editRelationshipDescription = relationship?.relationshipDescription ?? ""
+        editWorkingOn = relationship?.whatTheyAreWorkingOn ?? ""
         editTags = relationship?.tags ?? []
         
         isEditing = true
@@ -692,7 +723,7 @@ struct ContactView: View {
         userData["phone_number"] = editPhone
         userData["gender"] = editGender
         userData["ethnicity"] = editEthnicity
-        userData["field_of_interest"] = editInterests
+        userData["interests"] = editInterests
         userData["high_school"] = editHighSchool
         userData["linkedin_url"] = editLinkedinUrl
         userData["birthday"] = editBirthday
@@ -717,7 +748,8 @@ struct ContactView: View {
                                 contactId: self.user.id,
                                 description: self.editRelationshipDescription,
                                 notes: self.editNotes,
-                                tags: self.editTags
+                                tags: self.editTags,
+                                whatTheyAreWorkingOn: self.editWorkingOn
                             ) { updateResult in
                                 if case .success(true) = updateResult {
                                     // Force a refresh of connections from the network manager

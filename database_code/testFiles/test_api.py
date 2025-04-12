@@ -425,7 +425,7 @@ def test_user_operations():
         "phone_number": "5551234567",
         "location": "Test Location",
         "university": "Test University",
-        "field_of_interest": "Comprehensive Testing",
+        "interests": "Comprehensive Testing",
         "high_school": "Test High School",
         "gender": "Non-binary",
         "ethnicity": "Mixed",
@@ -462,7 +462,7 @@ def test_user_operations():
     # Test updating the user
     update_data = {
         "location": "Updated Test Location",
-        "field_of_interest": "Updated Testing, Software Quality"
+        "interests": "Updated Testing, Software Quality"
     }
     response = requests.put(f"{BASE_URL}/people/{user_id}", json=update_data)
     if response.status_code != 200:
@@ -526,7 +526,7 @@ def test_connection_operations():
         "phone_number": "5551234001",
         "location": "Test Location 1",
         "university": "Test University",
-        "field_of_interest": "Connection Testing",
+        "interests": "Connection Testing",
         "high_school": "Test High School"
     }
     
@@ -537,7 +537,7 @@ def test_connection_operations():
         "phone_number": "5551234002",
         "location": "Test Location 2",
         "university": "Test University",
-        "field_of_interest": "Connection Testing",
+        "interests": "Connection Testing",
         "high_school": "Test High School"
     }
     
@@ -705,7 +705,7 @@ def test_login_operations():
         "phone_number": "5557654321",
         "location": "Login Test Location",
         "university": "Auth University",
-        "field_of_interest": "Authentication, Security",
+        "interests": "Authentication, Security",
         "high_school": "Security High",
         "gender": "Other",
         "ethnicity": "Test",
@@ -850,7 +850,7 @@ def run_basic_tests():
             "phone_number": "5551234567",
             "location": "Test Location",
             "university": "Test University",
-            "field_of_interest": "Testing",
+            "interests": "Testing",
             "high_school": "Test High School",
             "profile_image_url": "https://example.com/default-profile.jpg",
             "linkedin_url": f"https://linkedin.com/in/test-basic-{int(time.time())}"

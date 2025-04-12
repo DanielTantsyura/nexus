@@ -246,7 +246,7 @@ class DatabaseManager:
             first_name ILIKE %s OR
             last_name ILIKE %s OR
             location ILIKE %s OR
-            field_of_interest ILIKE %s OR
+            interests ILIKE %s OR
             university ILIKE %s OR
             high_school ILIKE %s
         ORDER BY first_name, last_name;
@@ -282,12 +282,12 @@ class DatabaseManager:
         query = """
         INSERT INTO people (
             first_name, last_name, email, phone_number,
-            location, university, field_of_interest, high_school,
+            location, university, interests, high_school,
             gender, ethnicity, uni_major, job_title, current_company,
             profile_image_url, linkedin_url, recent_tags
         ) VALUES (
             %(first_name)s, %(last_name)s, %(email)s, %(phone_number)s,
-            %(location)s, %(university)s, %(field_of_interest)s, %(high_school)s,
+            %(location)s, %(university)s, %(interests)s, %(high_school)s,
             %(gender)s, %(ethnicity)s, %(uni_major)s, %(job_title)s, %(current_company)s,
             %(profile_image_url)s, %(linkedin_url)s, %(recent_tags)s
         ) RETURNING id;
@@ -299,7 +299,7 @@ class DatabaseManager:
         
         # Ensure all required fields exist in the data
         for field in ['first_name', 'last_name', 'email', 'phone_number',
-                     'location', 'university', 'field_of_interest', 'high_school',
+                     'location', 'university', 'interests', 'high_school',
                      'gender', 'ethnicity', 'uni_major', 'job_title', 'current_company',
                      'profile_image_url', 'linkedin_url']:
             if field not in user_data:
@@ -351,7 +351,7 @@ class DatabaseManager:
             'phone_number': 'phone_number',
             'location': 'location',
             'university': 'university',
-            'field_of_interest': 'field_of_interest',
+            'interests': 'interests',
             'high_school': 'high_school',
             'gender': 'gender',
             'ethnicity': 'ethnicity',
@@ -410,7 +410,7 @@ class DatabaseManager:
         SELECT 
             u.id, l.username, u.first_name, u.last_name,
             u.email, u.phone_number, u.location, u.university,
-            u.field_of_interest, u.high_school, u.gender, u.ethnicity,
+            u.interests, u.high_school, u.gender, u.ethnicity,
             u.uni_major, u.job_title, u.current_company, u.profile_image_url,
             u.linkedin_url, r.relationship_description, r.notes as custom_note,
             r.tags, r.last_viewed, r.created_at
@@ -430,7 +430,7 @@ class DatabaseManager:
             return []
     
     def add_connection(self, user_id: int, contact_id: int, relationship_description: str, 
-                       notes: str = None, tags: str = None) -> bool:
+                       notes: str = None, tags: str = None, what_they_are_working_on: str = None) -> bool:
         """
         Add a new connection between two users.
         One-directional: only from user_id to contact_id
@@ -441,18 +441,19 @@ class DatabaseManager:
             relationship_description: Type of the relationship
             notes: Optional detailed note about the connection
             tags: Optional comma-separated tags for the connection
+            what_they_are_working_on: Optional description of what the contact is currently working on
             
         Returns:
             True if successful, False otherwise
         """
         query = """
-        INSERT INTO relationships (user_id, contact_id, relationship_description, notes, tags, last_viewed)
-        VALUES (%s, %s, %s, %s, %s, NOW());
+        INSERT INTO relationships (user_id, contact_id, relationship_description, notes, tags, what_they_are_working_on, last_viewed)
+        VALUES (%s, %s, %s, %s, %s, %s, NOW());
         """
         
         try:
             # Create the one-way relationship: user_id -> contact_id
-            self.cursor.execute(query, (user_id, contact_id, relationship_description, notes, tags))
+            self.cursor.execute(query, (user_id, contact_id, relationship_description, notes, tags, what_they_are_working_on))
             
             self.connection.commit()
             return True
@@ -536,7 +537,7 @@ class DatabaseManager:
         
         # Handle all updateable fields
         for key, value in data.items():
-            if key in ['notes', 'tags', 'relationship_description']:
+            if key in ['notes', 'tags', 'relationship_description', 'what_they_are_working_on']:
                 set_fields.append(f"{key} = %s")
                 params.append(value)
         
@@ -961,7 +962,7 @@ if __name__ == "__main__":
             print(f"Phone: {user['phone_number']}")
             print(f"Location: {user['location']}")
             print(f"University: {user['university']}")
-            print(f"Interests: {user['field_of_interest']}")
+            print(f"Interests: {user['interests']}")
             
             # Example 4: Get user's connections
             print("\n--- Connections ---")
@@ -979,7 +980,7 @@ if __name__ == "__main__":
             "phone_number": "5551234567",
             "location": "Boston, Massachusetts",
             "university": "MIT",
-            "field_of_interest": "Artificial Intelligence, Robotics",
+            "interests": "Artificial Intelligence, Robotics",
             "high_school": "Boston Latin School"
         }
         new_user_id = db.add_user(new_user)

@@ -208,10 +208,11 @@ struct CreateContactView: View {
                     )
                 
                 if contactText.isEmpty {
-                    Text("John Smith, Software Engineer at Apple, lives in New York and went to Columbia University...")
+                    Text("John Smith, Software Engineer at Apple, lives in New York and went to Columbia, met him at a dinner hosted by General Catalyst, talked to him about our mutual love of the Knicks.")
                         .foregroundColor(.gray)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 16)
+                        .lineSpacing(6)
                         .allowsHitTesting(false)
                 }
             }

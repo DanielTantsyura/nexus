@@ -247,7 +247,7 @@ struct CreateAccountView: View {
             "uni_major": "",
             "job_title": "",
             "current_company": "",
-            "field_of_interest": "",
+            "interests": "",
             "profile_image_url": "",
             "linkedin_url": "",
             "recent_tags": ""

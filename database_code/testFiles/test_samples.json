@@ -22,7 +22,7 @@
         "uni_major": "Computer Science",
         "job_title": "Senior Software Engineer",
         "current_company": "Netflix",
-        "field_of_interest": "distributed systems and cloud architecture"
+        "interests": "distributed systems and cloud architecture"
       }
     },
     {
@@ -71,7 +71,7 @@
         "university": "Stanford University, Wharton",
         "uni_major": "Computer Science, MBA",
         "location": "Seattle",
-        "field_of_interest": "AI product development"
+        "interests": "AI product development"
       }
     },
     {
@@ -83,7 +83,7 @@
         "email": "sophie.martin@univ-paris.fr",
         "phone_number": "+33 1 23 45 67 89",
         "university": "University of Paris",
-        "field_of_interest": "molecular biology",
+        "interests": "molecular biology",
         "birthday": "1988-04-15",
         "job_title": "researcher"
       }

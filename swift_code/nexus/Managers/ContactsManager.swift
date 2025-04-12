@@ -532,7 +532,7 @@ class ContactsManager {
         if let phoneNumber = user.phoneNumber { userDict["phone_number"] = phoneNumber }
         if let location = user.location { userDict["location"] = location }
         if let university = user.university { userDict["university"] = university }
-        if let fieldOfInterest = user.fieldOfInterest { userDict["field_of_interest"] = fieldOfInterest }
+        if let fieldOfInterest = user.fieldOfInterest { userDict["interests"] = fieldOfInterest }
         if let highSchool = user.highSchool { userDict["high_school"] = highSchool }
         if let birthday = user.birthday { userDict["birthday"] = birthday }
         if let currentCompany = user.currentCompany { userDict["current_company"] = currentCompany }

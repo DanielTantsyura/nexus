@@ -102,7 +102,7 @@ class ConnectionsManager {
     
     // MARK: - Update Connection
     func updateConnection(contactId: Int, description: String? = nil, notes: String? = nil,
-                          tags: [String]? = nil, updateTimestampOnly: Bool = false,
+                          tags: [String]? = nil, whatTheyAreWorkingOn: String? = nil, updateTimestampOnly: Bool = false,
                           completion: @escaping (Result<Bool, Error>) -> Void) {
         guard let userId = networkManager.userId else {
             completion(.failure(createError(message: "Not logged in", code: 401)))
@@ -124,8 +124,9 @@ class ConnectionsManager {
         if updateTimestampOnly {
             requestDict["update_timestamp_only"] = true
         } else {
-            if let description = description { requestDict["relationship_type"] = description }
+            if let description = description { requestDict["relationship_description"] = description }
             if let notes = notes { requestDict["notes"] = notes }
+            if let whatTheyAreWorkingOn = whatTheyAreWorkingOn { requestDict["what_they_are_working_on"] = whatTheyAreWorkingOn }
             if let tags = tags { 
                 // Always include tags parameter to ensure it gets updated when empty
                 requestDict["tags"] = tags

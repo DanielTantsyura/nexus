@@ -39,7 +39,7 @@ CREATE TABLE people (
     -- Professional information
     job_title VARCHAR(100),
     current_company VARCHAR(100),
-    field_of_interest VARCHAR(100),
+    interests VARCHAR(100),
     
     -- External links
     profile_image_url VARCHAR(255),
@@ -80,6 +80,7 @@ CREATE TABLE relationships (
     relationship_description VARCHAR(255),
     notes TEXT,
     tags TEXT,
+    what_they_are_working_on TEXT,
     
     -- Metadata
     last_viewed TIMESTAMP NULL,

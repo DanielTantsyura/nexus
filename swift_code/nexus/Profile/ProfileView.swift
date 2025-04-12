@@ -643,7 +643,7 @@ struct ProfileView: View {
         userData["email"] = editEmail
         userData["phone_number"] = editPhone
         userData["uni_major"] = editMajor
-        userData["field_of_interest"] = editInterests
+        userData["interests"] = editInterests
         userData["current_company"] = editCompany
         userData["linkedin_url"] = editLinkedinUrl
         userData["birthday"] = editBirthday
