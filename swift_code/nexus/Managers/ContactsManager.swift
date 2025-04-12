@@ -454,7 +454,7 @@ class ContactsManager {
             }
         }.resume()
     }
-
+    
     // MARK: - Update a User
     func updateUser(userId: Int, userData: [String: Any], completion: @escaping (Result<Bool, Error>) -> Void) {
         guard let url = URL(string: "\(networkManager.baseURL)/people/\(userId)") else {

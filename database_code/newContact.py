@@ -217,7 +217,7 @@ def process_contact_text(text: str) -> Tuple[bool, Optional[Dict[str, Any]], str
            - Identify demographic information like gender and ethnicity
         3. When multiple educational institutions are mentioned (e.g., "Stanford undergrad MIT PhD"):
            - Combine them in the university field as a comma-separated list (e.g., "Stanford, MIT")
-        4. Parse dates in various formats and standardize to YYYY-MM-DD for the birthday field
+        4. Parse dates in various formats and standardize to MM/DD/YYYY for the birthday field
         5. For each field, extract the relevant information from the input text if present
         6. If the information for a field is not provided, return null for that field
         7. Only extract first_name and last_name if they're clearly identifiable

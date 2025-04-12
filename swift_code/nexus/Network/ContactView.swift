@@ -795,8 +795,6 @@ struct ContactView: View {
         userData["linkedin_url"] = editLinkedinUrl
         userData["birthday"] = editBirthday
         
-        print("Saving birthday value: \(editBirthday)")
-        
         let currentRelationship = relationship
         
         coordinator.networkManager.updateUser(userId: user.id, userData: userData) { result in
@@ -810,9 +808,6 @@ struct ContactView: View {
                             // Force view to refresh with updated user data
                             self.refreshTrigger.toggle()
                             
-                            // Show save alert with birthday info for debugging
-                            self.saveAlertMessage = "Contact saved successfully! Birthday: \(updatedUser.birthday ?? "nil")"
-                            self.showSaveAlert = true
                         }
                         // Turn off editing
                         self.isEditing = false

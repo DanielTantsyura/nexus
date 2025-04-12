@@ -878,13 +878,6 @@ class DatabaseManager:
             print("An error occurred:", e)
             self.connection.rollback()
             return False
-            
-    def __enter__(self):
-        """Context manager entry point - connect to the database."""
-        self.connect()
-        # Ensure birthday field exists when connecting
-        self.ensure_birthday_field_exists()
-        return self
         
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit point."""
@@ -915,35 +908,6 @@ class DatabaseManager:
         except Exception as e:
             print(f"Error checking if user has login: {e}")
             return False
-
-    def ensure_birthday_field_exists(self):
-        """
-        Ensures that the 'birthday' column exists in the people table.
-        If it doesn't exist, adds it.
-        """
-        try:
-            with self.connection.cursor() as cursor:
-                # Check if the column exists
-                cursor.execute("""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = 'people' AND column_name = 'birthday';
-                """)
-                
-                if cursor.fetchone() is None:
-                    # Column doesn't exist, add it
-                    print("Adding 'birthday' column to people table")
-                    cursor.execute("""
-                    ALTER TABLE people ADD COLUMN birthday VARCHAR(255);
-                    """)
-                    self.connection.commit()
-                    print("'birthday' column added successfully")
-                else:
-                    print("'birthday' column already exists")
-                    
-        except Exception as e:
-            print(f"Error ensuring birthday field exists: {e}")
-            raise
 
 
 # Example usage
