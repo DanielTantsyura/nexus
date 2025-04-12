@@ -404,6 +404,10 @@ struct CreateContactView: View {
             selectedTags.append(tag)
             print("Added tag: \(tag)")
         }
+        
+        // Clear search bar when selecting a tag
+        newTagText = ""
+        updateFilteredTags()
     }
    
     /// Clears the form fields
