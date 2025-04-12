@@ -238,6 +238,11 @@ struct ProfileView: View {
                 
                 Divider()
                 
+                // Birthday section
+                birthdaySection(user: user)
+                
+                Divider()
+                
                 // Contact Information
                 contactInformationSection(user: user)
                 
@@ -476,15 +481,10 @@ struct ProfileView: View {
         }
     }
     
-    /// Contact information section
-    private func contactInformationSection(user: User) -> some View {
+    /// Birthday section
+    private func birthdaySection(user: User) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Contact Information")
-                .font(.headline)
-                .padding(.bottom, 4)
-            
             if isEditing {
-                // Birthday field - placed at the top
                 HStack {
                     Image(systemName: "calendar")
                         .foregroundColor(.blue)
@@ -498,6 +498,21 @@ struct ProfileView: View {
                         TextField("MM/DD/YYYY", text: $editBirthday)
                     }
                 }
+            } else if let birthday = user.birthday {
+                InfoRow(icon: "calendar", title: "Birthday", value: birthday)
+            }
+        }
+    }
+    
+    /// Contact information section
+    private func contactInformationSection(user: User) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Contact Information")
+                .font(.headline)
+                .padding(.bottom, 4)
+            
+            if isEditing {
+                // Birthday field removed from here
                 
                 HStack {
                     Image(systemName: "envelope.fill")
@@ -542,10 +557,7 @@ struct ProfileView: View {
                     }
                 }
             } else {
-                // Birthday field - placed at the top
-                if let birthday = user.birthday {
-                    InfoRow(icon: "calendar", title: "Birthday", value: birthday)
-                }
+                // Birthday field removed from here
                 
                 if let email = user.email {
                     InfoRow(icon: "envelope.fill", title: "Email", value: email)

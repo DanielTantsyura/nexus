@@ -22,6 +22,10 @@ struct ContactView: View {
     // For subscribing to refresh signals
     @State private var refreshCancellable: AnyCancellable?
     
+    // Debug alerts
+    @State private var showSaveAlert = false
+    @State private var saveAlertMessage = ""
+    
     // Editing state variables...
     @State private var editFirstName = ""
     @State private var editLastName = ""
@@ -119,6 +123,9 @@ struct ContactView: View {
             // Update "last viewed" if needed
             updateLastViewed()
             
+            // Fetch recent tags
+            coordinator.networkManager.fetchRecentTags()
+            
             // Check if we should start in edit mode
             if UserDefaults.standard.bool(forKey: "StartContactInEditMode") {
                 let editContactId = UserDefaults.standard.integer(forKey: "EditContactId")
@@ -146,7 +153,12 @@ struct ContactView: View {
                     if refreshType == .connections {
                         // Relationship data might have changed or re-fetched
                         self.loadRelationship() 
-                        refreshTrigger.toggle()
+                        self.refreshTrigger.toggle()
+                    }
+                    
+                    // Refresh UI when recent tags update
+                    if refreshType == .none || refreshType == .currentUser {
+                        self.refreshTrigger.toggle()
                     }
                 }
                 
@@ -173,6 +185,13 @@ struct ContactView: View {
             // Remove the notification observer
             NotificationCenter.default.removeObserver(self, name: NSNotification.Name("CancelContactEditing"), object: nil)
         }
+        .alert(isPresented: $showSaveAlert) {
+            Alert(
+                title: Text("Save Status"),
+                message: Text(saveAlertMessage),
+                dismissButton: .default(Text("OK"))
+            )
+        }
     }
     
     // MARK: - Relationship Loading
@@ -191,6 +210,9 @@ struct ContactView: View {
         // Then in reloadRelationship() below, we actually update `relationship` from the manager.
         // This way we avoid the repeated .asyncAfter stuff.
         reloadRelationship()
+        
+        // Also ensure we have recent tags
+        ensureRecentTagsLoaded()
     }
     
     private func reloadRelationship() {
@@ -199,8 +221,43 @@ struct ContactView: View {
         
         // Try to find the connection in the manager's memory
         let found = coordinator.networkManager.connections.first { $0.id == self.user.id }
-        self.relationship = found
-        self.isLoadingRelationship = false
+        
+        // Only toggle refresh if we're getting new data
+        if self.relationship?.whatTheyAreWorkingOn != found?.whatTheyAreWorkingOn ||
+           self.relationship?.notes != found?.notes ||
+           self.relationship?.tags != found?.tags ||
+           self.relationship?.relationshipDescription != found?.relationshipDescription {
+            
+            DispatchQueue.main.async {
+                self.relationship = found
+                self.isLoadingRelationship = false
+                // Force UI refresh when relationship data changes
+                self.refreshTrigger.toggle()
+            }
+        } else {
+            // Just update the relationship without toggling refresh
+            self.relationship = found
+            self.isLoadingRelationship = false
+        }
+    }
+    
+    private func ensureRecentTagsLoaded() {
+        // If recent tags are empty, try to fetch them
+        if coordinator.networkManager.recentTags.isEmpty {
+            print("Recent tags not loaded, fetching them now...")
+            coordinator.networkManager.fetchRecentTags()
+            
+            // Check again after a short delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                print("Recent tags after fetch: \(self.coordinator.networkManager.recentTags.count)")
+                if !self.coordinator.networkManager.recentTags.isEmpty {
+                    // Force UI refresh if tags were loaded
+                    self.refreshTrigger.toggle()
+                }
+            }
+        } else {
+            print("Recent tags already loaded: \(coordinator.networkManager.recentTags.count)")
+        }
     }
     
     private func updateLastViewed() {
@@ -473,6 +530,12 @@ struct ContactView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     
                 } else {
+                    // Debug birthday in an appropriate way
+                    Color.clear.frame(width: 0, height: 0)
+                        .onAppear {
+                            debugBirthdayInfo(user: user)
+                        }
+                    
                     if let birthday = user.birthday {
                         InfoRow(icon: "calendar", title: "Birthday", value: birthday)
                             .padding(.vertical, 4)
@@ -627,6 +690,7 @@ struct ContactView: View {
                             }
                         }
                     }
+                    .id("recent-tags-\(coordinator.networkManager.recentTags.count)")
                 }
             }
             
@@ -686,6 +750,9 @@ struct ContactView: View {
     // MARK: - Edit Mode
     
     private func startEditing() {
+        // Ensure recent tags are loaded before editing
+        ensureRecentTagsLoaded()
+        
         editFirstName = user.firstName ?? ""
         editLastName = user.lastName ?? ""
         editJobTitle = user.jobTitle ?? ""
@@ -728,6 +795,8 @@ struct ContactView: View {
         userData["linkedin_url"] = editLinkedinUrl
         userData["birthday"] = editBirthday
         
+        print("Saving birthday value: \(editBirthday)")
+        
         let currentRelationship = relationship
         
         coordinator.networkManager.updateUser(userId: user.id, userData: userData) { result in
@@ -738,12 +807,18 @@ struct ContactView: View {
                     DispatchQueue.main.async {
                         if case .success(let updatedUser) = fetchResult {
                             self.user = updatedUser
+                            // Force view to refresh with updated user data
+                            self.refreshTrigger.toggle()
+                            
+                            // Show save alert with birthday info for debugging
+                            self.saveAlertMessage = "Contact saved successfully! Birthday: \(updatedUser.birthday ?? "nil")"
+                            self.showSaveAlert = true
                         }
                         // Turn off editing
                         self.isEditing = false
                         
                         // Update relationship (notes + tags) if we have it
-                        if let relationship = currentRelationship {
+                        if currentRelationship != nil {
                             coordinator.networkManager.updateConnection(
                                 contactId: self.user.id,
                                 description: self.editRelationshipDescription,
@@ -754,13 +829,23 @@ struct ContactView: View {
                                 if case .success(true) = updateResult {
                                     // Force a refresh of connections from the network manager
                                     coordinator.networkManager.fetchConnections(forUserId: coordinator.networkManager.userId ?? 0)
+                                    
+                                    DispatchQueue.main.async {
+                                        // Force another UI refresh after updating relationship
+                                        self.refreshTrigger.toggle()
+                                        
+                                        // Reload relationship data to show updated fields
+                                        self.loadRelationship()
+                                    }
                                 }
                             }
                         }
                     }
                 }
             case .success(false), .failure(_):
-                self.isEditing = false
+                DispatchQueue.main.async {
+                    self.isEditing = false
+                }
             }
         }
     }
@@ -788,5 +873,21 @@ struct ContactView: View {
         let colors: [Color] = [.blue, .green, .orange, .purple, .pink, .red]
         let hash = abs(tag.hashValue)
         return colors[hash % colors.count]
+    }
+    
+    private func debugBirthdayInfo(user: User) {
+        // Move debug code here where it won't cause SwiftUI view builder issues
+        print("DEBUG: User birthday value: \(String(describing: user.birthday))")
+        print("DEBUG: User fields: \(Mirror(reflecting: user).children.compactMap { $0.label })")
+        
+        // Add more detailed debugging
+        let allProperties = Mirror(reflecting: user).children
+            .compactMap { label, value in 
+                guard let label = label else { return nil }
+                return "\(label): \(value)"
+            }
+            .joined(separator: "\n")
+        
+        print("All user properties:\n\(allProperties)")
     }
 }

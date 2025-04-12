@@ -80,12 +80,27 @@ def get_user_by_id(user_id):
         with db_manager:
             user = db_manager.get_user_by_id(user_id)
             if user:
+                # Log detailed information about the user data
+                print(f"User data retrieved for ID {user_id}")
+                print(f"User data contains birthday: {'birthday' in user}")
+                if 'birthday' in user:
+                    print(f"Birthday value: {user['birthday']}")
+                else:
+                    print("WARNING: 'birthday' field missing from user data")
+                    print(f"Available fields: {list(user.keys())}")
+                    
+                    # Add the birthday field if it's missing from the result
+                    # This is a temporary fix that ensures the API returns a consistent schema
+                    user['birthday'] = None
+                    print("Added 'birthday' field with None value")
+                
                 return jsonify(user)
             else:
                 return jsonify({"error": f"User with ID {user_id} not found"}), 404
     except Exception as e:
         error_message = f"Error retrieving user: {str(e)}"
         print(error_message)
+        traceback.print_exc()  # Print detailed error information
         return jsonify({"error": error_message}), 500
 
 @app.route('/people/<int:user_id>/recent-tags', methods=['GET'])
@@ -193,10 +208,26 @@ def get_user_connections(user_id):
     try:
         with db_manager:
             connections = db_manager.get_user_connections(user_id)
-        return jsonify(connections)
+            
+            # Ensure all connections have the birthday field (even if null)
+            for conn in connections:
+                if 'birthday' not in conn:
+                    conn['birthday'] = None
+                    print(f"WARNING: Added missing 'birthday' field to connection {conn.get('id')}")
+            
+            # Log the first connection data for debugging
+            if connections and len(connections) > 0:
+                first_conn = connections[0]
+                print(f"Sample connection data (first connection):")
+                print(f"  ID: {first_conn.get('id')}")
+                print(f"  Name: {first_conn.get('first_name')} {first_conn.get('last_name')}")
+                print(f"  Birthday: {first_conn.get('birthday')}")
+            
+            return jsonify(connections)
     except Exception as e:
         error_message = f"Error retrieving user connections: {str(e)}"
         print(error_message)
+        traceback.print_exc()  # Print detailed error information
         return jsonify({"error": error_message}), 500
 
 @app.route('/connections', methods=['POST'])
@@ -730,6 +761,14 @@ if __name__ == '__main__':
     parser.add_argument('--port', type=int, default=API_PORT, 
                         help=f'Port to run the server on (default: {API_PORT})')
     args = parser.parse_args()
+    
+    # Ensure database schema is up to date
+    try:
+        with db_manager:
+            print("Checking and updating database schema...")
+            db_manager.ensure_birthday_field_exists()
+    except Exception as e:
+        print(f"Error checking database schema: {e}")
     
     port = int(os.environ.get("PORT", args.port))
     print(f"Starting API server on port {port}")

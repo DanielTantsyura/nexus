@@ -251,8 +251,17 @@ class ConnectionsManager {
     
     /// Parses connection data from JSON response, handling tag extraction
     private func parseConnectionsData(_ data: Data) -> [Connection] {
+        // Print the raw JSON for debugging
+        if let jsonString = String(data: data, encoding: .utf8) {
+            print("Raw JSON response: \(jsonString.prefix(500))...") // Print first 500 chars to avoid too much output
+        }
+        
         // Try standard decoding first
         if let connections = try? JSONDecoder().decode([Connection].self, from: data) {
+            // Debug the first connection
+            if let firstConn = connections.first {
+                print("First connection data: id=\(firstConn.id), workingOn=\(firstConn.whatTheyAreWorkingOn ?? "nil"), birthday=\(firstConn.birthday ?? "nil")")
+            }
             return connections
         }
         

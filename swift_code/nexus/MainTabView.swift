@@ -117,13 +117,17 @@ class KeyboardHandler: ObservableObject {
         // Listen to keyboard notifications
         NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)
             .sink { [weak self] _ in
-                self?.isVisible = true
+                DispatchQueue.main.async {
+                    self?.isVisible = true
+                }
             }
             .store(in: &cancellables)
         
         NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)
             .sink { [weak self] _ in
-                self?.isVisible = false
+                DispatchQueue.main.async {
+                    self?.isVisible = false
+                }
             }
             .store(in: &cancellables)
     }

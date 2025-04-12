@@ -327,72 +327,55 @@ class DatabaseManager:
             traceback.print_exc()  # Print the full traceback for debugging
             raise
     
-    def update_user(self, user_id: int, user_data: Dict[str, Any]) -> bool:
+    def update_user(self, user_id: int, user_data: dict) -> bool:
         """
-        Update an existing user in the database.
+        Update a user with new data.
         
         Args:
             user_id: The ID of the user to update
-            user_data: Dictionary containing updated user information
+            user_data: A dictionary of user data to update
             
         Returns:
-            True if update was successful, False otherwise
+            True if the update was successful, False otherwise
         """
-        # Build the SET clause dynamically based on provided fields
-        set_clauses = []
-        params = {'id': user_id}
-        
-        # Map of user_data keys to database columns
-        field_mapping = {
-            'username': 'username',
-            'first_name': 'first_name',
-            'last_name': 'last_name',
-            'email': 'email',
-            'phone_number': 'phone_number',
-            'location': 'location',
-            'university': 'university',
-            'interests': 'interests',
-            'high_school': 'high_school',
-            'gender': 'gender',
-            'ethnicity': 'ethnicity',
-            'uni_major': 'uni_major',
-            'job_title': 'job_title',
-            'current_company': 'current_company',
-            'profile_image_url': 'profile_image_url',
-            'linkedin_url': 'linkedin_url',
-            'recent_tags': 'recent_tags'
-        }
-        
-        for key, db_column in field_mapping.items():
-            if key in user_data:
-                set_clauses.append(f"{db_column} = %({key})s")
-                params[key] = user_data[key]
-        
-        if not set_clauses:
-            print("No fields to update")
-            return False
-        
-        query = f"""
-        UPDATE people
-        SET {', '.join(set_clauses)}
-        WHERE id = %(id)s
-        """
-        
         try:
-            self.cursor.execute(query, params)
-            rows_affected = self.cursor.rowcount
-            self.connection.commit()
-            
-            if rows_affected > 0:
-                print(f"User {user_id} updated successfully")
-                return True
-            else:
-                print(f"No user found with ID {user_id}")
+            # Check if user exists
+            if not self.get_user_by_id(user_id):
                 return False
+            
+            valid_fields = [
+                'first_name', 'last_name', 'email', 'phone_number', 'location',
+                'university', 'uni_major', 'interests', 'high_school', 'gender',
+                'ethnicity', 'job_title', 'current_company', 'profile_image_url',
+                'linkedin_url', 'birthday'
+            ]
+            
+            # Filter to only valid fields
+            update_data = {k: v for k, v in user_data.items() if k in valid_fields}
+            
+            if not update_data:
+                return True  # Nothing to update, but not an error
+            
+            # Build SET clause
+            set_clause = ', '.join([f"{field} = %s" for field in update_data.keys()])
+            values = list(update_data.values())
+            values.append(user_id)  # Add user_id for WHERE clause
+            
+            query = f"""
+            UPDATE people
+            SET {set_clause}
+            WHERE id = %s
+            """
+            
+            with self.connection.cursor() as cursor:
+                cursor.execute(query, values)
+                self.connection.commit()
+                
+                return cursor.rowcount > 0
         except Exception as e:
-            self.connection.rollback()
             print(f"Error updating user: {e}")
-            return False
+            self.connection.rollback()
+            raise
     
     # ========== RELATIONSHIP MANAGEMENT ==========
     
@@ -412,8 +395,8 @@ class DatabaseManager:
             u.email, u.phone_number, u.location, u.university,
             u.interests, u.high_school, u.gender, u.ethnicity,
             u.uni_major, u.job_title, u.current_company, u.profile_image_url,
-            u.linkedin_url, r.relationship_description, r.notes as custom_note,
-            r.tags, r.last_viewed, r.created_at
+            u.birthday, u.linkedin_url, r.relationship_description, r.notes as custom_note,
+            r.tags, r.what_they_are_working_on, r.last_viewed, r.created_at
         FROM people u
         JOIN relationships r ON u.id = r.contact_id
         LEFT JOIN logins l ON u.id = l.people_id
@@ -897,8 +880,10 @@ class DatabaseManager:
             return False
             
     def __enter__(self):
-        """Context manager entry point."""
+        """Context manager entry point - connect to the database."""
         self.connect()
+        # Ensure birthday field exists when connecting
+        self.ensure_birthday_field_exists()
         return self
         
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -930,6 +915,35 @@ class DatabaseManager:
         except Exception as e:
             print(f"Error checking if user has login: {e}")
             return False
+
+    def ensure_birthday_field_exists(self):
+        """
+        Ensures that the 'birthday' column exists in the people table.
+        If it doesn't exist, adds it.
+        """
+        try:
+            with self.connection.cursor() as cursor:
+                # Check if the column exists
+                cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'people' AND column_name = 'birthday';
+                """)
+                
+                if cursor.fetchone() is None:
+                    # Column doesn't exist, add it
+                    print("Adding 'birthday' column to people table")
+                    cursor.execute("""
+                    ALTER TABLE people ADD COLUMN birthday VARCHAR(255);
+                    """)
+                    self.connection.commit()
+                    print("'birthday' column added successfully")
+                else:
+                    print("'birthday' column already exists")
+                    
+        except Exception as e:
+            print(f"Error ensuring birthday field exists: {e}")
+            raise
 
 
 # Example usage

@@ -57,14 +57,15 @@ class NetworkManager: ObservableObject {
     
     /// Initialize the network manager and restore session if available
     init() {
-        let useLocalApi = ProcessInfo.processInfo.environment["USE_LOCAL_API"]?.lowercased() == "true"
+        // let useLocalApi = ProcessInfo.processInfo.environment["USE_LOCAL_API"]?.lowercased() == "true"
+        let useLocalApi = true
         print("API URL: \(baseURL) (using \(useLocalApi ? "local API" : "hosted Railway API"))")
         
         testApiConnection()
         
         // Restore session after initialization
         DispatchQueue.main.async { [weak self] in
-            self?.authManager.restoreSession()
+            _ = self?.authManager.restoreSession()
         }
     }
     

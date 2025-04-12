@@ -185,6 +185,9 @@ struct Connection: Identifiable, Codable, Hashable {
     /// High school of the connected user
     let highSchool: String?
     
+    /// User's birthday
+    let birthday: String?
+    
     /// Description of the relationship with this connection
     let relationshipDescription: String?
     
@@ -247,7 +250,7 @@ struct Connection: Identifiable, Codable, Hashable {
             university: university,
             fieldOfInterest: fieldOfInterest,
             highSchool: highSchool,
-            birthday: nil,
+            birthday: birthday,
             createdAt: nil,
             currentCompany: currentCompany,
             gender: gender,
@@ -296,6 +299,7 @@ struct Connection: Identifiable, Codable, Hashable {
         case university
         case fieldOfInterest = "interests"
         case highSchool = "high_school"
+        case birthday = "birthday"
         case relationshipDescription = "relationship_description"
         case gender
         case ethnicity

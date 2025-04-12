@@ -28,7 +28,7 @@ CREATE TABLE people (
     -- Personal information
     gender VARCHAR(50),
     ethnicity VARCHAR(100),
-    birthday DATE,
+    birthday VARCHAR(100),
     location VARCHAR(100),
     
     -- Educational information

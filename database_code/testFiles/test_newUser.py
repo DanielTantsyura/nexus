@@ -20,7 +20,7 @@ from typing import Dict, List
 
 # Add parent directory to path to access required modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from newUser import process_contact_text, create_new_contact, get_user_fields_from_schema, USER_FIELDS
+from newContact import process_contact_text, create_new_contact, get_user_fields_from_schema, USER_FIELDS
 from config import DEFAULT_TAGS
 
 class TestUserFieldsExtraction(unittest.TestCase):
@@ -99,7 +99,7 @@ class TestProcessContactText(unittest.TestCase):
                 "uni_major": "Computer Science",
                 "job_title": "Product Manager",
                 "current_company": "Apple",
-                "birthday": "1990-05-15"
+                "birthday": "04/15/2005"
             })))
         ]
         mock_openai.return_value = mock_response
@@ -121,7 +121,7 @@ class TestProcessContactText(unittest.TestCase):
         self.assertEqual("jane.smith@apple.com", data["email"])
         self.assertEqual("Stanford", data["university"])
         self.assertEqual("Computer Science", data["uni_major"])
-        self.assertEqual("1990-05-15", data["birthday"])
+        self.assertEqual("04/15/2005", data["birthday"])
         self.assertEqual(DEFAULT_TAGS, data["recent_tags"])
     
     @patch('openai.ChatCompletion.create')
@@ -181,8 +181,8 @@ class TestProcessContactText(unittest.TestCase):
 class TestCreateNewContact(unittest.TestCase):
     """Test the creation of new contacts from processed text."""
     
-    @patch('newUser.process_contact_text')
-    @patch('newUser.requests.post')
+    @patch('newContact.process_contact_text')
+    @patch('newContact.requests.post')
     def test_successful_contact_creation(self, mock_post, mock_process):
         """Test successful creation of a new contact."""
         # Mock the process_contact_text function
@@ -225,7 +225,7 @@ class TestCreateNewContact(unittest.TestCase):
         # Verify API calls
         self.assertEqual(2, mock_post.call_count)
     
-    @patch('newUser.process_contact_text')
+    @patch('newContact.process_contact_text')
     def test_processing_failure(self, mock_process):
         """Test handling of text processing failures."""
         # Mock the process_contact_text function to return failure
@@ -242,8 +242,8 @@ class TestCreateNewContact(unittest.TestCase):
         self.assertIsNone(user_id)
         self.assertEqual("Could not process text", message)
     
-    @patch('newUser.process_contact_text')
-    @patch('newUser.requests.post')
+    @patch('newContact.process_contact_text')
+    @patch('newContact.requests.post')
     def test_user_creation_api_failure(self, mock_post, mock_process):
         """Test handling of user creation API failures."""
         # Mock the process_contact_text function
@@ -269,8 +269,8 @@ class TestCreateNewContact(unittest.TestCase):
         self.assertIsNone(user_id)
         self.assertIn("Validation failed", message)
     
-    @patch('newUser.process_contact_text')
-    @patch('newUser.requests.post')
+    @patch('newContact.process_contact_text')
+    @patch('newContact.requests.post')
     def test_relationship_creation_api_failure(self, mock_post, mock_process):
         """Test handling of relationship creation API failures."""
         # Mock the process_contact_text function
